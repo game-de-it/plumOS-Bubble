@@ -139,6 +139,13 @@ E2FSPROGS_FAKE_TIME="$source_epoch" mkfs.ext4 -q -F -L PLUMOS_SYS \
     -U 42554242-4c45-5359-5300-000000000002 \
     -E lazy_itable_init=0,lazy_journal_init=0,hash_seed=42554242-4c45-5359-5300-000000000002 \
     -d "$work/storage" "$sys_ext4"
+# mke2fs -d preserves the host ctime for imported inodes.  ctime cannot be
+# backdated with touch(1), so normalize the populated paths explicitly.
+# Root and lost+found are already governed by E2FSPROGS_FAKE_TIME.
+for ext4_path in /plumos /plumos/logs /plumos/seed.manifest /update-state; do
+    debugfs -w -R "set_inode_field $ext4_path ctime @$source_epoch" \
+        "$sys_ext4" >/dev/null 2>&1
+done
 MTOOLS_SKIP_CHECK=1 mcopy -m -o -s -i "$boot_fat" "$work/boot/"* ::/
 
 dd if="$boot_fat" of="$image_path" bs=512 seek="$boot_start" conv=notrunc status=none
