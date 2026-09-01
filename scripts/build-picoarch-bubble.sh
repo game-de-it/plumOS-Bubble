@@ -2,6 +2,18 @@
 set -euo pipefail
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+TOOLS_IMAGE="${PLUMOS_BUBBLE_PICOARCH_TOOLS_IMAGE:-plumos-v90s-toolchain:dev}"
+if [[ ${1:-} != --inside ]]; then
+    docker image inspect "$TOOLS_IMAGE" >/dev/null 2>&1 || {
+        printf 'error: PicoArch toolchain image is missing: %s\n' "$TOOLS_IMAGE" >&2
+        exit 1
+    }
+    exec docker run --rm --platform linux/arm64 \
+        -e SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-}" \
+        -v "$ROOT_DIR:/work" -w /work "$TOOLS_IMAGE" \
+        ./scripts/build-picoarch-bubble.sh --inside
+fi
+
 V90S_REPO="https://github.com/game-de-it/plumOS-V90S_V2.git"
 V90S_REF="bc49dafe782173f35ab557035fa96ba81564038d"
 WORK_ROOT="$ROOT_DIR/${PLUMOS_BUBBLE_PICOARCH_WORK:-output/build/picoarch-bubble}"
@@ -16,6 +28,10 @@ BUBBLE_TRIGGER_AXES_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bu
 BUBBLE_EVDEV_HOTPLUG_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bubble-evdev-hotplug.patch"
 BUBBLE_FBDEV_STAGED_COPY_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bubble-fbdev-staged-copy.patch"
 BUBBLE_FBDEV_RENDERER_HEADER="$ROOT_DIR/src/frontend/plumos_fbdev_renderer.h"
+SDL_VERSION="2.32.0"
+SDL_SHA256="f5c2b52498785858f3de1e2996eba3c1b805d08fe168a47ea527c7fc339072d0"
+SDL_ARCHIVE="$ROOT_DIR/build/downloads/SDL2-$SDL_VERSION.tar.gz"
+SDL_BUILD_ROOT="$WORK_ROOT/sdl2-minimal"
 export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}"
 
 [ -f "$BUBBLE_AUDIO_STATUS_PATCH" ] || {
@@ -138,6 +154,51 @@ path.write_text(text.replace(audio_rate_marker, audio_rate_addition, 1))
 PY
 bash "$BUILD_COPY"
 
+mkdir -p "$(dirname "$SDL_ARCHIVE")"
+if [ ! -r "$SDL_ARCHIVE" ] ||
+   ! printf '%s  %s\n' "$SDL_SHA256" "$SDL_ARCHIVE" | sha256sum -c - >/dev/null 2>&1; then
+    curl -LfsS \
+        "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VERSION/SDL2-$SDL_VERSION.tar.gz" \
+        -o "$SDL_ARCHIVE"
+fi
+printf '%s  %s\n' "$SDL_SHA256" "$SDL_ARCHIVE" | sha256sum -c -
+rm -rf "$SDL_BUILD_ROOT"
+mkdir -p "$SDL_BUILD_ROOT/source" "$SDL_BUILD_ROOT/build" "$SDL_BUILD_ROOT/stage"
+tar -C "$SDL_BUILD_ROOT/source" --strip-components=1 -xf "$SDL_ARCHIVE"
+(
+    cd "$SDL_BUILD_ROOT/build"
+    "$SDL_BUILD_ROOT/source/configure" \
+        --prefix=/usr \
+        --disable-video-x11 \
+        --disable-video-wayland \
+        --disable-video-opengl \
+        --disable-video-opengles \
+        --disable-video-vulkan \
+        --disable-video-kmsdrm \
+        --enable-alsa \
+        --disable-pulseaudio \
+        --disable-jack \
+        --disable-sndio \
+        --disable-static \
+        --enable-shared
+    make -j"${JOBS:-$(nproc)}"
+    make DESTDIR="$SDL_BUILD_ROOT/stage" install
+)
+SDL_LIBRARY="$(find "$SDL_BUILD_ROOT/stage/usr/lib" -type f \
+    -name 'libSDL2-2.0.so.*' -print | sort | tail -n 1)"
+[ -n "$SDL_LIBRARY" ] || {
+    printf 'error: minimal SDL2 build did not produce a shared library\n' >&2
+    exit 1
+}
+SDL_NEEDED="$(readelf -d "$SDL_LIBRARY" | awk -F'[][]' '/NEEDED/ { print $2 }' | sort)"
+for allowed in libasound.so.2 libc.so.6 ld-linux-aarch64.so.1 libm.so.6; do
+    SDL_NEEDED="$(printf '%s\n' "$SDL_NEEDED" | grep -Fvx "$allowed" || true)"
+done
+[ -z "$SDL_NEEDED" ] || {
+    printf 'error: minimal SDL2 has unexpected runtime dependencies:\n%s\n' "$SDL_NEEDED" >&2
+    exit 1
+}
+
 V90S_OUT="$VENDOR_ROOT/output/picoarch/v90s"
 [ -x "$V90S_OUT/picoarch/bin/picoarch" ] || {
     printf 'error: PicoArch build did not produce a binary\n' >&2
@@ -150,6 +211,9 @@ mkdir -p "$PLUMOS_DIR/picoarch/bin" "$PLUMOS_DIR/picoarch/lib" \
 install -m 0755 "$V90S_OUT/picoarch/bin/picoarch" \
     "$PLUMOS_DIR/picoarch/bin/picoarch"
 install -m 0644 "$V90S_OUT"/picoarch/lib/* "$PLUMOS_DIR/picoarch/lib/"
+install -m 0644 "$SDL_LIBRARY" \
+    "$PLUMOS_DIR/picoarch/lib/libSDL2-2.0.so.0"
+strip --strip-unneeded "$PLUMOS_DIR/picoarch/lib/libSDL2-2.0.so.0"
 install -m 0755 \
     "$ROOT_DIR/package/picoarch-bubble/plumos/bin/plumos-picoarch-launch" \
     "$PLUMOS_DIR/bin/plumos-picoarch-launch"
@@ -157,12 +221,14 @@ install -m 0644 "$V90S_OUT/licenses/picoarch-LICENSE" \
     "$PLUMOS_DIR/licenses/picoarch-LICENSE"
 install -m 0644 "$V90S_OUT/licenses/sdl12-compat-LICENSE.txt" \
     "$PLUMOS_DIR/licenses/picoarch-sdl12-compat-LICENSE"
+install -m 0644 "$SDL_BUILD_ROOT/source/LICENSE.txt" \
+    "$PLUMOS_DIR/licenses/picoarch-SDL2-LICENSE.txt"
 
 cat >"$PLUMOS_DIR/components/picoarch/manifest.json" <<EOF
 {
   "name": "plumOS Bubble PicoArch",
   "device": "bubble",
-  "source_ref": "picoarch:802047c276a5a931b0bf837c4ea4b8e238bdeabe v90s-build:$V90S_REF bubble-audio-status:$BUBBLE_AUDIO_STATUS_PATCH_SHA256 bubble-rgb565-byteswap:$BUBBLE_RGB565_BYTESWAP_PATCH_SHA256 bubble-vfs-seek:$BUBBLE_VFS_SEEK_PATCH_SHA256 bubble-trigger-axes:$BUBBLE_TRIGGER_AXES_PATCH_SHA256 bubble-evdev-hotplug:$BUBBLE_EVDEV_HOTPLUG_PATCH_SHA256 bubble-fbdev-staged-copy:$BUBBLE_FBDEV_STAGED_COPY_PATCH_SHA256",
+  "source_ref": "picoarch:802047c276a5a931b0bf837c4ea4b8e238bdeabe v90s-build:$V90S_REF sdl2:$SDL_VERSION:$SDL_SHA256 bubble-audio-status:$BUBBLE_AUDIO_STATUS_PATCH_SHA256 bubble-rgb565-byteswap:$BUBBLE_RGB565_BYTESWAP_PATCH_SHA256 bubble-vfs-seek:$BUBBLE_VFS_SEEK_PATCH_SHA256 bubble-trigger-axes:$BUBBLE_TRIGGER_AXES_PATCH_SHA256 bubble-evdev-hotplug:$BUBBLE_EVDEV_HOTPLUG_PATCH_SHA256 bubble-fbdev-staged-copy:$BUBBLE_FBDEV_STAGED_COPY_PATCH_SHA256",
   "render_contract": "cpu-drm-pageflip-rgb565-to-bgra8888 with staged-fbdev fallback",
   "input_contract": "plumOS Bubble Controller evdev BTN_DPAD, ABS_Z/RZ triggers and full gamepad",
   "core_route": "cores/*_libretro.so"

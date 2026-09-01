@@ -73,6 +73,8 @@ if [ -n "$app_root" ]; then
 
     test -x "$app_root/bin/plumos-picoarch-launch"
     test -x "$app_root/picoarch/bin/picoarch"
+    test -f "$app_root/picoarch/lib/libSDL2-2.0.so.0"
+    test -f "$app_root/licenses/picoarch-SDL2-LICENSE.txt"
     jq -r '.systems[].launch_profiles[] | select(startswith("picoarch:")) | sub("^picoarch:"; "")' \
         "$systems" | sort -u | while IFS= read -r core_id; do
         test -f "$app_root/cores/${core_id}_libretro.so" || {
