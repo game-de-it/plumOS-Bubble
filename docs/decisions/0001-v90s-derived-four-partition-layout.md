@@ -24,6 +24,11 @@ Bubbleで変更してよいのはRockchip prefix、p2 boot形式、block device�
 hardware substrateだけであり、plumOSのstorage ownership、update transaction、共通visual
 designは機種独自化しない。
 
+stock Imageのembedded initramfsをhash固定解析した結果、SYSTEM_IMAGE引数によるp1上の
+System path選択は対応する一方、flashはmmcblk1p1、storageはmmcblk1p2へ固定されていた。
+そのためp3 runtimeを持つ4 partitionでは、stock kernelにV90S型state machineを所有する
+external initramfsを組み合わせる。kernel、DTB、module ABIは交換しない。
+
 ## Context
 
 BubbleのstockOSベースCFWは、16 MiBのraw Rockchip boot prefix、FAT32 boot partition、

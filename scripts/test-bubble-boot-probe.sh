@@ -31,7 +31,16 @@ trap cleanup EXIT HUP INT TERM
 python3 -m py_compile \
     "$repo_root/scripts/mkimage-uboot-script.py" \
     "$repo_root/scripts/instrument-bubble-boot-script.py" \
+    "$repo_root/scripts/inspect-bubble-stock-initramfs.py" \
     "$repo_root/scripts/generate-bubble-fb-marker.py"
+
+python3 "$repo_root/scripts/inspect-bubble-stock-initramfs.py" \
+    "$repo_root/artifacts/vendor/bubble-stock-source/boot/Image" \
+    > "$test_dir/stock-initramfs.txt"
+grep -q '^system_image_argument=yes$' "$test_dir/stock-initramfs.txt"
+grep -q '^storage_partition=/dev/mmcblk1p2$' "$test_dir/stock-initramfs.txt"
+grep -q '^external_initramfs_required_for_p3_runtime=yes$' \
+    "$test_dir/stock-initramfs.txt"
 
 python3 "$repo_root/scripts/mkimage-uboot-script.py" \
     --timestamp 1708596191 \

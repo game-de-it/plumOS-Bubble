@@ -42,6 +42,8 @@
   - 2 partition/2 GiB bring-up seedは拡張なしのdiagnostic-onlyで、正式layoutへ流用しない。
   - 正式seedはV90S同様にp1〜p3だけを収録し、初回bootでp3を8 GiB候補へ拡張して
     残領域にp4を作る。中断再開と未知p4/SD2非破壊をhost fixtureで先に検証する。
+  - stock embedded initramfsは`SYSTEM_IMAGE=`に対応するがstorageをp2固定するため、
+    p3 runtimeにはexternal provisioning initramfsが必要とhash固定解析で確定した。
 - [ ] `BUB-P1-08` sector image から複製 OS SD を作り、write後block readbackを実施する。
 - [ ] `BUB-P1-09` 複製 SD で cold boot、LCD、controller、audio、AP6330 Wi-Fi、SSH、ROM SD mount を物理確認する。
 - [ ] `BUB-P1-10` known-good SD 交換、boot log、SSH、可能なら UART を含む recovery procedure を実証する。
