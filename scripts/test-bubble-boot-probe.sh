@@ -73,6 +73,8 @@ test "$(shasum -a 256 "$test_dir/marker.raw" | awk '{print $1}')" = \
 for stage in S34 E34 S35 E35 S36 E36 S37 E37 S38 E38; do
     grep -q "$stage" "$repo_root/rootfs/bubble-minimal/init"
 done
+grep -q '/usr/sbin/wpa_cli' "$repo_root/rootfs/bubble-minimal/init"
+! grep -q '/usr/bin/wpa_cli' "$repo_root/rootfs/bubble-minimal/init"
 grep -q 'fat_value network-address.txt' "$repo_root/rootfs/bubble-minimal/init"
 ! find "$repo_root/rootfs/bubble-minimal" -type f -exec \
     grep -El '^[[:space:]]*(ssid|psk)=' {} + | grep -q .

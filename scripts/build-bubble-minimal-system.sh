@@ -143,7 +143,7 @@ printf '%s  SYSTEM\n' "$system_sha" > "$payload/checksums.sha256"
 listing=$out_dir/squashfs-list.txt
 unsquashfs -ll "$payload/SYSTEM" > "$listing"
 for required in sbin/init usr/lib/systemd/systemd bin/busybox \
-    usr/sbin/wpa_supplicant usr/sbin/dropbear usr/bin/dropbearkey \
+    usr/sbin/wpa_supplicant usr/sbin/wpa_cli usr/sbin/dropbear usr/bin/dropbearkey \
     etc/shadow etc/firmware/fw_bcmdhd.bin etc/firmware/fw_bcm43438a1.bin \
     etc/firmware/nvram.txt etc/firmware/nvram_ap6212a.txt \
     lib/modules/4.19.193-g5a07852a55cf-dirty/kernel/drivers/net/wireless/rockchip_wlan/rkwifi/bcmdhd/bcmdhd.ko \

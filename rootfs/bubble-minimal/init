@@ -93,10 +93,15 @@ start_recovery_network() {
     count=0
     associated=false
     while [ "$count" -lt 60 ]; do
-        if /usr/bin/wpa_cli -p /run/wpa_supplicant -i wlan0 status \
-            2>/dev/null | $bb grep -q '^wpa_state=COMPLETED$'; then
+        wpa_status=$(/usr/sbin/wpa_cli -p /run/wpa_supplicant -i wlan0 status \
+            2>>/run/plumos-wifi.log || true)
+        if printf '%s\n' "$wpa_status" | $bb grep -q '^wpa_state=COMPLETED$'; then
             associated=true
             break
+        fi
+        if [ $((count % 10)) -eq 0 ]; then
+            printf 'association_poll=%s\n%s\n' "$count" "$wpa_status" \
+                >>/run/plumos-wifi.log
         fi
         $bb sleep 0.5
         count=$((count + 1))

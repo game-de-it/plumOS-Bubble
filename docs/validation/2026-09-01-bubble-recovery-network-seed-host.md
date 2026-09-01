@@ -94,3 +94,19 @@ NVRAMをdriver自動選択名でもSYSTEMへ配置する。加えて、link up�
 corrective personalized imageはFAT/ext4再抽出、filesystem check、診断専用manifest、
 config byte一致、mode 0600、full image checksum、baseとのboot領域byte一致、
 平文password非混入に合格した。
+
+## Second physical network boot
+
+source `2abc1c6`のcorrective imageでは共通plumOS logoと`S39`を確認した。p2 readbackは
+1,593,835,520 bytes、SHA-256
+`6847393aa6888a40525bc91322dd26b5d805f6735339b82e6e6c2e1b9aa3af36`で、
+`e2fsck -fn` errorなしだった。
+
+stageは`S34_WIFI_MODULE_LOADED`、`S35_WIFI_INTERFACE_READY`、`S36_WPA_STARTED`から
+`E37_WIFI_ASSOCIATION_TIMEOUT`へ進んだ。一方kernel logはhash固定firmware/NVRAMのopen、
+NVRAM download、firmware起動、指定APへの`Link UP`、`connection succeeded`を記録した。
+したがってradio/credential失敗ではない。
+
+SYSTEMには`wpa_cli`が`/usr/sbin/wpa_cli`として収録されるが、initは存在しない
+`/usr/bin/wpa_cli`をstderr破棄で呼んでいた。正しいpathへ修正し、association poll結果を
+bounded intervalで`plumos-wifi.log`へ保存する。
