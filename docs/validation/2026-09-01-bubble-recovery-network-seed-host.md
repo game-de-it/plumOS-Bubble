@@ -1,7 +1,8 @@
 # Bubble recovery-network seed host validation
 
 Date: 2026-09-01  
-Source commit: `9a81427`  
+Source commit: `6630283`
+
 Scope: host build and private personalization。physical Wi-Fi/SSHは未実施。
 
 ## Recovery System
@@ -19,7 +20,7 @@ SYSTEM result:
 
 ```text
 size=8032256
-sha256=c9a7cef9ba4538b5708a181c8d7bfe4ff77c1f6801c3c93ea79fe78933c6c4a9
+sha256=9fcd7655949175a59c71acb1459b7d5ae89cda2f74bd3ec4b8631307706a0eca
 kernel_release=4.19.193-g5a07852a55cf-dirty
 bcmdhd_sha256=fd8abaada4aed3ef140e778e344316a1727b0c8d7d9d83d0aee51e3d008297f4
 wifi_firmware_sha256=c587abd06865aab98290e1bdd1e9185cfb5c30f89af329c77e0202afe4b932c1
@@ -37,13 +38,15 @@ tmpfs `/run`へ保持し、startup logをp2へcopyしてからp2をread-onlyへ�
 ```text
 file=output/image/bubble/plumOS-Bubble-0.1.0-dev-seed.img
 size=2147483648
-sha256=52b3b8d2bce4a63cd5b0307a8deec3f72fc4b7a49ccab40ceace3c7d0f8a4495
-boot_filesystem_sha256=5a73f288dfd08c8952058a97543689dd55259fab402775b365c1a62ff80f94c6
-sys_filesystem_sha256=f8d325070de4e205306d00890a560770691a88a91a89986107aa14355dac1978
+sha256=570c595b5c883c9a3e9ebff5a4c2d3253ca0460318f6706dcfa728978967d628
+boot_filesystem_sha256=f7a8f4900ec1d4c380ec11600079a5a0220250b079a1e374478aded7ce77c12d
+sys_filesystem_sha256=409adf94c419f23e7bc11b9f65472ed892509a17bae145271f41d59eb5cb098a
 ```
 
 independent verifierはRockchip prefix、MBR、FAT/ext4、SYSTEM readback、root UUID、seed markerを
-確認した。共通imageとrepositoryにはSSID、PSK、平文passwordを含めていない。
+確認した。FATの`plumos-probe/network-address.txt`は生成時に`NOT_ASSIGNED`で初期化し、起動時に
+DHCP addressをatomic renameで記録する。共通imageとrepositoryにはSSID、PSK、平文passwordを
+含めていない。
 
 ## Private personalization
 
@@ -54,8 +57,8 @@ manifestへ記録しない。
 ```text
 file=output/image/bubble/plumOS-Bubble-0.1.0-dev-seed-wifi.img
 size=2147483648
-sha256=9f02092f2dfad18ed0275b84acf977dcb9759e4290ccdf93985768eccbf21c09
-base_image_sha256=52b3b8d2bce4a63cd5b0307a8deec3f72fc4b7a49ccab40ceace3c7d0f8a4495
+sha256=c39cb064b1b69e6c1b0bf158edaa15f331b965d57dd28e6abb317ee716d41d13
+base_image_sha256=570c595b5c883c9a3e9ebff5a4c2d3253ca0460318f6706dcfa728978967d628
 publishable=no
 ```
 
