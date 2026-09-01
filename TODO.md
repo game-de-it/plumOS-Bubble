@@ -59,7 +59,8 @@
   - 新SDでphysical cold bootし、FAT `S39`、p2の全stage、clean ext4、BusyBox promptをreadback確認した。
 - [ ] `BUB-P2-06` stock FE を開始せず、plumOS marker、log、recovery SSH を保持できることを実機確認する。
   - stock FEを開始せず、framebuffer marker、persistent log、BusyBox promptまでは実証済み。
-  - recovery SSHを次のseedで追加し、Wi-Fi接続後に完了判定する。
+  - AP6330、bounded WPA/DHCP、Dropbear recovery SSHを次seedへ実装しhost検証済み。
+  - device-owned credential入りpersonalized imageを生成済み。実機Wi-Fi/SSH確認は未実施。
 - [ ] `BUB-P2-07` probe failure を意図的に起こし、original/known-good SDへ確実にrollbackできることを確認する。
 - [ ] `BUB-P2-08` preserved vendor substrate と plumOS-owned boundary の architecture decision record を確定する。
 
@@ -107,6 +108,8 @@
 ### Network/USB/storage
 
 - [ ] `BUB-P4-N01` AP6330 firmware/NVRAM/module/runtime ownership を固定する。
+  - stock hash/vermagic固定の`bcmdhd.ko`、firmware、NVRAMをdevelopment seedへ隔離して組み込み済み。
+  - 実機load/associationと再配布license判断は未完了。
 - [ ] `BUB-P4-N02` first connect、credential persist、cold boot reconnect、Wi-Fi OFF persist、bounded recovery を確認する。
 - [ ] `BUB-P4-N03` USB host/device/charging controller と同時利用制約を調査し、product policy を決める。
 - [ ] `BUB-P4-S01` OS SD と ROM SD を UUID/label/partition identity で安全に解決する。
@@ -144,6 +147,7 @@
 
 ## Next action
 
-- [ ] U-Boot FAT marker失敗に依存しないearly-init boot-source/cmdline記録を追加する。
-- [ ] minimal SystemへAP6330 firmware/module、bounded network設定、Dropbear recovery SSHを追加する。
-- [ ] 次seedでcold bootし、SSH、log readback、normal shutdown後のext4 cleanを確認する。
+- [x] U-Boot FAT marker失敗に依存しないearly-init cmdline/device/process snapshotを追加する。
+- [x] minimal SystemへAP6330 firmware/module、bounded network設定、Dropbear recovery SSHを追加する。
+- [ ] personalized recovery-network seedをSDへwrite/readbackする。
+- [ ] cold bootし、Wi-Fi association、DHCP、SSH、log、normal shutdown後のext4 cleanを確認する。
