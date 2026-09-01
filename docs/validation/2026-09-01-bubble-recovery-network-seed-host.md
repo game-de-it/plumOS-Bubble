@@ -1,10 +1,10 @@
 # Bubble recovery-network seed host validation
 
-Date: 2026-09-01; corrective build 2026-09-02
-Source commit: `2abc1c6`
+Date: 2026-09-01; latest corrective build 2026-09-02
+Source commit: `ed9549b`
 
-Scope: host build、private personalization、初回physical失敗解析。
-corrective buildのphysical Wi-Fi/SSHは未実施。
+Scope: host build、private personalization、2回のphysical失敗解析。
+latest corrective buildのphysical Wi-Fi/SSHは未実施。
 
 ## Recovery System
 
@@ -23,7 +23,7 @@ SYSTEM result:
 
 ```text
 size=8220672
-sha256=a3f24f7c44e5678ef56f8721a2bbddb8e82517557241fb7c976369631fa19747
+sha256=49514b6454e84f0e2efdbdcb549df64bd416c1b83e1de76516dad7e6ddb09bc2
 kernel_release=4.19.193-g5a07852a55cf-dirty
 bcmdhd_sha256=fd8abaada4aed3ef140e778e344316a1727b0c8d7d9d83d0aee51e3d008297f4
 wifi_firmware_sha256=c587abd06865aab98290e1bdd1e9185cfb5c30f89af329c77e0202afe4b932c1
@@ -37,14 +37,14 @@ tmpfs `/run`へ保持し、startup logをp2へcopyしてからp2をread-onlyへ�
 ## Base image
 
 先行sourceでは同じcommitから完全imageを2回生成し、image本体とmanifestのbyte-identical一致を
-確認した。corrective source `2abc1c6`では次のimageを生成し、独立verifierに合格した。
+確認した。latest corrective source `ed9549b`では次のimageを生成し、独立verifierに合格した。
 
 ```text
 file=output/image/bubble/plumOS-Bubble-0.1.0-dev-seed.img
 size=2147483648
-sha256=0ca39d42fd83fa0459da38f6e8f755405a3cde5d0ef6d79b0dbcca32580ae76e
-boot_filesystem_sha256=9c5ac46eec7d93e3a80561e7a33d7d4cd42faa7f9056dba8c65d5d0660ded116
-sys_filesystem_sha256=b60141b066c5547a3d68ff0bb722dd4f2d1ae6dfae7c39535e91e399ad31eff6
+sha256=95ad78206683f50580d3a4071b7b8c75b8dc46ad2be2b7f834316532b2fc2095
+boot_filesystem_sha256=c718daba36c34aa428adffa90e30042df145a0afa4ac788ec593429b723e67d2
+sys_filesystem_sha256=c0ee12e6171e7afbdfeba59ea3cdb221ea62c316ce9e259f12079f7669e33992
 ```
 
 independent verifierはRockchip prefix、MBR、FAT/ext4、SYSTEM readback、root UUID、seed markerを
@@ -62,8 +62,8 @@ manifestへ記録しない。
 ```text
 file=output/image/bubble/plumOS-Bubble-0.1.0-dev-seed-wifi.img
 size=2147483648
-sha256=7f2d2d94650fa79d2852f5ed517dfbf659a1441aa2835334cf36d1654c45c7b4
-base_image_sha256=0ca39d42fd83fa0459da38f6e8f755405a3cde5d0ef6d79b0dbcca32580ae76e
+sha256=6074e7f54bba8281a922833d28fe94a19514c6c271504e3c9b4cb339130efa55
+base_image_sha256=95ad78206683f50580d3a4071b7b8c75b8dc46ad2be2b7f834316532b2fc2095
 publishable=no
 ```
 
@@ -110,3 +110,11 @@ NVRAM download、firmware起動、指定APへの`Link UP`、`connection succeede
 SYSTEMには`wpa_cli`が`/usr/sbin/wpa_cli`として収録されるが、initは存在しない
 `/usr/bin/wpa_cli`をstderr破棄で呼んでいた。正しいpathへ修正し、association poll結果を
 bounded intervalで`plumos-wifi.log`へ保存する。
+
+## Third corrective host build
+
+source `ed9549b`で`/usr/sbin/wpa_cli`の使用をtestで固定し、10 pollごとの
+association statusをpersistent logの元になる`/run/plumos-wifi.log`へ追加した。
+base imageは独立verifierに合格し、private imageはext4 `e2fsck -fn`、config byte一致、
+mode 0600、full-image checksum、baseとのboot領域553,648,128 bytesの一致、
+平文password非混入に合格した。このlatest imageのphysical bootは次のgateとする。
