@@ -119,7 +119,7 @@ PLUMOS_BUBBLE_WRITE_TARGET=/dev/diskN \
 この2 partition seedはboot handoffとhardware recoveryを調べるためだけの非release artifactである。
 first-boot partition expansion、System A/B、p3 runtime、p4 user/update領域を持たず、正式imageの
 storage/update ABIとして扱わない。manifestの`final_partition_contract=no`、
-`first_boot_provisioning=not-included`、`publishable=no`をrelease gateで拒否する。
+`first_boot_provisioning=not-included`、`publishable=no`をverifierで必須確認し、release対象にしない。
 
 画面デザインはBubble独自にしない。V90S、A30、MFで共通の640x480 plumOS logoをexact hashで
 再利用し、Bubble固有処理は実機`fb0`向けXRGB8888変換だけに限定する。

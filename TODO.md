@@ -156,6 +156,6 @@
 - [x] minimal SystemへAP6330 firmware/module、bounded network設定、Dropbear recovery SSHを追加する。
 - [ ] personalized recovery-network seedをSDへwrite/readbackする。
 - [x] Bubble独自S33画面を廃止し、V90S/A30/MF共通plumOS logoのexact assetへ置換・検証する。
-- [x] diagnostic seedを正式layoutから機械的に区別し、release gateで拒否する。
+- [x] diagnostic seedを正式layoutからmanifest/verifierで機械的に区別し、release対象にしない。
 - [ ] V90S型first-boot provisioningとSystem A/B/update metadataをBubble geometryへ移植する。
 - [ ] cold bootし、Wi-Fi association、DHCP、SSH、log、normal shutdown後のext4 cleanを確認する。
