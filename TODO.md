@@ -92,7 +92,11 @@
 - [ ] `BUB-P3-04` `/run`、`/tmp`、managed persistent、mutable config、user media の mount contract を実装する。
 - [ ] `BUB-P3-05` plumOS supervisor、boot log、visible error screen、recovery SSH を実装する。
 - [ ] `BUB-P3-06` Bubble root/app-layer manifest と `checksums.sha256` を生成・検証する。
+  - frontend、RetroArch、QuickNESのcomponent manifest/checksumと全app-layer checksumを
+    host生成し、p3からの独立readback verifierへ合格。実機bootstrap合格を残す。
 - [ ] `BUB-P3-07` componentごとの loader/library path を固定し、global `LD_LIBRARY_PATH` fallback を禁止する。
+  - frontendは`frontend/lib`、RetroArch/amixerは`emulator/lib`だけを各launcherで設定し、
+    GPU library非依存をELF検証済み。実機mapped-library確認を残す。
 - [ ] `BUB-P3-08` intentional System/app checksum failure で SSH/log が残り、stock FE が起動しないことを実機確認する。
 - [ ] `BUB-P3-09` device-owned config/save/credential が System deploy 前後で不変であることをhash/semantic checkする。
 
@@ -102,6 +106,7 @@
 
 - [ ] `BUB-P4-D01` DRM connector/CRTC/plane/format/stride/modifier を read-only probe で採取する。
 - [ ] `BUB-P4-D02` CPU-rendered DRM dumb-buffer double buffering と page-flip completion を実装する。
+  - MFの共通rendererとRetroArch DRM修正をBubbleへ移植しhost build済み。実パネル確認を残す。
 - [ ] `BUB-P4-D03` 640x480 panel の実 refresh、scroll pacing、input-to-visible response を測定する。
 - [ ] `BUB-P4-D04` fbdev/DRM handoff、FE/game/menu、終了後のscanout ownershipを物理確認する。
 - [ ] `BUB-P4-D05` vendor `libmali` のlicense、redistribution、DDK/kernel ABIを監査し、採用・隔離・不採用を決定する。
@@ -117,6 +122,8 @@
 ### Audio/power
 
 - [ ] `BUB-P4-A01` RK817 mixer controls、speaker/headphone route、jack detect、safe gain を採取する。
+  - exact control存在時だけ`Resume Path=ON`、`Playback Path=SPK`、`SPK=40%`を行う
+    guarded bring-upを実装。Bubble実機のcontrol/readbackとheadphone routeは未確認。
 - [ ] `BUB-P4-A02` supported rate/format、hardware pointer、XRUN、5分継続を speaker で確認する。
 - [ ] `BUB-P4-A03` headphone 接続/抜去、ゲーム終了、suspend/resume 後の route 復帰を確認する。
 - [ ] `BUB-P4-P01` backlight 0..255 の安全範囲、段階、persist policy を決める。
@@ -137,8 +144,12 @@
 ## P5: frontend and NES baseline
 
 - [ ] `BUB-P5-01` Bubble 640x480 frontend profile と runtime DRM discovery を実装する。
+  - CPU DRM、runtime connector/mode discovery、Bubble物理A/B mappingをhost build済み。
+    `S39..E81`、input trace、frame statsを次のphysical gateへ組み込み済み。
 - [ ] `BUB-P5-02` FEのinput、audio、brightness/volume、power menu ownershipをBubble helperへ接続する。
 - [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
+  - RetroArch v1.22.2とQuickNES `058d665`をAArch64 containerからbuildし、
+    software DRM/RGUI/ALSA/udev、GPU runtime非依存、component checksumをhost検証済み。
 - [ ] `BUB-P5-04` 利用者提供の小さな既知正常NES content 1本だけをGit外からtest deploymentする。
 - [ ] `BUB-P5-05` FE -> QuickNES -> FE のdisplay/input/audio lifecycleを実機確認する。
 - [ ] `BUB-P5-06` menu/exit、save/state、reboot後の保持を確認する。
@@ -180,4 +191,10 @@
     poweroff後のoffline p1/p2 hashとFAT/ext4 fsckを残す。
 - [ ] cold bootし、Wi-Fi association、DHCP、SSH、log、normal shutdown後のext4 cleanを確認する。
   - association、DHCP、SSH、persistent log、normal shutdown、SD readbackのext4 cleanは合格。
-  - p1 FATはmacOS自動check前のclean状態が未証明。U-Boot `fatwrite`廃止後の次回SDで再確認する。
+  - normal poweroff後、macOS `diskutil verifyVolume`のread-only `fsck_msdos -n`でp1 FATもclean。
+- [ ] frontend/RetroArch/QuickNES private probeをRaspberry Pi Imagerでwriteし、1回のcold bootで
+  FE表示、Bubble入力、RetroArch RGUI、利用者提供NESのQuickNES video/input/audio、FE復帰、
+  Wi-Fi/SSH、`S39..S79`とerror-free kernel logを確認する。
+  - source `dc9cdb0`から再現buildしたprivate imageを独立readback verifierへ合格させ、
+    RetroArch `1.22.2`のARM64 runtime、UDEV、ALSA、dynamic core loadingをhost確認済み。
+    残りはこの1枚による実機acceptanceのみ。
