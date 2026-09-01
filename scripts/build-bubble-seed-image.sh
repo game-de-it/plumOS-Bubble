@@ -95,6 +95,10 @@ boot_substrate=stock-bubble
 kernel_release=4.19.193-g5a07852a55cf-dirty
 system=minimal-diagnostic-userland
 storage_policy=diagnostic-ext4-remounted-read-only-after-log
+development_purpose=boot-boundary-only
+final_partition_contract=no
+first_boot_provisioning=not-included
+publishable=no
 EOF
 
 cat > "$work/boot/plumos-image.manifest" <<EOF
@@ -111,6 +115,10 @@ stock_image_sha256=$(sha256sum "$boot/Image" | cut -d' ' -f1)
 stock_dtb_sha256=$(sha256sum "$boot/dtbs/$kernel_version/rockchip/rk3566-gkd-geek-bbg.dtb" | cut -d' ' -f1)
 system_sha256=$(sha256sum "$system_dir/SYSTEM" | cut -d' ' -f1)
 layout=bringup-v1,raw-prefix-16MiB,p1-fat32-512MiB,p2-ext4-remainder
+development_purpose=boot-boundary-only
+final_partition_contract=no
+first_boot_provisioning=not-included
+publishable=no
 root_uuid=42554242-4c45-5359-5300-000000000002
 logging=uboot-fat,system-console,system-kmsg,system-fat,system-ext4
 recovery_network=ap6330-bcmdhd,wpa_supplicant,dropbear

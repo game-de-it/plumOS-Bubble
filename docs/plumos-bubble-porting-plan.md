@@ -62,6 +62,11 @@ roleとupdate ownershipは採用済みだが、p1/p2/p3の正確な容量、p2 r
 provisionalである。Bubble U-Bootのload/recoveryを複製SDで証明するまでは、現CFWと同じ
 p1 file bootを維持する。V90Sの物理sizeやAllwinner boot imageはコピーしない。
 
+2 partition bring-up seedはこのboot proof専用で、first-boot expansionを実装しない。
+正式imageへ進む前に、V90Sと同じp1 System A/B、p3 seed-to-target expansion、残領域p4作成、
+中断再開marker、未知partition非破壊guardをBubble block geometryへ移植する。boot/progress画面は
+V90S・A30・MFと同一のplumOS共通assetを使い、機種名を加えた独自designを作らない。
+
 ## Phase 0: repository and safety baseline
 
 Deliverables:

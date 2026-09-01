@@ -31,7 +31,7 @@ prepare/install scriptは拒否する。
 | `S30` | stock built-in initramfsがplumOS `SYSTEM` entrypointを実行した |
 | `S31` / `E31` | p2 ext4 `/storage` mount成功 / 失敗 |
 | `S32` / `E32` | p1 FAT `/flash` mount成功 / 失敗 |
-| `S33` / `E33` | framebuffer marker描画成功 / fbdev利用不可 |
+| `S33` / `E33` | 既存plumOS共通logoをframebufferへ描画成功 / fbdev利用不可 |
 | `S34` / `E34` | hash固定bcmdhd moduleが既にactiveまたはload成功 / load失敗 |
 | `S35` / `E35` | `wlan0`出現・link up / interface未出現またはfirmware loadを伴うlink up失敗 |
 | `S36` / `E36` | device-owned WPA configからsupplicant開始 / config不在または開始失敗 |
@@ -71,7 +71,7 @@ python3 scripts/instrument-bubble-boot-script.py \
 2. clean arm64 containerで最小plumOS `SYSTEM`と2 GiB seed imageを生成・検証する。
 3. original OS SDを実機から抜いて保管する。
 4. 新SDだけをMacへ挿し、seed imageを書いて全image-size blockをreadbackする。
-5. 新SDを実機でcold bootし、画面の`S33` markerを確認する。
+5. 新SDを実機でcold bootし、既存plumOS共通logoとFATの`S33` markerを確認する。
 6. 失敗時はSDをMacへ戻し、FATの`uboot-stage.txt`と`system-stage.txt`を読む。
 7. `S33`合格後にWi-Fi/SSHとfrontendをminimal Systemへ一層ずつ追加する。
 
@@ -113,6 +113,16 @@ PLUMOS_BUBBLE_WRITE_TARGET=/dev/diskN \
 
 2つのSD readerを使用できる場合は、既存のdevice-to-device clone probeも引き続き利用できる。
 これはstock CFW equivalence確認用であり、one-slot最小plumOS bring-upの必須工程ではない。
+
+## Diagnostic-only boundary
+
+この2 partition seedはboot handoffとhardware recoveryを調べるためだけの非release artifactである。
+first-boot partition expansion、System A/B、p3 runtime、p4 user/update領域を持たず、正式imageの
+storage/update ABIとして扱わない。manifestの`final_partition_contract=no`、
+`first_boot_provisioning=not-included`、`publishable=no`をrelease gateで拒否する。
+
+画面デザインはBubble独自にしない。V90S、A30、MFで共通の640x480 plumOS logoをexact hashで
+再利用し、Bubble固有処理は実機`fb0`向けXRGB8888変換だけに限定する。
 
 system probe installは再起動しない。clone確認後に実行する例:
 

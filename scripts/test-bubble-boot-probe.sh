@@ -61,8 +61,14 @@ for stage in S10 S11 S12 E12 S13 E13 S14 S19 E20; do
     grep -q "$stage" "$test_dir/instrumented/boot.cmd"
 done
 
-python3 "$repo_root/scripts/generate-bubble-fb-marker.py" "$test_dir/marker.raw"
+test "$(shasum -a 256 "$repo_root/package/boot-assets-common/plumos-640x480.bmp" | awk '{print $1}')" = \
+    6b4be39f18289bffe0a9ea65c11f0d479fd12946bd67154ae7332350df795fa8
+python3 "$repo_root/scripts/generate-bubble-fb-marker.py" \
+    "$repo_root/package/boot-assets-common/plumos-640x480.bmp" \
+    "$test_dir/marker.raw"
 test "$(stat -f '%z' "$test_dir/marker.raw")" -eq 1228800
+test "$(shasum -a 256 "$test_dir/marker.raw" | awk '{print $1}')" = \
+    651addb9bd8ad1873fb1a016726f65a0bfcabd4c6fa02bec635c2c25d086d037
 
 for stage in S34 E34 S35 E35 S36 E36 S37 E37 S38 E38; do
     grep -q "$stage" "$repo_root/rootfs/bubble-minimal/init"

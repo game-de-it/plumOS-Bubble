@@ -3,6 +3,10 @@
 Date: 2026-09-01  
 Scope: one-slot workflow向けhost build。physical SD write/bootは未実施。
 
+> 2026-09-02: この記録の独自`PLUMOS BUBBLE` S33画面はboot境界確認だけに使った後、
+> 正式plumOSの共通visual方針に合わないため廃止した。後続buildはV90S/A30/MFと同一の
+> 640x480 plumOS logoを使う。この2 partition imageは引き続き拡張なし・非releaseの診断用である。
+
 ## Result
 
 Mac側に既にread-only captureしたBubble stock boot substrateから、2 GiBの開発用seed imageを

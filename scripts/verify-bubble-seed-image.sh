@@ -48,5 +48,16 @@ MTOOLS_SKIP_CHECK=1 mtype -i "$verify/boot.fat" \
 debugfs -R 'cat /plumos/seed.manifest' "$verify/storage.ext4" 2>/dev/null \
     > "$verify/seed.manifest"
 grep -q '^format=plumos-bubble-seed-v1$' "$verify/seed.manifest"
+grep -q '^development_purpose=boot-boundary-only$' "$verify/seed.manifest"
+grep -q '^final_partition_contract=no$' "$verify/seed.manifest"
+grep -q '^first_boot_provisioning=not-included$' "$verify/seed.manifest"
+grep -q '^publishable=no$' "$verify/seed.manifest"
+MTOOLS_SKIP_CHECK=1 mtype -i "$verify/boot.fat" \
+    ::/plumos-image.manifest > "$verify/plumos-image.manifest"
+grep -q '^layout=bringup-v1,' "$verify/plumos-image.manifest"
+grep -q '^development_purpose=boot-boundary-only$' "$verify/plumos-image.manifest"
+grep -q '^final_partition_contract=no$' "$verify/plumos-image.manifest"
+grep -q '^first_boot_provisioning=not-included$' "$verify/plumos-image.manifest"
+grep -q '^publishable=no$' "$verify/plumos-image.manifest"
 
 echo "bubble_seed_verify=result-ok image=$image sha256=$expected_sha"

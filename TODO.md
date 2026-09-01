@@ -39,6 +39,9 @@
   - vendor artifactのsource identity/license/redistribution判断は`BUB-P3-02`と`BUB-P4-D05`で行う。
 - [ ] `BUB-P1-07A` 現SYSTEMと生成plumOS Systemの実サイズからp1 A/B容量を計算し、
   Bubble U-Boot/recovery proofからp2容量・形式を固定する。
+  - 2 partition/2 GiB bring-up seedは拡張なしのdiagnostic-onlyで、正式layoutへ流用しない。
+  - 正式seedはV90S同様にp1〜p3だけを収録し、初回bootでp3を8 GiB候補へ拡張して
+    残領域にp4を作る。中断再開と未知p4/SD2非破壊をhost fixtureで先に検証する。
 - [ ] `BUB-P1-08` sector image から複製 OS SD を作り、write後block readbackを実施する。
 - [ ] `BUB-P1-09` 複製 SD で cold boot、LCD、controller、audio、AP6330 Wi-Fi、SSH、ROM SD mount を物理確認する。
 - [ ] `BUB-P1-10` known-good SD 交換、boot log、SSH、可能なら UART を含む recovery procedure を実証する。
@@ -152,4 +155,7 @@
 - [x] U-Boot FAT marker失敗に依存しないearly-init cmdline/device/process snapshotを追加する。
 - [x] minimal SystemへAP6330 firmware/module、bounded network設定、Dropbear recovery SSHを追加する。
 - [ ] personalized recovery-network seedをSDへwrite/readbackする。
+- [x] Bubble独自S33画面を廃止し、V90S/A30/MF共通plumOS logoのexact assetへ置換・検証する。
+- [x] diagnostic seedを正式layoutから機械的に区別し、release gateで拒否する。
+- [ ] V90S型first-boot provisioningとSystem A/B/update metadataをBubble geometryへ移植する。
 - [ ] cold bootし、Wi-Fi association、DHCP、SSH、log、normal shutdown後のext4 cleanを確認する。

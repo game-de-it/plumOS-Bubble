@@ -88,8 +88,11 @@ install -m 0644 "$runtime/firmware/nvram_AP6330.txt" \
 install -m 0644 "$runtime/firmware/nvram_AP6330.txt" \
     "$rootfs/etc/firmware/nvram_ap6212a.txt"
 sed -i "s/VERSION_ID=.*/VERSION_ID=\"$version\"/" "$rootfs/etc/os-release"
+shared_boot_logo=$repo_root/package/boot-assets-common/plumos-640x480.bmp
+test "$(sha256sum "$shared_boot_logo" | cut -d' ' -f1)" = \
+    6b4be39f18289bffe0a9ea65c11f0d479fd12946bd67154ae7332350df795fa8
 python3 "$repo_root/scripts/generate-bubble-fb-marker.py" \
-    "$rootfs/usr/share/plumos/bubble-s33-xrgb8888.raw"
+    "$shared_boot_logo" "$rootfs/usr/share/plumos/bubble-s33-xrgb8888.raw"
 printf '%s\n' '4.19.193-g5a07852a55cf-dirty' > "$rootfs/etc/plumos-kernel-abi"
 printf '%s\n' "$version" > "$rootfs/etc/plumos-system-version"
 install -m 0644 "$repo_root/LICENSE" "$rootfs/usr/share/licenses/plumOS-MIT.txt"
@@ -127,6 +130,8 @@ kernel_release=4.19.193-g5a07852a55cf-dirty
 boot_substrate=stock-bubble
 entrypoints=/sbin/init,/usr/lib/systemd/systemd
 recovery_network=ap6330-bcmdhd,wpa_supplicant,dropbear
+boot_visual=shared-plumos-640x480
+boot_visual_source_sha256=6b4be39f18289bffe0a9ea65c11f0d479fd12946bd67154ae7332350df795fa8
 bcmdhd_sha256=fd8abaada4aed3ef140e778e344316a1727b0c8d7d9d83d0aee51e3d008297f4
 wifi_firmware_sha256=c587abd06865aab98290e1bdd1e9185cfb5c30f89af329c77e0202afe4b932c1
 wifi_nvram_sha256=68952ca377ea4f629c7d01042ba6d95e2c74f347a893c4d49a4d3c3f38a5bf1b

@@ -3,6 +3,27 @@
 Date: 2026-09-01  
 Status: Accepted direction; exact geometry and p2 format are pending boot-probe validation
 
+## 2026-09-02 boundary clarification
+
+2 GiBのp1 FAT + p2 ext4 imageは、stock initramfsからplumOS Systemへのhandoffを測定する
+diagnostic-only artifactである。空きSD容量の拡張、System A/B、managed runtime、user/update
+partitionを実装しておらず、最終imageやupdate ABIへ昇格させない。manifestで
+`final_partition_contract=no`と`first_boot_provisioning=not-included`を必須記録し、公開しない。
+
+正式Bubble imageではV90Sの実証済みroleとstate machineを維持する。
+
+- seedはp1〜p3だけを持ち、p4は初回bootで未使用末尾領域へ作成する。
+- p3は実使用量から算出したseed sizeから8 GiB候補へ、exact geometry check後に拡張する。
+- backup partition table relocation、ext4 fsck/resize、p4作成、FAT32 format、user tree投入を
+  永続marker付きで中断再開可能にする。
+- 既存または未知のp4/SD2を自動formatしない。
+- p1 System A/B、p3 active/pending/attempted/healthy metadata、inactive-slot readbackを
+  通常System updateの契約にする。
+
+Bubbleで変更してよいのはRockchip prefix、p2 boot形式、block device解決、実測容量などの
+hardware substrateだけであり、plumOSのstorage ownership、update transaction、共通visual
+designは機種独自化しない。
+
 ## Context
 
 BubbleのstockOSベースCFWは、16 MiBのraw Rockchip boot prefix、FAT32 boot partition、
