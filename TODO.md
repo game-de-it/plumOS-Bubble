@@ -61,6 +61,8 @@
   - stock FEを開始せず、framebuffer marker、persistent log、BusyBox promptまでは実証済み。
   - AP6330、bounded WPA/DHCP、Dropbear recovery SSHを次seedへ実装しhost検証済み。
   - device-owned credential入りpersonalized imageを生成済み。実機Wi-Fi/SSH確認は未実施。
+  - 初回network seedはmodule loadと`wlan0`生成後、driver自動選択firmware path不在で
+    `E36_WPA_START_FAILED`。p2 readbackはcleanで、固定名aliasと正確なE35判定を追加中。
 - [ ] `BUB-P2-07` probe failure を意図的に起こし、original/known-good SDへ確実にrollbackできることを確認する。
 - [ ] `BUB-P2-08` preserved vendor substrate と plumOS-owned boundary の architecture decision record を確定する。
 

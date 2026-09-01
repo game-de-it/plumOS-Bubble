@@ -64,3 +64,24 @@ publishable=no
 
 personalized p2を再抽出し、`e2fsck -fn` clean、config byte一致、mode 0600、full image checksum、
 平文password非混入を確認した。このimageはprivate physical bring-up専用で公開しない。
+
+## First physical network boot
+
+personalized seedをcold bootした結果、FATは`S39_RECOVERY_IDLE_STORAGE_RO`、
+`network-address.txt=NOT_ASSIGNED`だった。強制電源断後にp2全領域をreadbackし、
+SHA-256 `b4fcd46c9d8ad960932d47fea3c7ce355726eb8a7ab5e83b3a4f60ead85ba620`、
+`e2fsck -fn` errorなしを確認した。
+
+persistent logは`S34_WIFI_MODULE_LOADED`、`S35_WIFI_INTERFACE_READY`の後、
+`E36_WPA_START_FAILED`を記録した。kernel logではSDIO chip `0xa9a6`と`wlan0`の生成後、
+interface up時にdriverが自動選択した次のpathを開けずfirmware downloadが失敗していた。
+
+```text
+/etc/firmware/fw_bcm43438a1.bin
+/etc/firmware/nvram_ap6212a.txt
+/etc/firmware/clm_bcm43438a1.blob
+```
+
+stock firmware inventoryにはCLM名のfileは存在しないため、必須のhash固定AP6330 firmwareと
+NVRAMをdriver自動選択名でもSYSTEMへ配置する。加えて、link up失敗を無視せず
+`E35_WIFI_INTERFACE_UP_FAILED`として停止・永続化する。

@@ -33,7 +33,7 @@ prepare/install scriptは拒否する。
 | `S32` / `E32` | p1 FAT `/flash` mount成功 / 失敗 |
 | `S33` / `E33` | framebuffer marker描画成功 / fbdev利用不可 |
 | `S34` / `E34` | hash固定bcmdhd moduleが既にactiveまたはload成功 / load失敗 |
-| `S35` / `E35` | `wlan0`出現・link up / interface未出現 |
+| `S35` / `E35` | `wlan0`出現・link up / interface未出現またはfirmware loadを伴うlink up失敗 |
 | `S36` / `E36` | device-owned WPA configからsupplicant開始 / config不在または開始失敗 |
 | `S37` / `E37` | APへassociation完了 / bounded timeout |
 | `S38` / `E38` | DHCP address取得とDropbear開始 / DHCP・host key・listener失敗 |

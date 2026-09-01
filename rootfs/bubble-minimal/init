@@ -47,6 +47,7 @@ start_recovery_network() {
     module=/lib/modules/4.19.193-g5a07852a55cf-dirty/kernel/drivers/net/wireless/rockchip_wlan/rkwifi/bcmdhd/bcmdhd.ko
     config=/storage/plumos/config/wpa_supplicant.conf
     host_key=/storage/plumos/ssh/dropbear_ed25519_host_key
+    : >/run/plumos-wifi.log
 
     if [ -d /sys/class/net/wlan0 ]; then
         network_stage S34_WIFI_MODULE_ALREADY_ACTIVE
@@ -68,8 +69,12 @@ start_recovery_network() {
         network_stage E35_WIFI_INTERFACE_MISSING
         return 0
     fi
-    $bb ip link set wlan0 up 2>/dev/null || true
-    network_stage S35_WIFI_INTERFACE_READY
+    if $bb ip link set wlan0 up >>/run/plumos-wifi.log 2>&1; then
+        network_stage S35_WIFI_INTERFACE_READY
+    else
+        network_stage E35_WIFI_INTERFACE_UP_FAILED
+        return 0
+    fi
 
     if [ ! -s "$config" ]; then
         network_stage E36_WIFI_CONFIG_MISSING

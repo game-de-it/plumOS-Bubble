@@ -81,8 +81,12 @@ install -m 0644 "$runtime/modules/bcmdhd.ko" \
     "$rootfs/lib/modules/4.19.193-g5a07852a55cf-dirty/kernel/drivers/net/wireless/rockchip_wlan/rkwifi/bcmdhd/bcmdhd.ko"
 install -m 0644 "$runtime/firmware/fw_bcm43438a1.bin" \
     "$rootfs/etc/firmware/fw_bcmdhd.bin"
+install -m 0644 "$runtime/firmware/fw_bcm43438a1.bin" \
+    "$rootfs/etc/firmware/fw_bcm43438a1.bin"
 install -m 0644 "$runtime/firmware/nvram_AP6330.txt" \
     "$rootfs/etc/firmware/nvram.txt"
+install -m 0644 "$runtime/firmware/nvram_AP6330.txt" \
+    "$rootfs/etc/firmware/nvram_ap6212a.txt"
 sed -i "s/VERSION_ID=.*/VERSION_ID=\"$version\"/" "$rootfs/etc/os-release"
 python3 "$repo_root/scripts/generate-bubble-fb-marker.py" \
     "$rootfs/usr/share/plumos/bubble-s33-xrgb8888.raw"
@@ -135,7 +139,8 @@ listing=$out_dir/squashfs-list.txt
 unsquashfs -ll "$payload/SYSTEM" > "$listing"
 for required in sbin/init usr/lib/systemd/systemd bin/busybox \
     usr/sbin/wpa_supplicant usr/sbin/dropbear usr/bin/dropbearkey \
-    etc/shadow etc/firmware/fw_bcmdhd.bin etc/firmware/nvram.txt \
+    etc/shadow etc/firmware/fw_bcmdhd.bin etc/firmware/fw_bcm43438a1.bin \
+    etc/firmware/nvram.txt etc/firmware/nvram_ap6212a.txt \
     lib/modules/4.19.193-g5a07852a55cf-dirty/kernel/drivers/net/wireless/rockchip_wlan/rkwifi/bcmdhd/bcmdhd.ko \
     usr/share/plumos/bubble-s33-xrgb8888.raw dev proc sys flash storage; do
     grep -q "squashfs-root/$required" "$listing"
