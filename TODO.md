@@ -11,18 +11,27 @@
 - [x] `BUB-P0-02` 起動中 CFW を SSH から読み取り専用で調査し、boot/storage/process/hardware inventory を記録する。
 - [x] `BUB-P0-03` Bubble porting plan と phase gate を作成する。
 - [x] `BUB-P0-04` Git repository を初期化し、local artifact/output を除外する。
+- [x] `BUB-P0-05A` V90S由来のp1 boot/System A/B、p2 matching boot、p3 ext4 runtime、
+  p4 FAT32 user/update、optional SD2というownership方向を採用する。
 - [ ] `BUB-P0-05` preserved / replaceable / unknown の path・partition ownership 表を、SD capture 後のhash付きで確定する。
 - [ ] `BUB-P0-06` original OS SD、ROM SD、ROM、BIOS、save、credential、active config の書き込み禁止境界を利用者と確認する。
 
 ## P1: stock media capture and recovery
 
-- [ ] `BUB-P1-01` OS SD を macOS へ接続し、disk identifier、physical/sector size、MBR、partition LBA、unpartitioned region を read-only で採取する。
+- [x] `BUB-P1-01` OS SD を macOS へ接続し、disk identifier、physical/sector size、MBR、partition LBA、unpartitioned region を read-only で採取する。
 - [ ] `BUB-P1-02` original OS SD の sector image または復元に必要な全領域を採取し、SHA-256 と readback を記録する。
 - [ ] `BUB-P1-03` ROM SD は filesystem metadata と dirty state だけを read-only で確認し、ROM/BIOS/save 内容を repository や build artifact に取り込まない。
 - [ ] `BUB-P1-04` raw Rockchip prefix、IDBLoader/SPL、U-Boot、environment の offset/size/hash を特定する。
+  - 先頭16 MiBをread-only取得し、exact size、SHA-256、RKNS/FIT/BL3X主要headerを確認済み。
+  - U-Boot environmentの保存場所、冗長性、boot source selectionは未確認。
 - [ ] `BUB-P1-05` `Image`、`SYSTEM`、`boot.scr/cmd`、`uEnv.txt`、全 DTB/DTBO の hash/provenance manifest を作成する。
+  - active `Image`、通常/HDMI DTB、適用overlay/fixup、U-Boot DTB、boot scriptをhash照合してlocal artifactへ取得済み。
+  - stock `SYSTEM`はanalysis-only hashだけを記録し、vendor/release outputへコピーしていない。
+  - 未選択を含む全DTB/DTBO inventoryとlicense/provenanceは未完了。
 - [ ] `BUB-P1-06` runtime device tree を採取し、selected `rk3566-gkd-geek-bbg.dtb` + overlays と比較する。
 - [ ] `BUB-P1-07` `/proc/config.gz`、module、firmware、vendor Mali userspace の ABI inventory を固定する。
+- [ ] `BUB-P1-07A` 現SYSTEMと生成plumOS Systemの実サイズからp1 A/B容量を計算し、
+  Bubble U-Boot/recovery proofからp2容量・形式を固定する。
 - [ ] `BUB-P1-08` sector image から複製 OS SD を作り、write後block readbackを実施する。
 - [ ] `BUB-P1-09` 複製 SD で cold boot、LCD、controller、audio、AP6330 Wi-Fi、SSH、ROM SD mount を物理確認する。
 - [ ] `BUB-P1-10` known-good SD 交換、boot log、SSH、可能なら UART を含む recovery procedure を実証する。
@@ -118,5 +127,5 @@
 
 ## Next action
 
-- [ ] OS SD を macOS に接続してもらい、`BUB-P1-01` から `BUB-P1-07` を完全読み取り専用で進める。
-
+- [ ] boot artifact captureを完了し、OS SDを実機へ戻してruntime DTB/kernel ABIをread-only採取する。
+- [ ] 別の複製用SDを用意し、original OS SDのdevice-to-device cloneとreadbackを行う。

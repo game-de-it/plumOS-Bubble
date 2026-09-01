@@ -1,0 +1,15 @@
+# 2026-09-01 Bubble stockOS-based CFW active boot inputs.
+# SYSTEM is analysis-only and must not be copied into a plumOS release.
+648078e91860adf21bd4ec8f1fd8a64ce52de0ce24511393b156b920327b4ec2  rockchip-boot-prefix.bin
+a6674c54976bf1bea36891bdb7f7a17c6f895437973adbda78fa7556570bfaab  Image
+e45423a917896397286295a546bc241f5d208695163fedd17dac33a664e3284e  SYSTEM.analysis-only
+88bd25f6883cbb8a2baba0d2322289f1664b73dceef08197e137ad93bd2b04b8  boot.cmd
+bd1395eb7f8e3d8a8858d21f8df83ce80863c0457b8b408e33065f958e2c8e20  boot.scr
+3b7992c12406d4f7b37d4c4aa9764bd047010838086399b7ef1df97246f74cc6  uEnv.txt
+2ac8e3bb27445267895980a30ccb94617105fcfd98b7ad656997ba875f7ebc60  rk3566-gkd-geek-bbg-uboot.dtb
+72be2b2295fd55ea71dd057248b875b082d1db57d8f706de319a6aea94683ec2  rk3566-gkd-geek-bbg.dtb
+fc063d74d4c30bdcb9614381ef5e53b16f572344888656ab205da94c5d787b40  rk3566-gkd-geek-bbg-hdmi.dtb
+3bc14efc86f7c89628b07f8f9dea30b15f96c0653fdc7c2f7d90ab6823755754  rk3568-fiq-debugger-uart2m0.dtbo
+ad4566498a89ca15f9aab3b4dc3652be29a4c409db64eaef113ae888092ed09b  rk3568-disable-npu.dtbo
+deba580fbff3bc97017f1c15c3f16615825b85231c80060d91bf43ffd18d78e9  rockchip-fixup.scr
+

@@ -41,22 +41,26 @@ recovery-capable boot -> plumOS System -> frontend -> NES/QuickNES
 | `plumOS-XU20V32` | boot prefix保全、matching System+Kernel update、physical acceptance | A133 layout、kernel config、display helpers |
 | `plumOS-A30` / `plumOS-MMF` | reversible entry、device backend、user-config preservation | MainUI hook、vendor display/input values |
 
-## Provisional architecture decision
+## Adopted storage direction and provisional boot implementation
+
+V90Sの4 partition ownershipとtransactional update contractをBubbleにも採用する。
+詳細と未確定gateは`docs/decisions/0001-v90s-derived-four-partition-layout.md`に記録した。
 
 初回観測では、OS SD は raw Rockchip boot prefix + FAT boot partition + ext4 storage で、
-FAT 上の `SYSTEM` SquashFS が `/` へ loop mount される。このため最有力候補は次である。
+FAT 上の `SYSTEM` SquashFS が `/` へ loop mount される。最終候補は次である。
 
 ```text
-preserved raw Rockchip prefix / U-Boot
-  -> preserved vendor 4.19 kernel + exact Bubble DTB + initial handoff
-  -> checksum-verified plumOS System A/B files
-  -> plumOS supervisor and recovery network
-  -> plumOS app layer on managed storage
-  -> separate mutable config and user media
+raw 16 MiB exact Rockchip prefix
+  -> p1 PLUMBOOT: boot resources + signed System A/B
+  -> p2 BOOT: matching kernel + DTB + initramfs/recovery bundle
+  -> p3 PLUMOS_SYS: ext4 managed runtime/state/rollback
+  -> p4 PLUMOS: FAT32 user content/update/logs
+  -> optional SD2: ROM/BIOS/media, not required for boot/update
 ```
 
-この決定は Phase 1 gate まで provisional とする。raw prefix、U-Boot env、initrd、runtime DTB、
-kernel/module/GPU ABI を再現可能に採取できない場合、独自 System への置換は開始しない。
+roleとupdate ownershipは採用済みだが、p1/p2/p3の正確な容量、p2 raw format、MBR/GPTは
+provisionalである。Bubble U-Bootのload/recoveryを複製SDで証明するまでは、現CFWと同じ
+p1 file bootを維持する。V90Sの物理sizeやAllwinner boot imageはコピーしない。
 
 ## Phase 0: repository and safety baseline
 
@@ -86,6 +90,8 @@ Deliverables:
 - kernel config、module/firmware、vendor Mali userspace の ABI/provenance inventory
 - original SD と複製 SD の byte/readback verification
 - known-good SD への戻し方と serial/SSH/log recovery route
+- V90S由来4 partition candidateのp1 A/B capacity計算、p2 boot形式、p3 seed/target、
+  p4/SD2 ownershipの確定
 
 Gate:
 
@@ -225,4 +231,3 @@ Preserved: 変更しなかったboot/user data
 Verified: host/build/deploy/readback/physicalを分離
 Remaining: 未確認の物理経路
 ```
-

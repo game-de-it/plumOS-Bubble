@@ -75,6 +75,32 @@ ROM SD は boot log で dirty volume と報告されている。現段階では�
 - `initrdimg` / `initrdsize` の実値と初期 userspace handoff
 - runtime に適用済みの exact DTB と `/flash` 上 DTB の一致
 
+### macOS raw prefix capture
+
+OS SDをmacOSへ接続し、`/dev/disk4`が次と一致することを確認してから全volumeをunmountし、
+`/dev/rdisk4`の先頭16 MiBだけを読み取った。SDへのwriteは実行していない。
+
+| 項目 | 観測値 |
+| --- | --- |
+| physical size | 124,383,133,696 bytes / 242,935,808 sectors |
+| sector size | 512 bytes |
+| partition table | MBR |
+| p1 start | sector 32768 / 16,777,216 bytes |
+| p1 | FAT32 `EMUELEC`, 5,967,233 sectors |
+| p2 | Linux type 0x83, 236,935,168 sectors |
+| captured prefix | exactly 16,777,216 bytes |
+| prefix SHA-256 | `648078e91860adf21bd4ec8f1fd8a64ce52de0ce24511393b156b920327b4ec2` |
+
+prefixはMBRだけではない。offset `0x8000`に`RKNS` loader、`0x100000`と`0x800000`に
+FIT header、`0xc00000`に`BL3X` headerがあり、RK3566 DDR初期化、U-Boot SPL 2017.09、
+ATF/U-Boot文字列を確認した。したがって16 MiB全体をexact immutable vendor inputとして扱い、
+個別領域へ分解して再配置する前に複製SDでboot equivalenceを証明する。
+
+FAT p1はread-only mountしてhashを取得した。active boot inputのexpected hashは
+`configs/bubble-stock-active-boot.expected.sha256`に記録した。p1にはuser-owned ROM fileも
+存在するため、boot artifact captureでは明示したkernel/DTB/scriptだけを対象にし、ROM treeを
+コピーまたはhash inventoryへ含めない。
+
 ### Display と GPU
 
 | 項目 | 観測値 |
@@ -121,12 +147,12 @@ charger-connected boot、suspend/resume は物理操作を伴うため未確認�
 
 ## 暫定結論
 
-最初の plumOS architecture 候補は、raw Rockchip boot prefix、U-Boot、vendor kernel、
-exact DTB と必要な firmware/module を hardware substrate として保持し、`SYSTEM` 以降を
-plumOS が所有する方式である。ただしこれは採用決定ではない。複製 OS SD から boot prefix、
-DTB、initrd/handoff を再現可能に採取し、rollback を実証した後に決定する。
+storage/update ownershipはV90S由来のp1 `PLUMBOOT`、p2 `BOOT`、p3 `PLUMOS_SYS`、
+p4 `PLUMOS`とoptional SD2を採用する。boot implementationは、raw Rockchip prefix、U-Boot、
+vendor kernel、exact DTB と必要な firmware/module をhardware substrateとして保持し、
+`SYSTEM`以降をplumOSが所有する方式を候補とする。p2形式と各容量は、複製SDでDTB、
+initrd/handoff、rollbackを実証した後に固定する。
 
 MF は同じ RK3566/RK817/640x480 の hardware probe 参考、Pixel2 は stock substrate と
 System ownership の参考、V90S/XU20 は vendor artifact 固定と transactional update の参考にする。
 各機種固有の path、button code、DTB、GPU library、partition number はコピーしない。
-
