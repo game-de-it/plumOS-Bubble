@@ -129,6 +129,9 @@
   - exact control存在時だけ`Resume Path=ON`、`Playback Path=SPK`、`SPK=40%`を行う
     guarded bring-upを実装。Bubble実機のcontrol/readbackとheadphone routeは未確認。
 - [ ] `BUB-P4-A02` supported rate/format、hardware pointer、XRUN、5分継続を speaker で確認する。
+  - QuickNES/gpSP/PCSX-ReARMed/Flycast Xtreme/YabaSanshiroでALSA `RUNNING`と
+    pointer進行を実機確認した。N64 2 coreは`PREPARED`/`hw_ptr=0`のため未解決。
+    speaker実聴、XRUN、5分継続は未確認。
 - [ ] `BUB-P4-A03` headphone 接続/抜去、ゲーム終了、suspend/resume 後の route 復帰を確認する。
 - [ ] `BUB-P4-P01` backlight 0..255 の安全範囲、段階、persist policy を決める。
 - [ ] `BUB-P4-P02` battery/charger node、capacity、charging状態、volume/power keyをhelperへ閉じ込める。
@@ -156,6 +159,8 @@
     software DRM/RGUI/ALSA/udev、GPU runtime非依存、component checksumをhost検証済み。
 - [ ] `BUB-P5-04` 利用者提供の小さな既知正常NES content 1本だけをGit外からtest deploymentする。
 - [ ] `BUB-P5-05` FE -> QuickNES -> FE のdisplay/input/audio lifecycleを実機確認する。
+  - RetroArchとPicoArchのQuickNESはcontent起動、ALSA pointer進行、停止後FE 1 process、
+    audio owner解放まで合格。LCDの向き/aspectとspeaker実聴は未確認。
 - [ ] `BUB-P5-06` menu/exit、save/state、reboot後の保持を確認する。
 - [ ] `BUB-P5-07` game終了後にfrontendが1 processだけで、DRM/input/audio owner残留がないことを確認する。
 
@@ -181,6 +186,8 @@
   - PicoArch、PCSX-ReARMed、YabaSanshiro、PPSSPP、OpenBOR、Pyxel、PortMasterを
     host build/checksum済み。DraSticは項目を維持し、`/dev/miyooio`非搭載理由付きで
     visible unsupported。各runtimeの実機検証を残す。
+  - PicoArchの欠落SDL2をcomponent内へ追加し、QuickNES contentと停止時child回収を実機確認。
+    standalone YabaSanshiroもSaturn content、GLES、ALSA、正常終了に合格した。
 - [ ] `BUB-P6-04` package済みcoreからFE導線、FE導線からlauncher/coreを双方向検証し、
   実行不能な導線も`未実装`/`未対応`理由付きで表示する。QuickNES-only app-layerはreleaseを拒否する。
   - 98 system / 196 profile / RetroArch 116 id / PicoArch 20 id / standalone 5 idと
@@ -194,6 +201,9 @@
   ROMセットを変更せず一括実機acceptanceを開始する。
   - hostでは全system/profile解決と114/114 core load smokeまで合格。
     contentを使う代表起動、画面・入力・音声・終了復帰は正式partition imageで一括実機試験する。
+  - 実機代表contentはNES/GBA/PS1/Dreamcast/Saturnのprocess・PCM進行に合格。
+    N64はParaLLEl/Mupen64Plus-NextともPCMが`PREPARED`のままで未合格。
+    PSP/NDSはROM SDにcontentがなく未試験。物理LCD/aspect/speaker確認を残す。
 
 ## P7: update, lifecycle and release
 
@@ -238,4 +248,7 @@
   - 全runtimeのhost build、98 system / 196 profileの導線検証、114/114 core load smoke、
     1.8 GiB app-layer checksumまで合格。first-boot p3拡張とp4生成もhost fixture合格。
     personalized full-stack validation imageのpartition/app-layer readbackも全合格し、旧imageを削除済み。
-    次はこの1本を一度だけwriteし、first bootと代表contentの一括実機acceptanceを行う。
+    実機first bootでp3=8 GiB拡張、p4作成は完了したが進捗画面は表示されなかった。
+    代表contentのruntime結果は
+    `docs/validation/2026-09-02-bubble-emulator-device-acceptance.md`へ記録した。
+    次は物理LCD/aspect/speaker確認、N64 audio修正、visible first-boot progressを行う。
