@@ -18,18 +18,23 @@ log() {
     fi
 }
 
-fat_stage() {
-    stage=$1
+fat_value() {
+    name=$1
+    value=$2
     mounted /flash || return 0
     if $bb mount -o remount,rw /flash 2>/dev/null; then
         $bb mkdir -p /flash/plumos-probe
-        printf '%s\n' "$stage" >/flash/plumos-probe/system-stage.tmp 2>/dev/null || true
+        printf '%s\n' "$value" >"/flash/plumos-probe/$name.tmp" 2>/dev/null || true
         $bb sync
-        $bb mv -f /flash/plumos-probe/system-stage.tmp \
-            /flash/plumos-probe/system-stage.txt 2>/dev/null || true
+        $bb mv -f "/flash/plumos-probe/$name.tmp" \
+            "/flash/plumos-probe/$name" 2>/dev/null || true
         $bb sync
         $bb mount -o remount,ro /flash 2>/dev/null || true
     fi
+}
+
+fat_stage() {
+    fat_value system-stage.txt "$1"
 }
 
 network_stage() {
@@ -124,6 +129,7 @@ start_recovery_network() {
         -r "$host_key" -p 22 -K 30 -I 300 \
         >>/run/dropbear/dropbear.log 2>&1; then
         log "stage=S38_RECOVERY_SSH_READY ip=$address port=22"
+        fat_value network-address.txt "$address"
         fat_stage S38_RECOVERY_SSH_READY
     else
         network_stage E38_SSH_START_FAILED

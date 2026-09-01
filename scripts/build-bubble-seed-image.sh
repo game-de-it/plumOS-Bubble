@@ -82,6 +82,7 @@ sed \
     "$boot/uEnv.txt" > "$work/boot/uEnv.txt"
 printf '%s\n' '----' > "$work/boot/plumos-probe/uboot-stage.txt"
 printf '%s\n' 'NOT_REACHED' > "$work/boot/plumos-probe/system-stage.txt"
+printf '%s\n' 'NOT_ASSIGNED' > "$work/boot/plumos-probe/network-address.txt"
 printf '%s\n' 'PLUMOS_BUBBLE_SEED_V1' > "$work/boot/plumos-probe/seed-authorized.txt"
 
 cat > "$work/storage/plumos/seed.manifest" <<EOF

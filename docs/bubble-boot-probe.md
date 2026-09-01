@@ -96,6 +96,7 @@ scripts/personalize-bubble-seed-wifi.sh \
 
 recovery SSHはTCP 22、user/passwordはdevelopment既定の`root` / `plumos`である。
 host keyはp2 `/plumos/ssh`へ初回生成し、System rebuildでは上書きしない。
+DHCP成功時のaddressはFAT `plumos-probe/network-address.txt`にも原子的に記録する。
 
 新SDへのwriteはwhole-disk identifier確定後にだけ行う。
 Mac内蔵SDXC readerは`Internal=true`と報告されるため、writerは`disk0`を常に拒否し、
