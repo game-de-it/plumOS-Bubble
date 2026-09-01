@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+
+action=shutdown
+dry_run=no
+for arg in "$@"; do
+    case "$arg" in
+        --reboot) action=reboot ;;
+        --shutdown|--poweroff) action=shutdown ;;
+        --dry-run) dry_run=yes ;;
+    esac
+done
+printf 'safe_power=begin action=%s\n' "$action" >/dev/console 2>/dev/null || true
+/bin/busybox sync
+[ "$dry_run" = no ] || exit 0
+/bin/busybox mount -o remount,ro /storage 2>/dev/null || true
+/bin/busybox mount -o remount,ro /flash 2>/dev/null || true
+/bin/busybox sync
+if [ "$action" = reboot ]; then
+    exec /bin/busybox reboot -f
+fi
+exec /bin/busybox poweroff -f

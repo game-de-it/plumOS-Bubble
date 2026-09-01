@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "themes": [
+    {"id": "default", "display_name": "Default", "path": "/storage/plumos/themes/default/theme.json", "builtin_fallback": true}
+  ]
+}

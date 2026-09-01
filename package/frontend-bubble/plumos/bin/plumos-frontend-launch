@@ -1,0 +1,42 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+LOG=$PLUMOS_ROOT/logs/frontend.log
+export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT"
+export PLUMOS_SDCARD_ROOT=${PLUMOS_SDCARD_ROOT:-/storage}
+export PLUMOS_ROM_ROOT=${PLUMOS_ROM_ROOT:-/storage/Roms}
+export PLUMOS_BIOS_ROOT=${PLUMOS_BIOS_ROOT:-/storage/BIOS}
+export PLUMOS_IMAGE_ROOT=${PLUMOS_IMAGE_ROOT:-/storage/Images}
+
+$BB mkdir -p "$PLUMOS_ROOT/logs" "$RUNTIME_ROOT/frontend" \
+    "$PLUMOS_ROOT/state/frontend" "$PLUMOS_ROOT/config/frontend" \
+    "$PLUMOS_ROOT/config/system" "$PLUMOS_ROM_ROOT/FC" \
+    "$PLUMOS_BIOS_ROOT" "$PLUMOS_IMAGE_ROOT/nes"
+printf 'frontend_start=stage-S40 device=bubble renderer=software-drm\n' >>"$LOG"
+
+seed_default() {
+    target=$1
+    factory=$2
+    if [ ! -s "$target" ]; then
+        $BB cp "$factory" "$target.next"
+        $BB sync
+        $BB mv "$target.next" "$target"
+        $BB sync
+        printf 'frontend_default=seeded target=%s\n' "$target" >>"$LOG"
+    else
+        printf 'frontend_default=preserved target=%s\n' "$target" >>"$LOG"
+    fi
+}
+seed_default "$PLUMOS_ROOT/config/frontend/settings.json" \
+    "$PLUMOS_ROOT/factory-defaults/frontend/settings.json"
+seed_default "$PLUMOS_ROOT/config/system/settings.json" \
+    "$PLUMOS_ROOT/factory-defaults/system/settings.json"
+
+printf 'frontend_scan=stage-S41\n' >>"$LOG"
+PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+    "$PLUMOS_ROOT/bin/plumos-library-scan" --defer-thumbnails >>"$LOG" 2>&1
+printf 'frontend_exec=stage-S42\n' >>"$LOG"
+exec "$BB" sh "$PLUMOS_ROOT/bin/plumos-controller-ui-bubble" "$@" >>"$LOG" 2>&1

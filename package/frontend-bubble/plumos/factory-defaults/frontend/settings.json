@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "ui_mode": "graphic",
+  "top_mode": "graphic",
+  "rom_mode": "graphic",
+  "show_empty_systems": true,
+  "show_favorites_on_top": false,
+  "show_recent_on_top": false,
+  "rom_cursor_wrap": true,
+  "boot_resume_mode": "off",
+  "sort_systems": "sort_order",
+  "sort_roms": "name",
+  "rom_scan_policy": "on_enter",
+  "theme_id": "default",
+  "graphic_theme_id": "default",
+  "last_system_id": ""
+}

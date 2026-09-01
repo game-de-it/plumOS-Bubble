@@ -1,0 +1,25 @@
+#!/bin/sh
+
+bb=/bin/busybox
+
+case "${1:-}" in
+deconfig)
+    "$bb" ifconfig "$interface" 0.0.0.0
+    ;;
+bound|renew)
+    "$bb" ifconfig "$interface" "$ip" \
+        ${broadcast:+broadcast "$broadcast"} \
+        ${subnet:+netmask "$subnet"}
+    if [ -n "${router:-}" ]; then
+        "$bb" route del default dev "$interface" 2>/dev/null || true
+        set -- $router
+        "$bb" route add default gw "$1" dev "$interface"
+    fi
+    : >/run/resolv.conf
+    for server in ${dns:-}; do
+        printf 'nameserver %s\n' "$server" >>/run/resolv.conf
+    done
+    ;;
+esac
+
+exit 0

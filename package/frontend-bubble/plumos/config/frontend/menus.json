@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "menus": [
+    {
+      "id": "start",
+      "display_name": "START",
+      "entries": [
+        {"id": "apps", "display_name": "Apps", "kind": "submenu", "action": "menu:apps"},
+        {"id": "help", "display_name": "Help", "kind": "internal", "action": "internal:help"},
+        {"id": "reboot", "display_name": "Reboot", "kind": "system", "action": "system:reboot", "confirm": true},
+        {"id": "shutdown", "display_name": "Shutdown", "kind": "system", "action": "system:shutdown", "confirm": true}
+      ]
+    }
+  ]
+}

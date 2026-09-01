@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+wanted=${1:-controller}
+case "$wanted" in
+    controller) name=retrogame_joypad ;;
+    power) name='rk805 pwrkey' ;;
+    volume) name=gpio-keys ;;
+    *) echo "usage: $0 controller|power|volume" >&2; exit 2 ;;
+esac
+
+event=
+matched=
+while IFS= read -r line; do
+    case "$line" in
+        N:\ Name=*)
+            case "$line" in *\"$name\"*) matched=yes ;; *) matched= ;; esac
+            ;;
+        H:\ Handlers=*)
+            if [ "$matched" = yes ]; then
+                for handler in $line; do
+                    case "$handler" in event[0-9]*) event=/dev/input/$handler ;; esac
+                done
+                [ -z "$event" ] || break
+            fi
+            ;;
+        '') matched= ;;
+    esac
+done </proc/bus/input/devices
+[ -n "$event" ] || exit 1
+printf '%s\n' "$event"

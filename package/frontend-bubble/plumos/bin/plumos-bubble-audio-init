@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+AMIXER=$PLUMOS_ROOT/bin/plumos-amixer
+LOG=$PLUMOS_ROOT/logs/audio-init.log
+export LD_LIBRARY_PATH=$PLUMOS_ROOT/emulator/lib
+export ALSA_CONFIG_PATH=$PLUMOS_ROOT/share/alsa/alsa.conf
+[ -x "$AMIXER" ] || { echo 'audio_init=result-skipped reason=amixer-missing' >>"$LOG"; exit 0; }
+controls=$($AMIXER -c 0 scontrols 2>>"$LOG" || true)
+printf '%s\n' "$controls" >>"$LOG"
+has_control() { printf '%s\n' "$controls" | grep -Fq "'$1'"; }
+if has_control 'Resume Path' && has_control 'Playback Path' && has_control 'SPK'; then
+    $AMIXER -c 0 sset 'Resume Path' ON >>"$LOG" 2>&1
+    $AMIXER -c 0 sset 'Playback Path' SPK >>"$LOG" 2>&1
+    $AMIXER -c 0 sset 'SPK' 40% >>"$LOG" 2>&1
+    echo 'audio_init=result-ok route=SPK volume=40-percent' >>"$LOG"
+else
+    echo 'audio_init=result-skipped reason=exact-rk817-controls-not-found' >>"$LOG"
+fi

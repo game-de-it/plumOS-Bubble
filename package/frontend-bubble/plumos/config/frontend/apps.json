@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "apps": [
+    {
+      "id": "retroarch",
+      "display_name": "RetroArch",
+      "kind": "emulator",
+      "launch_profile": "shell:$PLUMOS_ROOT/bin/plumos-retroarch-menu-launch",
+      "visible": true,
+      "menu": "apps"
+    }
+  ]
+}

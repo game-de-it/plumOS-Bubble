@@ -1,0 +1,5 @@
+::sysinit:/bin/mount -o remount,ro /storage
+ttyFIQ0::respawn:/bin/sh
+tty1::respawn:/bin/sh
+::ctrlaltdel:/bin/sync
+::shutdown:/bin/umount -a -r

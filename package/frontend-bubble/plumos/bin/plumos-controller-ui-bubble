@@ -1,0 +1,30 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+controller=${PLUMOS_INPUT_EVENT:-}
+power=${PLUMOS_POWER_INPUT_EVENT:-}
+[ -n "$controller" ] || controller=$($BB sh "$PLUMOS_ROOT/bin/plumos-bubble-find-input" controller)
+[ -n "$power" ] || power=$($BB sh "$PLUMOS_ROOT/bin/plumos-bubble-find-input" power 2>/dev/null || true)
+
+export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT"
+export PLUMOS_SDCARD_ROOT=${PLUMOS_SDCARD_ROOT:-/storage}
+export PLUMOS_ROM_ROOT=${PLUMOS_ROM_ROOT:-/storage/Roms}
+export PLUMOS_BIOS_ROOT=${PLUMOS_BIOS_ROOT:-/storage/BIOS}
+export PLUMOS_IMAGE_ROOT=${PLUMOS_IMAGE_ROOT:-/storage/Images}
+export PLUMOS_DEVICE_ID=bubble PLUMOS_RENDERER=fbdev
+export PLUMOS_DEVICE_NAME='GKD Bubble'
+export PLUMOS_FB=${PLUMOS_FB:-/dev/fb0}
+export PLUMOS_DRM_DEVICE=${PLUMOS_DRM_DEVICE:-/dev/dri/card0}
+export PLUMOS_FBDEV_ROTATION=${PLUMOS_FBDEV_ROTATION:-none}
+export PLUMOS_FE_ANALOG_NAVIGATION=${PLUMOS_FE_ANALOG_NAVIGATION:-0}
+export PLUMOS_FRONTEND_LIB_DIR=${PLUMOS_FRONTEND_LIB_DIR:-$PLUMOS_ROOT/frontend/lib}
+export LD_LIBRARY_PATH="$PLUMOS_FRONTEND_LIB_DIR"
+export PLUMOS_INPUT_TRACE_PATH=${PLUMOS_INPUT_TRACE_PATH:-$PLUMOS_ROOT/logs/input-events.log}
+export PLUMOS_FRAME_STATS_PATH=${PLUMOS_FRAME_STATS_PATH:-$PLUMOS_ROOT/logs/frontend-frame-stats.log}
+
+set -- --renderer fbdev --fb "$PLUMOS_FB" --event "$controller" "$@"
+[ -z "$power" ] || set -- "$@" --power-event "$power"
+exec "$PLUMOS_ROOT/bin/plumos-controller-ui-fbdev" "$@"

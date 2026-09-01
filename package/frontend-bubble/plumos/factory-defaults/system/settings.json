@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "device": "bubble",
+  "model": "GKD Bubble",
+  "language": "ja.lang",
+  "timezone": "Asia/Tokyo",
+  "brightness": 128,
+  "volume": 40
+}

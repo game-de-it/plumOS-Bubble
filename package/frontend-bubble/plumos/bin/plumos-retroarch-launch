@@ -1,0 +1,44 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+system=
+core=
+rom=
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --system) system=$2; shift 2 ;;
+        --core) core=$2; shift 2 ;;
+        --rom) rom=$2; shift 2 ;;
+        --cpu|--audio|--audio-latency|--safe-exit) shift 2 ;;
+        --auto-state) shift ;;
+        *) echo "plumos-retroarch-launch: unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+[ "$system" = nes ] || { echo 'only NES is enabled in this bring-up image' >&2; exit 2; }
+[ "$core" = "$PLUMOS_ROOT/cores/quicknes_libretro.so" ] || { echo 'unexpected core path' >&2; exit 2; }
+case "$rom" in /storage/Roms/*) ;; *) echo 'ROM path escaped /storage/Roms' >&2; exit 2 ;; esac
+[ -f "$core" ] && [ -f "$rom" ] || exit 1
+config=$PLUMOS_ROOT/config/retroarch/retroarch-bubble.cfg
+factory=$PLUMOS_ROOT/factory-defaults/retroarch/retroarch-bubble.cfg
+$BB mkdir -p "$PLUMOS_ROOT/config/retroarch" "$PLUMOS_ROOT/logs" \
+    "$PLUMOS_ROOT/saves" "$PLUMOS_ROOT/states" "$RUNTIME_ROOT/retroarch"
+if [ ! -s "$config" ]; then
+    $BB cp "$factory" "$config.next"
+    $BB sync
+    $BB mv "$config.next" "$config"
+    $BB sync
+fi
+export LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib"
+export ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf"
+export XDG_CONFIG_HOME="$PLUMOS_ROOT/config"
+printf 'retroarch_game=stage-S70 system=%s core=quicknes\n' "$system" >>"$PLUMOS_ROOT/logs/session.log"
+set +e
+"$PLUMOS_ROOT/bin/retroarch" -v -c "$config" -L "$core" "$rom" \
+    >>"$PLUMOS_ROOT/logs/retroarch-game.log" 2>&1
+rc=$?
+set -e
+printf 'retroarch_game=stage-S79 rc=%s\n' "$rc" >>"$PLUMOS_ROOT/logs/session.log"
+exit "$rc"

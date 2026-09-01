@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+config=$PLUMOS_ROOT/config/retroarch/retroarch-bubble.cfg
+factory=$PLUMOS_ROOT/factory-defaults/retroarch/retroarch-bubble.cfg
+$BB mkdir -p "$PLUMOS_ROOT/config/retroarch" "$PLUMOS_ROOT/logs" "$RUNTIME_ROOT/retroarch"
+if [ ! -s "$config" ]; then
+    $BB cp "$factory" "$config.next"
+    $BB sync
+    $BB mv "$config.next" "$config"
+    $BB sync
+fi
+export LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib"
+export ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf"
+export XDG_CONFIG_HOME="$PLUMOS_ROOT/config"
+printf 'retroarch_menu=stage-S60 begin\n' >>"$PLUMOS_ROOT/logs/session.log"
+set +e
+"$PLUMOS_ROOT/bin/retroarch" -v -c "$config" \
+    >>"$PLUMOS_ROOT/logs/retroarch-menu.log" 2>&1
+rc=$?
+set -e
+printf 'retroarch_menu=stage-S69 end rc=%s\n' "$rc" >>"$PLUMOS_ROOT/logs/session.log"
+exit "$rc"
