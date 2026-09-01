@@ -3,8 +3,8 @@
 Date: 2026-09-01; latest corrective build 2026-09-02
 Source commit: `ed9549b`
 
-Scope: host build、private personalization、2回のphysical失敗解析。
-latest corrective buildのphysical Wi-Fi/SSHは未実施。
+Scope: host build、private personalization、2回のphysical失敗解析、3回目physical合格。
+latest corrective buildのWi-Fi/DHCP/SSHは実機確認済み。
 
 ## Recovery System
 
@@ -118,3 +118,25 @@ association statusをpersistent logの元になる`/run/plumos-wifi.log`へ追�
 base imageは独立verifierに合格し、private imageはext4 `e2fsck -fn`、config byte一致、
 mode 0600、full-image checksum、baseとのboot領域553,648,128 bytesの一致、
 平文password非混入に合格した。このlatest imageのphysical bootは次のgateとする。
+
+## Third physical network boot
+
+source `ed9549b`のprivate seedをcold bootし、共通plumOS logoとBusyBox promptを確認した。
+Macから`192.168.10.101`のARP MAC `6c:21:a2:59:45:d6`を照合し、pingとTCP 22、
+root SSH loginに合格した。
+
+SSHから次を読み戻した。
+
+- `wpa_state=COMPLETED`、WPA2-PSK、AP channel 12、`192.168.10.101/24`
+- default route `192.168.10.1`、DHCP lease 172800 seconds
+- `S30_SYSTEM_ENTRY`から`S39_RECOVERY_IDLE_STORAGE_RO`まで全stage連続成功
+- FAT `network-address.txt=192.168.10.101`
+- `/flash` vfat、`/storage` ext4、SYSTEM SquashFSはすべてread-only
+- Dropbearはdevice-sideで初回host keyを生成・永続化しTCP 22で稼働
+- device上のimage/System/seed manifestはsource `ed9549b`、SYSTEM SHA-256
+  `49514b6454e84f0e2efdbdcb549df64bd416c1b83e1de76516dad7e6ddb09bc2`、
+  `final_partition_contract=no`、`first_boot_provisioning=not-included`、`publishable=no`で一致
+
+kernel logはhash固定firmware/NVRAMのopen、`Link UP`、`connection succeeded`を再度記録した。
+SSHから`sync; poweroff`を実行し、Macから2回目のpollでping unreachableを確認した。
+SDをhostへ戻した後のFAT/ext4 clean checkは未実施である。

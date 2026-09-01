@@ -60,7 +60,7 @@
   - AArch64 static BusyBox、stock handoff互換entrypoint、FAT/ext4/console/kmsg stage、
     framebuffer `S33` markerを持つ最小Systemと2 GiB seed imageをhost build/verifyした。
   - 新SDでphysical cold bootし、FAT `S39`、p2の全stage、clean ext4、BusyBox promptをreadback確認した。
-- [ ] `BUB-P2-06` stock FE を開始せず、plumOS marker、log、recovery SSH を保持できることを実機確認する。
+- [x] `BUB-P2-06` stock FE を開始せず、plumOS marker、log、recovery SSH を保持できることを実機確認する。
   - stock FEを開始せず、framebuffer marker、persistent log、BusyBox promptまでは実証済み。
   - AP6330、bounded WPA/DHCP、Dropbear recovery SSHを次seedへ実装しhost検証済み。
   - device-owned credential入りpersonalized imageを生成済み。実機Wi-Fi/SSH確認は未実施。
@@ -69,7 +69,8 @@
   - 2回目はfirmware/NVRAM download、WPA開始、APへのlink upまで成功したが、SYSTEM内の
     `/usr/sbin/wpa_cli`を`/usr/bin/wpa_cli`で呼んだため接続完了を検出できず`E37`。
   - `wpa_cli` pathを修正し、bounded association status logを追加したsource `ed9549b`の
-    private seedを再生成・host検証済み。最新seedの実機Wi-Fi/DHCP/SSHは未実施。
+    private seedで`S30..S39`、WPA2 association、DHCP `.101`、Dropbear SSH、FAT IP marker、
+    p1/p2 read-onlyを実機確認し、SSHからのnormal poweroffを実施した。
 - [ ] `BUB-P2-07` probe failure を意図的に起こし、original/known-good SDへ確実にrollbackできることを確認する。
 - [ ] `BUB-P2-08` preserved vendor substrate と plumOS-owned boundary の architecture decision record を確定する。
 
@@ -163,3 +164,4 @@
 - [x] diagnostic seedを正式layoutからmanifest/verifierで機械的に区別し、release対象にしない。
 - [ ] V90S型first-boot provisioningとSystem A/B/update metadataをBubble geometryへ移植する。
 - [ ] cold bootし、Wi-Fi association、DHCP、SSH、log、normal shutdown後のext4 cleanを確認する。
+  - association、DHCP、SSH、persistent log、normal shutdownは合格。SD readbackのext4 cleanのみ未確認。
