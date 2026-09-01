@@ -91,3 +91,8 @@ now pass the separate real block-device host fixture. The next device cycle
 must use the full-stack validation seed and perform one batched physical pass
 covering first-boot provisioning, FE enumeration, representative content,
 video/input/audio, menu/exit, save/state, FE return, and device-owner cleanup.
+
+The resulting personalized full-stack validation image subsequently passed
+the same catalog, component checksum, and 114/114 load gates from p3 readback.
+Its image identity is recorded in
+`docs/validation/2026-09-02-bubble-first-boot-storage-host.md`.

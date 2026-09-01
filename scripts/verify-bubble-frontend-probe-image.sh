@@ -99,12 +99,16 @@ done
 ! grep -q fatwrite "$verify/boot.cmd"
 
 gzip -dc "$initramfs" | (cd "$verify/initramfs" && /bin/busybox cpio -idm 2>/dev/null)
-for stage in S21 S22 S23 S24 S24A S24B S24C S24D S25 S26 S27 S28 S29 \
-    E23 E24 E24A E24B E24C E24D E25 E26 E27 E28 E29; do
+for stage in S21 S22 S23 S24 S25 S26 S27 S28 S29 \
+    E23 E24 E25 E26 E27 E28 E29; do
     grep -q "$stage" "$verify/initramfs/init"
 done
 test "$(stat -c '%a' "$verify/initramfs/init")" = 755
 test "$(stat -c '%a' "$verify/initramfs/usr/sbin/plumos-bubble-provision-storage")" = 755
+for stage in S24A S24B S24C S24D E24A E24B E24C E24D; do
+    grep -q "$stage" \
+        "$verify/initramfs/usr/sbin/plumos-bubble-provision-storage"
+done
 for tool in parted partprobe e2fsck resize2fs mkfs.fat fsck.fat; do
     test -x "$verify/initramfs/usr/sbin/$tool"
 done

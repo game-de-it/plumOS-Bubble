@@ -66,3 +66,25 @@ bubble_first_boot_storage_test=result-ok
 
 Physical first-boot timing, panel progress, kernel partition reread on the
 Bubble SD controller, clean poweroff, and post-boot readback remain required.
+
+## Full-stack validation image
+
+The 2304 MiB p3 seed was assembled with the complete emulator stack and then
+verified by partition readback. The base image passed System A/B, initramfs,
+all seven component checksums, the 98-system/196-profile bidirectional FE
+catalog gate, and the 114/114 libretro load smoke. A private derivative was
+then created from the verified base by writing only the external
+`wpa_supplicant.conf`; mode 0600 and exact content were read back before the
+image was accepted.
+
+```text
+file=plumOS-Bubble-0.1.0-dev-full-stack-validation-wifi-private.img
+size=3036676096
+sha256=de03259a27fe9b24579a08d13d5f6716ba5fde39ffc2dce3b9d467b8bb6c53ee
+source_ref=9424a2e
+personalized=yes
+publishable=no
+```
+
+The base and the previous QuickNES-era diagnostic image were removed after
+the private image passed the same full readback. Exactly one `.img` remains.

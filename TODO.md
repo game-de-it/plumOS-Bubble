@@ -237,4 +237,5 @@
   host coverage gateに合格してからROM総合試験へ進む。
   - 全runtimeのhost build、98 system / 196 profileの導線検証、114/114 core load smoke、
     1.8 GiB app-layer checksumまで合格。first-boot p3拡張とp4生成もhost fixture合格。
-    次は現1.5 GiB診断用p3へlive deployせず、full-stack validation seedを一度だけwriteする。
+    personalized full-stack validation imageのpartition/app-layer readbackも全合格し、旧imageを削除済み。
+    次はこの1本を一度だけwriteし、first bootと代表contentの一括実機acceptanceを行う。
