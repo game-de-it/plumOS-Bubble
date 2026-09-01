@@ -1,14 +1,17 @@
 plumOS Bubble minimal System notice
 
 The diagnostic read-only System contains plumOS-authored init and display
-marker files plus the statically linked BusyBox binary from the pinned Debian
-Bookworm arm64 build environment.
+marker files, the statically linked BusyBox binary, and the Dropbear and
+wpa_supplicant recovery-network clients from the pinned Debian Bookworm arm64
+build environment.
 
-plumOS-authored files use the repository MIT License. BusyBox retains its
-upstream GPL terms. The System image packages the corresponding license and
-Debian copyright documents under /usr/share/licenses.
+plumOS-authored files use the repository MIT License. BusyBox, Dropbear,
+wpa_supplicant, and their runtime libraries retain their upstream terms. The
+System image packages the corresponding Debian copyright documents under
+/usr/share/licenses.
 
 The generated development seed also contains captured stock Bubble boot
-artifacts. It is an analysis and physical bring-up artifact, not a public
-release. Redistribution remains prohibited until provenance and license review
-is complete.
+artifacts and the hash-pinned bcmdhd module/firmware/NVRAM hardware substrate.
+It is an analysis and physical bring-up artifact, not a public release.
+Redistribution remains prohibited until provenance and license review is
+complete.

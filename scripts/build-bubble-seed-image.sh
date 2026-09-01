@@ -57,7 +57,8 @@ verify_registered rockchip-fixup.scr \
 
 case "$work" in /work/work/bubble-seed-image) ;; *) exit 2;; esac
 find "$work" -depth -delete 2>/dev/null || true
-mkdir -p "$work/boot" "$work/storage/plumos/logs" "$work/storage/update-state" "$out_dir"
+mkdir -p "$work/boot" "$work/storage/plumos/logs" \
+    "$work/storage/plumos/config" "$work/storage/update-state" "$out_dir"
 
 kernel_version=4.19.193-51-rockchip-gb2c01b3d79f2
 dtb_root=$work/boot/dtbs/$kernel_version/rockchip
@@ -111,6 +112,8 @@ system_sha256=$(sha256sum "$system_dir/SYSTEM" | cut -d' ' -f1)
 layout=bringup-v1,raw-prefix-16MiB,p1-fat32-512MiB,p2-ext4-remainder
 root_uuid=42554242-4c45-5359-5300-000000000002
 logging=uboot-fat,system-console,system-kmsg,system-fat,system-ext4
+recovery_network=ap6330-bcmdhd,wpa_supplicant,dropbear
+wifi_credentials=external-device-owned-p2-config
 EOF
 
 total_sectors=4194304
@@ -142,7 +145,8 @@ E2FSPROGS_FAKE_TIME="$source_epoch" mkfs.ext4 -q -F -L PLUMOS_SYS \
 # mke2fs -d preserves the host ctime for imported inodes.  ctime cannot be
 # backdated with touch(1), so normalize the populated paths explicitly.
 # Root and lost+found are already governed by E2FSPROGS_FAKE_TIME.
-for ext4_path in /plumos /plumos/logs /plumos/seed.manifest /update-state; do
+for ext4_path in /plumos /plumos/logs /plumos/config \
+    /plumos/seed.manifest /update-state; do
     debugfs -w -R "set_inode_field $ext4_path ctime @$source_epoch" \
         "$sys_ext4" >/dev/null 2>&1
 done

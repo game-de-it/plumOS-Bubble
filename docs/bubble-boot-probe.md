@@ -32,6 +32,11 @@ prepare/install scriptは拒否する。
 | `S31` / `E31` | p2 ext4 `/storage` mount成功 / 失敗 |
 | `S32` / `E32` | p1 FAT `/flash` mount成功 / 失敗 |
 | `S33` / `E33` | framebuffer marker描画成功 / fbdev利用不可 |
+| `S34` / `E34` | hash固定bcmdhd moduleが既にactiveまたはload成功 / load失敗 |
+| `S35` / `E35` | `wlan0`出現・link up / interface未出現 |
+| `S36` / `E36` | device-owned WPA configからsupplicant開始 / config不在または開始失敗 |
+| `S37` / `E37` | APへassociation完了 / bounded timeout |
+| `S38` / `E38` | DHCP address取得とDropbear開始 / DHCP・host key・listener失敗 |
 | `S39` / `E39` | 最小recovery待機へ到達しp2をread-only化 / read-only化失敗 |
 | `S40` | built-in initramfsと`SYSTEM` handoff後、systemd probeへ到達 |
 | `S45` | `/storage` persistent logへ書込み成功 |
@@ -76,6 +81,21 @@ build/verify:
 scripts/build-bubble-seed-image.sh
 scripts/verify-bubble-seed-image.sh
 ```
+
+Wi-Fi credentialは共通imageへ入れない。通常形式の`wpa_supplicant.conf`をrepository外に作り、
+`ctrl_interface=/run/wpa_supplicant`を含める。次のpersonalizationはbase imageを変更せず、
+別imageのp2 `/plumos/config/wpa_supplicant.conf`へmode 0600で書く。生成したpersonalized imageは
+credentialを含むため公開しない。
+
+```sh
+scripts/personalize-bubble-seed-wifi.sh \
+  output/image/bubble/plumOS-Bubble-0.1.0-dev-seed.img \
+  /absolute/private/path/wpa_supplicant.conf \
+  output/image/bubble/plumOS-Bubble-0.1.0-dev-seed-wifi.img
+```
+
+recovery SSHはTCP 22、user/passwordはdevelopment既定の`root` / `plumos`である。
+host keyはp2 `/plumos/ssh`へ初回生成し、System rebuildでは上書きしない。
 
 新SDへのwriteはwhole-disk identifier確定後にだけ行う。
 

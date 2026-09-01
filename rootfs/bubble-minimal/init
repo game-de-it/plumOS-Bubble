@@ -32,6 +32,127 @@ fat_stage() {
     fi
 }
 
+network_stage() {
+    stage=$1
+    log "stage=$stage"
+    fat_stage "$stage"
+}
+
+start_recovery_network() {
+    module=/lib/modules/4.19.193-g5a07852a55cf-dirty/kernel/drivers/net/wireless/rockchip_wlan/rkwifi/bcmdhd/bcmdhd.ko
+    config=/storage/plumos/config/wpa_supplicant.conf
+    host_key=/storage/plumos/ssh/dropbear_ed25519_host_key
+
+    if [ -d /sys/class/net/wlan0 ]; then
+        network_stage S34_WIFI_MODULE_ALREADY_ACTIVE
+    elif [ -f "$module" ] && $bb insmod "$module" \
+        firmware_path=/etc/firmware/fw_bcmdhd.bin \
+        nvram_path=/etc/firmware/nvram.txt 2>/dev/null; then
+        network_stage S34_WIFI_MODULE_LOADED
+    else
+        network_stage E34_WIFI_MODULE_LOAD_FAILED
+        return 0
+    fi
+
+    count=0
+    while [ ! -d /sys/class/net/wlan0 ] && [ "$count" -lt 50 ]; do
+        $bb sleep 0.2
+        count=$((count + 1))
+    done
+    if [ ! -d /sys/class/net/wlan0 ]; then
+        network_stage E35_WIFI_INTERFACE_MISSING
+        return 0
+    fi
+    $bb ip link set wlan0 up 2>/dev/null || true
+    network_stage S35_WIFI_INTERFACE_READY
+
+    if [ ! -s "$config" ]; then
+        network_stage E36_WIFI_CONFIG_MISSING
+        return 0
+    fi
+    $bb mkdir -p /run/wpa_supplicant
+    if /usr/sbin/wpa_supplicant -B -P /run/wpa_supplicant.pid \
+        -i wlan0 -D nl80211,wext -c "$config" \
+        >>/run/plumos-wifi.log 2>&1; then
+        network_stage S36_WPA_STARTED
+    else
+        network_stage E36_WPA_START_FAILED
+        return 0
+    fi
+
+    count=0
+    associated=false
+    while [ "$count" -lt 60 ]; do
+        if /usr/bin/wpa_cli -p /run/wpa_supplicant -i wlan0 status \
+            2>/dev/null | $bb grep -q '^wpa_state=COMPLETED$'; then
+            associated=true
+            break
+        fi
+        $bb sleep 0.5
+        count=$((count + 1))
+    done
+    if [ "$associated" != true ]; then
+        network_stage E37_WIFI_ASSOCIATION_TIMEOUT
+        return 0
+    fi
+    network_stage S37_WIFI_ASSOCIATED
+
+    if ! $bb udhcpc -q -n -t 5 -T 3 -i wlan0 \
+        -p /run/udhcpc-wlan0.pid -s /usr/share/udhcpc/default.script \
+        >>/run/plumos-wifi.log 2>&1; then
+        network_stage E38_DHCP_FAILED
+        return 0
+    fi
+    address=$($bb ip -4 addr show dev wlan0 2>/dev/null | \
+        $bb awk '/inet / { sub("/.*", "", $2); print $2; exit }')
+    if [ -z "$address" ]; then
+        network_stage E38_ADDRESS_MISSING
+        return 0
+    fi
+
+    $bb mkdir -p /storage/plumos/ssh /run/dropbear /root/.ssh
+    $bb chmod 0700 /storage/plumos/ssh /root/.ssh 2>/dev/null || true
+    if [ ! -s "$host_key" ]; then
+        /usr/bin/dropbearkey -t ed25519 -f "$host_key" \
+            >>/run/dropbear/dropbear.log 2>&1 || {
+            network_stage E38_SSH_HOST_KEY_FAILED
+            return 0
+        }
+        $bb chmod 0600 "$host_key" 2>/dev/null || true
+    fi
+    if /usr/sbin/dropbear -E -P /run/dropbear/dropbear.pid \
+        -r "$host_key" -p 22 -K 30 -I 300 \
+        >>/run/dropbear/dropbear.log 2>&1; then
+        log "stage=S38_RECOVERY_SSH_READY ip=$address port=22"
+        fat_stage S38_RECOVERY_SSH_READY
+    else
+        network_stage E38_SSH_START_FAILED
+    fi
+}
+
+capture_snapshot() {
+    for runtime_log in plumos-wifi.log dropbear/dropbear.log; do
+        [ -f "/run/$runtime_log" ] || continue
+        destination=${runtime_log##*/}
+        $bb cat "/run/$runtime_log" \
+            >>"/storage/plumos/logs/$destination" 2>/dev/null || true
+    done
+    {
+        echo '=== cmdline ==='
+        cat /proc/cmdline 2>/dev/null || true
+        echo '=== mounts ==='
+        cat /proc/mounts 2>/dev/null || true
+        echo '=== addresses ==='
+        $bb ip addr 2>/dev/null || true
+        echo '=== devices ==='
+        ls -l /dev/mmcblk* /dev/fb* /dev/dri/* /dev/input/event* 2>/dev/null || true
+        echo '=== processes ==='
+        $bb ps w 2>/dev/null || true
+        echo '=== kernel tail ==='
+        dmesg 2>/dev/null | tail -240 || true
+    } >/storage/plumos/logs/minimal-snapshot.txt 2>/dev/null || true
+}
+
 mounted /proc || $bb mount -t proc proc /proc 2>/dev/null || true
 mounted /sys || $bb mount -t sysfs sysfs /sys 2>/dev/null || true
 mounted /dev || $bb mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
@@ -70,17 +191,6 @@ else
     log 'stage=E32_FLASH_NOT_MOUNTED'
 fi
 
-{
-    echo '=== cmdline ==='
-    cat /proc/cmdline 2>/dev/null || true
-    echo '=== mounts ==='
-    cat /proc/mounts 2>/dev/null || true
-    echo '=== devices ==='
-    ls -l /dev/mmcblk* /dev/fb* /dev/dri/* /dev/input/event* 2>/dev/null || true
-    echo '=== kernel tail ==='
-    dmesg 2>/dev/null | tail -200 || true
-} >/storage/plumos/logs/minimal-snapshot.txt 2>/dev/null || true
-
 if [ -c /dev/fb0 ] && [ -r /usr/share/plumos/bubble-s33-xrgb8888.raw ]; then
     $bb cat /usr/share/plumos/bubble-s33-xrgb8888.raw >/dev/fb0 2>/dev/null && {
         log 'stage=S33_FRAMEBUFFER_MARKER_DRAWN'
@@ -90,6 +200,9 @@ else
     log 'stage=E33_FRAMEBUFFER_UNAVAILABLE'
     fat_stage E33_FRAMEBUFFER_UNAVAILABLE
 fi
+
+start_recovery_network
+capture_snapshot
 
 log 'stage=S39_RECOVERY_IDLE_STORAGE_RO'
 fat_stage S39_RECOVERY_IDLE_STORAGE_RO
