@@ -49,13 +49,17 @@
 - [ ] `BUB-P2-02` U-Boot の boot source selection、environment、root UUID、initrd variables、fallback を記録する。
 - [ ] `BUB-P2-03` boot milestone を serial/FAT/persistent log に記録し、cold/warm boot baseline を測る。
   - U-Boot `S10..E20`、systemd/frontend `S40..S90/E80`の二系統probeとclone-only guardを実装済み。
-  - 複製SDでのreadback、cold/warm boot実測は未実施。
+  - 初回cold bootでminimal Systemのpersistent/FAT `S30..S39`を実証済み。
+  - stock U-Bootの`fatwrite` markerは`----`のままで、UARTまたはearly-init由来の代替記録が必要。
+  - warm bootと時間baselineは未実施。
 - [ ] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
-- [ ] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
+- [x] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
   - AArch64 static BusyBox、stock handoff互換entrypoint、FAT/ext4/console/kmsg stage、
-    framebuffer `S33` markerを持つ最小Systemと2 GiB seed imageをhost build/verify済み。
-  - 新SDへのwrite/readbackとphysical bootは未実施。
+    framebuffer `S33` markerを持つ最小Systemと2 GiB seed imageをhost build/verifyした。
+  - 新SDでphysical cold bootし、FAT `S39`、p2の全stage、clean ext4、BusyBox promptをreadback確認した。
 - [ ] `BUB-P2-06` stock FE を開始せず、plumOS marker、log、recovery SSH を保持できることを実機確認する。
+  - stock FEを開始せず、framebuffer marker、persistent log、BusyBox promptまでは実証済み。
+  - recovery SSHを次のseedで追加し、Wi-Fi接続後に完了判定する。
 - [ ] `BUB-P2-07` probe failure を意図的に起こし、original/known-good SDへ確実にrollbackできることを確認する。
 - [ ] `BUB-P2-08` preserved vendor substrate と plumOS-owned boundary の architecture decision record を確定する。
 
@@ -140,6 +144,6 @@
 
 ## Next action
 
-- [ ] 新しい書込み先SDだけをmacOSへ接続し、whole-disk identifierを確定する。
-- [ ] verified 2 GiB seed imageを書き、image-size全block readback後にejectする。
-- [ ] 実機cold bootし、画面の`S33` markerまたはFATの最終stageからhandoff結果を判定する。
+- [ ] U-Boot FAT marker失敗に依存しないearly-init boot-source/cmdline記録を追加する。
+- [ ] minimal SystemへAP6330 firmware/module、bounded network設定、Dropbear recovery SSHを追加する。
+- [ ] 次seedでcold bootし、SSH、log readback、normal shutdown後のext4 cleanを確認する。

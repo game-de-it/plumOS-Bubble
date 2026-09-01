@@ -40,6 +40,11 @@ prepare/install scriptは拒否する。
 | `S80` / `E80` | frontend process開始 / unit失敗 |
 | `S90` | frontend開始を含む`miniplus.target` boot完了 |
 
+初回physical seed bootではsystem側`S30..S39`とBusyBox promptまで到達したが、U-Boot
+`fatwrite` markerは初期値`----`のままだった。したがってstock U-BootのFAT書込みは
+診断の必須条件にしない。次seed以降はkernel cmdline、early-init snapshot、必要ならUARTを
+U-Bootからkernelへの境界証拠として併用する。
+
 `uboot-stage.txt=S19`でsystem logが無い場合、kernel entryからbuilt-in initramfs、p2 mount、
 `SYSTEM` loop handoffの間に失敗している。`S40`以降はboot ID単位のsnapshotでさらに切り分ける。
 
