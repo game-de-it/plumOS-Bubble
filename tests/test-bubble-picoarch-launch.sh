@@ -63,6 +63,7 @@ launcher_rc=$?
 set -e
 test "$launcher_rc" -eq 143
 ! kill -0 "$child_pid" 2>/dev/null
+test -z "$(pidof picoarch 2>/dev/null || true)"
 grep -Fqx 'picoarch=stage-P19 system=nes core=quicknes rc=143' \
     "$root/logs/session.log"
 

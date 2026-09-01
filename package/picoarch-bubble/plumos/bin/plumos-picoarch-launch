@@ -84,7 +84,10 @@ child=$!
 wait "$child"
 rc=$?
 set -e
-[ -z "$stop_rc" ] || rc=$stop_rc
+if [ -n "$stop_rc" ]; then
+    wait "$child" 2>/dev/null || true
+    rc=$stop_rc
+fi
 trap - HUP INT TERM
 printf 'picoarch=stage-P19 system=%s core=%s rc=%s\n' \
     "$SYSTEM_ID" "$CORE_ID" "$rc" >>"$PLUMOS_ROOT/logs/session.log"
