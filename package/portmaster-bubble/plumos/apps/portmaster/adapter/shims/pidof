@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+case "${1:-}" in
+  gptokeyb|gptokeyb2)
+    exec "${PLUMOS_ROOT:-/storage/plumos}/bin/plumos-portmaster-gptokeyb-stop" --list "$1"
+    ;;
+  *)
+    exec "${PLUMOS_ROOT:-/storage/plumos}/bin/busybox" pidof "$@"
+    ;;
+esac

@@ -1,0 +1,36 @@
+diff --git a/yabause/src/retro_arena/main.cpp b/yabause/src/retro_arena/main.cpp
+--- a/yabause/src/retro_arena/main.cpp
++++ b/yabause/src/retro_arena/main.cpp
+@@ -434,9 +434,11 @@ int main(int argc, char** argv)
+   std::string tmpfilename = home_dir + "tmp.png";
+ 
+   struct sched_param thread_param;
+-  thread_param.sched_priority = 15; //sched_get_priority_max(SCHED_FIFO);
+-  if ( pthread_setschedparam(pthread_self(), SCHED_FIFO, &thread_param) < -1 ) {
+-    LOG("sched_setscheduler");
++  // MF keeps emulator work on the normal scheduler. FIFO caused input and
++  // audio work to be delivered in bursts on the RK3566 runtime.
++  thread_param.sched_priority = 0;
++  if (pthread_setschedparam(pthread_self(), SCHED_OTHER, &thread_param) != 0) {
++    LOG("pthread_setschedparam SCHED_OTHER");
+   }
+   setpriority( PRIO_PROCESS, 0, -8);
+   int frame_cont = 0;
+diff --git a/yabause/src/scsp.c b/yabause/src/scsp.c
+--- a/yabause/src/scsp.c
++++ b/yabause/src/scsp.c
+@@ -5586,9 +5586,11 @@ void ScspAsynMainRealtime(void * p) {
+ #if defined(ARCH_IS_LINUX)
+   struct timespec tm;
+   struct sched_param thread_param;
+-  thread_param.sched_priority = 15; //sched_get_priority_max(SCHED_FIFO);
+-  if ( pthread_setschedparam(pthread_self(), SCHED_FIFO, &thread_param) < -1 ) {
+-    LOG("sched_setscheduler");
++  // Keep SCSP on the normal scheduler so it remains fair with input, audio,
++  // and renderer work on MF.
++  thread_param.sched_priority = 0;
++  if (pthread_setschedparam(pthread_self(), SCHED_OTHER, &thread_param) != 0) {
++    LOG("pthread_setschedparam SCHED_OTHER");
+   }
+   setpriority( PRIO_PROCESS, 0, -10);
+ #endif

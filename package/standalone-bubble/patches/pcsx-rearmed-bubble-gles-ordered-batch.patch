@@ -1,0 +1,525 @@
+--- a/plugins/gpu-gles/gpuDraw.c
++++ b/plugins/gpu-gles/gpuDraw.c
+@@ -1350,15 +1350,16 @@
+ 
+ BOOL bSetClip=FALSE;
+ 
+-void SetOGLDisplaySettings(BOOL DisplaySet)
+-{
++void SetOGLDisplaySettings(BOOL DisplaySet)
++{
+  static RECT rprev={0,0,0,0};
+  static RECT rC   ={0,0,0,0};
+  static int iOldX=0;
+  static int iOldY=0;
+- RECT r;float XS,YS;
+-
+- bDisplayNotSet = FALSE;
++ RECT r;float XS,YS;
++
++ plumos_prim_batch_flush();
++ bDisplayNotSet = FALSE;
+ 
+  //----------------------------------------------------// that's a whole screen upload
+  if(!DisplaySet)
+--- a/plugins/gpu-gles/gpuExternals.h
++++ b/plugins/gpu-gles/gpuExternals.h
+@@ -70,7 +70,7 @@
+ 
+ #define CLUTUSED     0x80000000
+ //glColor4ubv(x.c.col)
+-#define SETCOL(x)  if(x.c.lcol!=ulOLDCOL) {ulOLDCOL=x.c.lcol;glColor4ub(x.c.col[0],x.c.col[1],x.c.col[2],x.c.col[3]);} 
++#define SETCOL(x)  if(x.c.lcol!=ulOLDCOL) {plumos_batch_note_state_change();ulOLDCOL=x.c.lcol;glColor4ub(x.c.col[0],x.c.col[1],x.c.col[2],x.c.col[3]);} 
+ //#define SETPCOL(x)  if(x->c.lcol!=ulOLDCOL) {ulOLDCOL=x->c.lcol;glColor4ub(x->c.col[0],x->c.col[1],x->c.col[2],x->c.col[3]);}
+ 
+ #define INFO_TW        0
+--- a/plugins/gpu-gles/gpuPrim.c
++++ b/plugins/gpu-gles/gpuPrim.c
+@@ -37,8 +37,8 @@
+ // defines
+ ////////////////////////////////////////////////////////////////////////
+ 
+-#define DEFOPAQUEON  glAlphaFunc(GL_EQUAL,0.0f);bBlendEnable=FALSE;glDisable(GL_BLEND);                                
+-#define DEFOPAQUEOFF glAlphaFunc(GL_GREATER,0.49f);
++#define DEFOPAQUEON  plumos_batch_note_state_change();glAlphaFunc(GL_EQUAL,0.0f);bBlendEnable=FALSE;glDisable(GL_BLEND);
++#define DEFOPAQUEOFF plumos_batch_note_state_change();glAlphaFunc(GL_GREATER,0.49f);
+ #define fpoint(x) x
+ ////////////////////////////////////////////////////////////////////////                                          
+ // globals
+@@ -88,7 +88,79 @@
+ int           drawX,drawY,drawW,drawH;                 // offscreen drawing checkers
+ short         sxmin,sxmax,symin,symax;
+ unsigned int CSVERTEX=0,CSCOLOR=0,CSTEXTURE=0;
++
++/*
++ * Keep textured client-array storage stable so compatible ordered PSX
++ * primitives can be submitted together.  Mali's GLES1 userspace driver spends
++ * substantial CPU time validating thousands of tiny draws in busy scenes.
++ *
++ * gpulib_if.c resets CSVERTEX/CSCOLOR/CSTEXTURE after display-side drawing.
++ * Treat CSVERTEX==0 as an external pointer invalidation so the first primitive
++ * of the next frame always restores the correct addresses.
++ */
++#define PLUMOS_PRIM_BATCH_MAX_VERTICES 4096
++
++static Vertex prim_vertex[PLUMOS_PRIM_BATCH_MAX_VERTICES];
++static Vertex2 prim_vertex2[PLUMOS_PRIM_BATCH_MAX_VERTICES];
++static unsigned int prim_pointer_layout;
++static int plumos_prim_batch_enabled=-1;
++static int plumos_prim_batch_kind;
++static int plumos_prim_batch_vertices;
++
++static void plumos_prim_batch_flush(void)
++{
++ if(plumos_prim_batch_vertices==0) return;
++ glDrawArrays(GL_TRIANGLES,0,plumos_prim_batch_vertices);glError();
++ plumos_prim_batch_kind=0;
++ plumos_prim_batch_vertices=0;
++}
++
++static int plumos_prim_batch_prepare(int kind,int vertices,int compatible)
++{
++ const char *setting;
++
++ if(plumos_prim_batch_enabled<0)
++  {
++   setting=getenv("PLUMOS_PCSX_GLES_BATCH");
++   plumos_prim_batch_enabled=
++    setting!=NULL && setting[0]!='\0' && strcmp(setting,"0")!=0;
++   fprintf(stderr,"Bubble GLES ordered batch: %s\n",
++           plumos_prim_batch_enabled ? "enabled" : "disabled");
++  }
++ if(!plumos_prim_batch_enabled || !compatible)
++  {
++   plumos_prim_batch_flush();
++   return 0;
++  }
++ if(plumos_prim_batch_kind!=kind ||
++    plumos_prim_batch_vertices+vertices>PLUMOS_PRIM_BATCH_MAX_VERTICES)
++  plumos_prim_batch_flush();
++ plumos_prim_batch_kind=kind;
++ return 1;
++}
++
++static void plumos_prim_batch_queue(int vertices)
++{
++ plumos_prim_batch_vertices+=vertices;
++}
+ 
++static void SetPrimVertexPointers(void)
++{
++ if(prim_pointer_layout==1 && CSVERTEX!=0) return;
++ glTexCoordPointer(2, GL_FLOAT, sizeof(prim_vertex[0]), &prim_vertex[0].st);glError();
++ glVertexPointer(3, GL_FLOAT, sizeof(prim_vertex[0]), &prim_vertex[0].xyz);glError();
++ prim_pointer_layout=1;
++}
++
++static void SetPrimVertex2Pointers(void)
++{
++ if(prim_pointer_layout==2 && CSVERTEX!=0) return;
++ glTexCoordPointer(2, GL_FLOAT, sizeof(prim_vertex2[0]), &prim_vertex2[0].st);glError();
++ glVertexPointer(3, GL_FLOAT, sizeof(prim_vertex2[0]), &prim_vertex2[0].xyz);glError();
++ glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(prim_vertex2[0]), &prim_vertex2[0].rgba);glError();
++ prim_pointer_layout=2;
++}
++
+ void offsetPSX4(void)
+ {
+  lx0 += PSXDisplay.DrawOffset.x;
+@@ -176,10 +248,10 @@
+ void PRIMdrawTexturedQuad(OGLVertex* vertex1, OGLVertex* vertex2,
+                                    OGLVertex* vertex3, OGLVertex* vertex4) 
+ {
++int queued=plumos_prim_batch_prepare(1,6,!bDrawMultiPass && !ubOpaqueDraw);
++Vertex *v=queued ? &prim_vertex[plumos_prim_batch_vertices] : prim_vertex;
++Vertex fourth;
+ 
+-
+-Vertex v[4];
+-
+ v[0].xyz.x = fpoint(vertex1->x);
+ v[0].xyz.y = fpoint(vertex1->y);
+ v[0].xyz.z = fpoint(vertex1->z);
+@@ -203,12 +275,22 @@
+ v[3].xyz.z = fpoint(vertex3->z);
+ v[3].st.x = fpoint(vertex3->sow);
+ v[3].st.y = fpoint(vertex3->tow);
++if(queued)
++ {
++  fourth=v[3];
++  v[3]=v[2];
++  v[4]=v[1];
++  v[5]=fourth;
++ }
+ if (CSCOLOR==1) glDisableClientState(GL_COLOR_ARRAY);glError();
+ if (CSTEXTURE==0) glEnableClientState(GL_TEXTURE_COORD_ARRAY);glError();
+ if (CSVERTEX==0) glEnableClientState(GL_VERTEX_ARRAY);glError();
+-glTexCoordPointer(2, GL_FLOAT, sizeof(v[0]), &v[0].st);glError();
+-glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0].xyz);glError();
+-glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
++SetPrimVertexPointers();
++if(queued) plumos_prim_batch_queue(6);
++else
++ {
++  glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
++ }
+ CSTEXTURE=CSVERTEX=1;
+ CSCOLOR=0;
+ }
+@@ -218,8 +300,9 @@
+ void PRIMdrawTexturedTri(OGLVertex* vertex1, OGLVertex* vertex2,
+                                   OGLVertex* vertex3) 
+ {
+-Vertex v[3];
+ if (vertex1->x==0&&vertex1->y==0&&vertex2->x==0&&vertex2->y==0&&vertex3->x==0&&vertex3->y==0) return;
++int queued=plumos_prim_batch_prepare(2,3,!bDrawMultiPass && !ubOpaqueDraw);
++Vertex *v=queued ? &prim_vertex[plumos_prim_batch_vertices] : prim_vertex;
+ 
+ v[0].xyz.x = fpoint(vertex1->x);
+ v[0].xyz.y = fpoint(vertex1->y);
+@@ -241,9 +324,12 @@
+ if (CSCOLOR==1) glDisableClientState(GL_COLOR_ARRAY);glError();
+ if (CSTEXTURE==0) glEnableClientState(GL_TEXTURE_COORD_ARRAY);glError();
+ if (CSVERTEX==0) glEnableClientState(GL_VERTEX_ARRAY);glError();
+-glTexCoordPointer(2, GL_FLOAT, sizeof(v[0]), &v[0].st);glError();
+-glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0].xyz);glError();
+-glDrawArrays(GL_TRIANGLES, 0, 3);glError();
++SetPrimVertexPointers();
++if(queued) plumos_prim_batch_queue(3);
++else
++ {
++  glDrawArrays(GL_TRIANGLES, 0, 3);glError();
++ }
+ CSTEXTURE=CSVERTEX=1;
+ CSCOLOR=0;
+ 
+@@ -254,9 +340,9 @@
+ void PRIMdrawTexGouraudTriColor(OGLVertex* vertex1, OGLVertex* vertex2,
+                                          OGLVertex* vertex3) 
+ {
+-
+-Vertex2 v[3];
+ if (vertex1->x==0&&vertex1->y==0&&vertex2->x==0&&vertex2->y==0&&vertex3->x==0&&vertex3->y==0) return;
++int queued=plumos_prim_batch_prepare(3,3,!bDrawMultiPass && !ubOpaqueDraw);
++Vertex2 *v=queued ? &prim_vertex2[plumos_prim_batch_vertices] : prim_vertex2;
+ 
+ v[0].xyz.x = fpoint(vertex1->x);
+ v[0].xyz.y = fpoint(vertex1->y);
+@@ -292,11 +378,13 @@
+ if (CSVERTEX==0) glEnableClientState(GL_VERTEX_ARRAY);glError();
+ if (CSCOLOR==0) glEnableClientState(GL_COLOR_ARRAY);glError();
+ 
+-glTexCoordPointer(2, GL_FLOAT, sizeof(v[0]), &v[0].st);glError();
+-glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0].xyz);glError();
+-glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(v[0]), &v[0].rgba);glError();
++SetPrimVertex2Pointers();
+ 
+-glDrawArrays(GL_TRIANGLES, 0, 3);glError();
++if(queued) plumos_prim_batch_queue(3);
++else
++ {
++  glDrawArrays(GL_TRIANGLES, 0, 3);glError();
++ }
+ CSTEXTURE=CSVERTEX=CSCOLOR=1;
+ }
+ 
+@@ -305,8 +393,10 @@
+ void PRIMdrawTexGouraudTriColorQuad(OGLVertex* vertex1, OGLVertex* vertex2,
+                                              OGLVertex* vertex3, OGLVertex* vertex4) 
+ {
+-Vertex2 v[4];
+ if (vertex1->x==0&&vertex1->y==0&&vertex2->x==0&&vertex2->y==0&&vertex3->x==0&&vertex3->y==0&&vertex4->x==0&&vertex4->y==0) return;
++int queued=plumos_prim_batch_prepare(4,6,!bDrawMultiPass && !ubOpaqueDraw);
++Vertex2 *v=queued ? &prim_vertex2[plumos_prim_batch_vertices] : prim_vertex2;
++Vertex2 fourth;
+ 
+ v[0].xyz.x = fpoint(vertex1->x);
+ v[0].xyz.y = fpoint(vertex1->y);
+@@ -347,16 +437,25 @@
+ v[3].rgba.g = vertex3->c.col[1];
+ v[3].rgba.b = vertex3->c.col[2];
+ v[3].rgba.a = vertex3->c.col[3];
++if(queued)
++ {
++  fourth=v[3];
++  v[3]=v[2];
++  v[4]=v[1];
++  v[5]=fourth;
++ }
+ 
+ if (CSTEXTURE==0) glEnableClientState(GL_TEXTURE_COORD_ARRAY);glError();
+ if (CSVERTEX==0) glEnableClientState(GL_VERTEX_ARRAY);glError();
+ if (CSCOLOR==0) glEnableClientState(GL_COLOR_ARRAY);glError();
+ 
+-glTexCoordPointer(2, GL_FLOAT, sizeof(v[0]), &v[0].st);glError();
+-glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0].xyz);glError();
+-glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(v[0]), &v[0].rgba);glError();
++SetPrimVertex2Pointers();
+ 
+-glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
++if(queued) plumos_prim_batch_queue(6);
++else
++ {
++  glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
++ }
+ CSTEXTURE=CSVERTEX=CSCOLOR=1;
+ }
+ 
+@@ -383,8 +482,9 @@
+ if (CSTEXTURE==1) glDisableClientState(GL_TEXTURE_COORD_ARRAY);glError();
+ if (CSCOLOR==1) glDisableClientState(GL_COLOR_ARRAY);glError();
+ 
+-glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0]);glError();
+-glDrawArrays(GL_TRIANGLES, 0, 3);glError();
++glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0]);glError();
++prim_pointer_layout=0;
++glDrawArrays(GL_TRIANGLES, 0, 3);glError();
+ CSVERTEX=1;
+ CSTEXTURE=CSCOLOR=0;
+ 
+@@ -418,8 +518,9 @@
+ if (CSTEXTURE==1) glDisableClientState(GL_TEXTURE_COORD_ARRAY);glError();
+ if (CSCOLOR==1) glDisableClientState(GL_COLOR_ARRAY);glError();
+ 
+-glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0]);glError();
+-glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
++glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0]);glError();
++prim_pointer_layout=0;
++glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
+ CSVERTEX=1;
+ CSTEXTURE=CSCOLOR=0;
+ }
+@@ -460,10 +561,11 @@
+ if (CSCOLOR==0) glEnableClientState(GL_COLOR_ARRAY);glError();
+ if (CSTEXTURE==1) glDisableClientState(GL_TEXTURE_COORD_ARRAY);glError();
+ 
+-glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0].xyz);glError();
+-glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(v[0]), &v[0].rgba);glError();
+-
+-glDrawArrays(GL_TRIANGLES, 0, 3);glError();
++glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0].xyz);glError();
++glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(v[0]), &v[0].rgba);glError();
++prim_pointer_layout=0;
++
++glDrawArrays(GL_TRIANGLES, 0, 3);glError();
+ CSVERTEX=CSCOLOR=1;
+ CSTEXTURE=0;
+ }
+@@ -512,10 +614,11 @@
+ if (CSVERTEX==0) glEnableClientState(GL_VERTEX_ARRAY);glError();
+ if (CSCOLOR==0) glEnableClientState(GL_COLOR_ARRAY);glError();
+ 
+-glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0].xyz);glError();
+-glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(v[0]), &v[0].rgba);glError();
+-
+-glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
++glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0].xyz);glError();
++glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(v[0]), &v[0].rgba);glError();
++prim_pointer_layout=0;
++
++glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
+ CSTEXTURE=0;
+ CSVERTEX=CSCOLOR=1;
+ }
+@@ -563,11 +666,12 @@
+ if (CSVERTEX==0) glEnableClientState(GL_VERTEX_ARRAY);glError();
+ if (CSCOLOR==0) glEnableClientState(GL_COLOR_ARRAY);glError();
+ 
+-glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0].xyz);glError();
+-glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(v[0]), &v[0].rgba);glError();
++glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0].xyz);glError();
++glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(v[0]), &v[0].rgba);glError();
++prim_pointer_layout=0;
++
++glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
+ 
+-glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
+-
+ CSTEXTURE=0;
+ CSVERTEX=CSCOLOR=1;
+ 
+@@ -617,10 +721,11 @@
+ if (CSVERTEX==0) glEnableClientState(GL_VERTEX_ARRAY);glError();
+ if (CSCOLOR==0) glEnableClientState(GL_COLOR_ARRAY);glError();
+ 
+-glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0].xyz);glError();
+-glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(v[0]), &v[0].rgba);glError();
+-
+-glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
++glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0].xyz);glError();
++glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(v[0]), &v[0].rgba);glError();
++prim_pointer_layout=0;
++
++glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
+ CSTEXTURE=0;
+ CSVERTEX=CSCOLOR=1;
+ }
+@@ -653,8 +758,9 @@
+ if (CSVERTEX==0) glEnableClientState(GL_VERTEX_ARRAY);glError();
+ if (CSCOLOR==1) glDisableClientState(GL_COLOR_ARRAY);glError();
+ 
+-glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0]);glError();
+-glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
++glVertexPointer(3, GL_FLOAT, sizeof(v[0]), &v[0]);glError();
++prim_pointer_layout=0;
++glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);glError();
+ CSTEXTURE=0;
+ CSVERTEX=1;
+ CSCOLOR=0;
+@@ -694,9 +800,9 @@
+ */
+ 
+  if(!DrawSemiTrans)                                    // no semi trans at all?
+-  {
++ {
+    if(bBlendEnable)
+-    {glDisable(GL_BLEND);glError();bBlendEnable=FALSE;}// -> don't wanna blend
++    {plumos_batch_note_state_change();glDisable(GL_BLEND);glError();bBlendEnable=FALSE;}// -> don't wanna blend
+    ubGloAlpha=ubGloColAlpha=255;                       // -> full alpha
+    return;                                             // -> and bye
+   }
+@@ -704,7 +810,7 @@
+  ubGloAlpha=ubGloColAlpha=TransSets[GlobalTextABR].alpha;
+ 
+  if(!bBlendEnable)
+-  {glEnable(GL_BLEND);glError();bBlendEnable=TRUE;}    // wanna blend
++  {plumos_batch_note_state_change();glEnable(GL_BLEND);glError();bBlendEnable=TRUE;}    // wanna blend
+ 
+  if(TransSets[GlobalTextABR].srcFac!=obm1 || 
+     TransSets[GlobalTextABR].dstFac!=obm2)
+@@ -713,6 +819,7 @@
+     {
+      obm1=TransSets[GlobalTextABR].srcFac;
+      obm2=TransSets[GlobalTextABR].dstFac;
++     plumos_batch_note_state_change();
+      glBlendFunc(obm1,obm2); glError();                // set blend func
+     }
+    /*else
+@@ -744,6 +851,7 @@
+ */
+  obm1=TransSets[0].srcFac;
+  obm2=TransSets[0].dstFac;
++ plumos_batch_note_state_change();
+  glBlendFunc(obm1,obm2); glError();                    // set blend func
+ }
+ 
+@@ -757,6 +865,7 @@
+ */
+  obm1=TransSets[2].srcFac;
+  obm2=TransSets[2].dstFac;
++ plumos_batch_note_state_change();
+  glBlendFunc(obm1,obm2); glError();                    // set blend func
+ }
+ 
+@@ -837,10 +946,11 @@
+   }
+ 
+  if(!bBlendEnable)
+-  {glEnable(GL_BLEND);glError();bBlendEnable=TRUE;}    // wanna blend
++  {plumos_batch_note_state_change();glEnable(GL_BLEND);glError();bBlendEnable=TRUE;}    // wanna blend
+ 
+  if(bm1!=obm1 || bm2!=obm2)
+   {
++   plumos_batch_note_state_change();
+    glBlendFunc(bm1,bm2); glError();                    // set blend func
+    obm1=bm1;obm2=bm2;
+   }
+@@ -982,14 +1092,14 @@
+    else                 currTex=SelectSubTextureS(GlobalTextTP,ulClutID);
+ 
+    if(gTexName!=currTex)
+-    {gTexName=currTex;glBindTexture(GL_TEXTURE_2D,currTex); glError();}
++    {plumos_batch_note_state_change();gTexName=currTex;glBindTexture(GL_TEXTURE_2D,currTex); glError();}
+ 
+    if(!bTexEnabled)                                    // -> turn texturing on
+-    {bTexEnabled=TRUE;glEnable(GL_TEXTURE_2D); glError();}
++    {plumos_batch_note_state_change();bTexEnabled=TRUE;glEnable(GL_TEXTURE_2D); glError();}
+   }
+  else                                                  // no texture ?
+  if(bTexEnabled) 
+-  {bTexEnabled=FALSE;glDisable(GL_TEXTURE_2D); glError();} // -> turn texturing off
++  {plumos_batch_note_state_change();bTexEnabled=FALSE;glDisable(GL_TEXTURE_2D); glError();} // -> turn texturing off
+ 
+  if(bSCol)                                             // also set color ?
+   {
+@@ -1013,6 +1123,7 @@
+  
+  if(bDrawSmoothShaded!=bOldSmoothShaded)               // shading changed?
+   {
++   plumos_batch_note_state_change();
+    if(bDrawSmoothShaded) glShadeModel(GL_SMOOTH);      // -> set actual shading
+    else                  glShadeModel(GL_FLAT);
+    glError();
+@@ -2282,6 +2393,7 @@
+      r=((GLclampf)RED(gpuData[0]))/255.0f;
+      
+      //glDisable(GL_SCISSOR_TEST); glError();
++     plumos_batch_note_state_change();
+      glClearColor(r,g,b,1.0f); glError();
+      glClear(uiBufferBits); glError();
+      gl_z=0.0f;
+--- a/plugins/gpu-gles/gpuTexture.c
++++ b/plugins/gpu-gles/gpuTexture.c
+@@ -4208,6 +4208,7 @@
+ 
+  // not found? upload texture and store infos in cache
+  gTexName=uiStexturePage[iCache];
++ plumos_batch_note_texture_upload();
+  LoadSubTexFn(GlobalTexturePage,TextureMode,cx,cy);
+  uiStexturePage[iCache]=gTexName;
+  *OPtr=ubOpaqueDraw;
+--- a/plugins/gpu-gles/gpulib_if.c
++++ b/plugins/gpu-gles/gpulib_if.c
+@@ -19,6 +19,19 @@
+ #include "gpuStdafx.h"
+ #include <sys/time.h>
+ #include <SDL.h>
++
++static void plumos_prim_batch_flush(void);
++
++static void plumos_batch_note_state_change(void)
++{
++ plumos_prim_batch_flush();
++}
++
++static void plumos_batch_note_texture_upload(void)
++{
++ plumos_prim_batch_flush();
++}
++
+ #include "gpuDraw.c"
+ #include "gpuTexture.c"
+ #include "gpuPrim.c"
+@@ -326,6 +339,7 @@
+ 
+ void updateDisplay(void)
+ {
++ plumos_batch_note_state_change();
+  bFakeFrontBuffer=FALSE;
+  bRenderFrontBuffer=FALSE;
+ 
+@@ -761,6 +775,8 @@
+  GLint max_clip_planes = 0;
+  GLint max_lights = 0;
+  size_t i;
++
++ plumos_prim_batch_flush();
+  for (i = 0; i < sizeof(caps) / sizeof(caps[0]); i++) {
+   glDisable(caps[i]);
+   glError();
+@@ -1150,6 +1166,7 @@
+  if (is_paused)
+   return 0;
+ 
++ plumos_prim_batch_flush();
+  glFinish();
+  if (has_external_gles_context()) {
+   if (switch_to_menu_gles_context() != 0)
+@@ -1187,6 +1204,7 @@
+ {
+  if (!is_opened)
+   return 0;
++ plumos_prim_batch_flush();
+  is_opened = 0;
+  is_paused = 0;
+  paused_config_changed = 0;

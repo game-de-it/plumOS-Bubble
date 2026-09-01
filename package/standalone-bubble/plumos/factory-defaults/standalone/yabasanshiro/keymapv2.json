@@ -1,0 +1,24 @@
+{
+  "player1": {
+    "DeviceID": 0,
+    "padmode": 0,
+    "deviceGUID": "190000004b4800000111000000010000",
+    "deviceName": "retrogame_joypad"
+  },
+  "0_retrogame_joypad_190000004b4800000111000000010000": {
+    "up": {"type": "button", "id": 13, "value": 1},
+    "right": {"type": "button", "id": 16, "value": 1},
+    "down": {"type": "button", "id": 14, "value": 1},
+    "left": {"type": "button", "id": 15, "value": 1},
+    "a": {"type": "button", "id": 0, "value": 1},
+    "b": {"type": "button", "id": 1, "value": 1},
+    "c": {"type": "button", "id": 2, "value": 1},
+    "x": {"type": "button", "id": 3, "value": 1},
+    "y": {"type": "button", "id": 4, "value": 1},
+    "z": {"type": "button", "id": 5, "value": 1},
+    "l": {"type": "button", "id": 6, "value": 1},
+    "r": {"type": "button", "id": 7, "value": 1},
+    "select": {"type": "button", "id": 10, "value": 1},
+    "start": {"type": "button", "id": 9, "value": 1}
+  }
+}

@@ -1,0 +1,25 @@
+diff --git a/Makefile b/Makefile
+index 3269005..d996c37 100644
+--- a/Makefile
++++ b/Makefile
+@@ -58,4 +58,6 @@ else ifneq (,$(findstring rpi,$(platform)))
+    override platform += unix
+ else ifneq (,$(findstring odroid,$(platform)))
+    override platform += unix
++else ifneq (,$(findstring rk3566,$(platform)))
++   override platform += unix
+ endif
+@@ -169,3 +171,13 @@ ifneq (,$(findstring unix,$(platform)))
++   # Miyoo Flip: RK3566 Cortex-A55, AArch64 dynarec, and GLES2 rendering.
++   ifneq (,$(findstring rk3566,$(platform)))
++      GLES = 1
++      GL_LIB := -lGLESv2
++      CPUFLAGS += -DNO_ASM -DARM -DARM_ASM -DDONT_WANT_ARM_OPTIMIZATIONS -DARM_FIX -DCLASSIC -DARM64
++      HAVE_NEON = 1
++      WITH_DYNAREC=aarch64
++      CPUFLAGS += -D__NEON_OPT -march=armv8-a+crc -mcpu=cortex-a55 -mtune=cortex-a55
++   endif
++
+    # ODROIDs
+    ifneq (,$(findstring odroid,$(platform)))
+       BOARD ?= $(shell cat /proc/cpuinfo | grep -i odroid | awk '{print $$3}')

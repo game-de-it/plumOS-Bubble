@@ -1,0 +1,135 @@
+diff --git a/src/io/loader.cpp b/src/io/loader.cpp
+index 27b991a..b964966 100755
+--- a/src/io/loader.cpp
++++ b/src/io/loader.cpp
+@@ -226,7 +226,7 @@ void Loader::load(const std::vector<std::string>& lines, Machine& m)
+             if (index < UNUSED_CHANNEL)
+               music->setSound(i, index);
+             else
+-              assert(true || (index == UNUSED_CHANNEL + i + 1));
++              music->disableChannel(i);
+           }
+ 
+           ++msc;
+diff --git a/src/vm/sound.cpp b/src/vm/sound.cpp
+index 67f6df8..4a18bd1 100644
+--- a/src/vm/sound.cpp
++++ b/src/vm/sound.cpp
+@@ -4,6 +4,8 @@
+ 
+ #include <random>
+ #include <cassert>
++#include <algorithm>
++#include <cmath>
+ 
+ #if SOUND_ENABLED
+ 
+@@ -151,6 +153,21 @@ inline void DSP::noise(uint32_t frequency, int16_t amplitude, int32_t position,
+   }
+ }
+ 
++inline void DSP::phaserWave(uint32_t frequency, int16_t amplitude, int32_t position, int16_t* dest, size_t samples)
++{
++  for (size_t i = 0; i < samples; ++i)
++  {
++    const float advance = position * float(frequency) / rate;
++    const float t = std::fmod(advance, 1.0f);
++    const float k = std::fabs(2.0f * std::fmod(advance / 128.0f, 1.0f) - 1.0f);
++    const float u = std::fmod(t + 0.5f * k, 1.0f);
++    const float wave = (std::fabs(4.0f * u - 2.0f) -
++                        std::fabs(8.0f * t - 4.0f)) / 6.0f;
++    dest[i] += int16_t(amplitude * wave);
++    ++position;
++  }
++}
++
+ void DSP::fadeIn(int16_t amplitude, int16_t* dest, size_t samples)
+ {
+   const float incr = 1.0f / samples;
+@@ -256,7 +273,7 @@ void APU::handleCommands()
+           channel.end = s.end;
+           channel.sample = s.start;
+ 
+-          size_t samplePerTick = (44100 / 128) * (channel.sound->speed + 1);
++          size_t samplePerTick = 366 * std::max<size_t>(1, channel.sound->speed);
+ 
+           channel.position = s.start*samplePerTick;
+         }
+@@ -280,7 +297,7 @@ void APU::handleCommands()
+               mstate.channels[i].sound = memory.sound(mstate.music->sound(i));
+               mstate.channels[i].sample = 0;
+               mstate.channels[i].position = 0;
+-              mstate.channels[i].end = 31; //TODO: fix according to behavior
++              mstate.channels[i].end = 32;
+             }
+             else
+               mstate.channels[i].sound = nullptr;
+@@ -361,7 +378,7 @@ void APU::updateChannel(SoundState& channel, const Music* music)
+           mstate.channels[i].sound = memory.sound(mstate.music->sound(i));
+           mstate.channels[i].sample = 0;
+           mstate.channels[i].position = 0;
+-          mstate.channels[i].end = 31; //TODO: fix according to behavior
++          mstate.channels[i].end = 32;
+         }
+         else
+           mstate.channels[i].sound = nullptr;
+@@ -402,6 +419,9 @@ void APU::renderSound(const SoundState& channel, int16_t* buffer, size_t samples
+   case Waveform::NOISE:
+     dsp.noise(frequency, volume, channel.position, buffer, samples);
+     break;
++  case Waveform::PHASER:
++    dsp.phaserWave(frequency, volume, channel.position, buffer, samples);
++    break;
+   }
+ }
+ 
+@@ -424,7 +444,7 @@ void APU::renderSounds(int16_t* dest, size_t totalSamples)
+     {
+       if (channel.sound)
+       {
+-        const size_t samplePerTick = (44100 / 128) * (channel.sound->speed + 1);
++        const size_t samplePerTick = 366 * std::max<size_t>(1, channel.sound->speed);
+         while (samples > 0 && channel.sound)
+         {
+           /* generate the maximum amount of samples available for same note */
+diff --git a/src/vm/sound.h b/src/vm/sound.h
+index 19293a3..e820cf7 100644
+--- a/src/vm/sound.h
++++ b/src/vm/sound.h
+@@ -102,15 +102,16 @@ namespace retro8
+     {
+     private:
+       constexpr static uint8_t SOUND_INDEX_MASK = 0b00111111;
+-      constexpr static uint8_t CONFIG_MASK = 0b11000000;
+-      constexpr static uint8_t SOUND_ON_FLAG = 0b01000000;
++      constexpr static uint8_t CONFIG_MASK = 0b10000000;
++      constexpr static uint8_t CHANNEL_DISABLED_FLAG = 0b01000000;
+       constexpr static uint8_t LOOP_FLAG = 0b10000000;
+ 
+       std::array<uint8_t, 4> indices;
+ 
+     public:
+       
+-      void setSound(channel_index_t channel, sound_index_t index) { indices[channel] = (indices[channel] & CONFIG_MASK) | index | SOUND_ON_FLAG; }
++      void setSound(channel_index_t channel, sound_index_t index) { indices[channel] = (indices[channel] & CONFIG_MASK) | (index & SOUND_INDEX_MASK); }
++      void disableChannel(channel_index_t channel) { indices[channel] = (indices[channel] & CONFIG_MASK) | CHANNEL_DISABLED_FLAG; }
+       void markLoopBegin() { indices[0] |= LOOP_FLAG; }
+       void markLoopEnd() { indices[1] |= LOOP_FLAG; }
+       void markStop() { indices[2] |= LOOP_FLAG; }
+@@ -119,7 +120,7 @@ namespace retro8
+       inline bool isLoopEnd() const { return (indices[1] & LOOP_FLAG) != 0; }
+       inline bool isStop() const { return (indices[2] & LOOP_FLAG) != 0; }
+ 
+-      inline bool isChannelEnabled(channel_index_t channel) const { return (indices[channel] & SOUND_ON_FLAG) != 0; }
++      inline bool isChannelEnabled(channel_index_t channel) const { return (indices[channel] & CHANNEL_DISABLED_FLAG) == 0; }
+       sound_index_t sound(channel_index_t channel) const { return indices[channel] & SOUND_INDEX_MASK; }
+     };
+ 
+@@ -165,6 +166,7 @@ namespace retro8
+       void tiltedSawtoothWave(uint32_t frequency, int16_t amplitude, int16_t offset, float dutyCycle, int32_t position, int16_t* dest, size_t samples);
+       void organWave(uint32_t frequency, int16_t amplitude, int16_t offset, float coefficient, int32_t position, int16_t* dest, size_t samples);
+       void noise(uint32_t frequency, int16_t amplitude, int32_t position, int16_t* dest, size_t samples);
++      void phaserWave(uint32_t frequency, int16_t amplitude, int32_t position, int16_t* dest, size_t samples);
+ 
+       void fadeIn(int16_t amplitude, int16_t* dest, size_t samples);
+       void fadeOut(int16_t amplitude, int16_t* dest, size_t samples);

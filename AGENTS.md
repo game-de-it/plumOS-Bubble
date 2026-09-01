@@ -21,6 +21,11 @@ plumOS_gitlog_problem_solution_guide.ja.md
 - 他のplumOSシリーズに存在する共通メニュー項目を、Bubble側で未実装であることを理由に
   削除してはならない。共通の並びと項目を表示したまま、未実装の機能は選択時に
   `未実装`または`未対応`を明示し、対応TODOへ追跡可能にする。
+- 共通runtime catalogに含まれるsystem、emulator、core、launch profileを、個別移植が
+  未完了であることを理由に一覧や検証対象から削除してはならない。実行可能な導線を
+  提供するか、機種固有の未対応理由を機械可読なcoverage表とFE上の状態表示へ残す。
+- release gateでは、package済みcoreの全てがFE導線または明示的な未対応表示へ到達すること、
+  FEが公開する全導線が実在するlauncher/coreへ解決することを双方向に検証する。
 - 実装済み項目を減らす変更では、同等機能への置換、移行経路、実機acceptanceが揃うまで
   既存項目を保持する。
 

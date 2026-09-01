@@ -143,7 +143,7 @@
 - [ ] `BUB-P4-S01` OS SD と ROM SD を UUID/label/partition identity で安全に解決する。
 - [ ] `BUB-P4-S02` dirty ROM SD を自動修復せず、警告・read-only・退避手順を定義する。
 
-## P5: frontend and NES baseline
+## P5: frontend and minimum game-path baseline
 
 - [ ] `BUB-P5-01` Bubble 640x480 frontend profile と runtime DRM discovery を実装する。
   - CPU DRM、runtime connector/mode discovery、Bubble物理A/B mappingをhost build済み。
@@ -159,12 +159,39 @@
 
 ## P6: wider runtime and compatibility
 
-- [ ] `BUB-P6-01` software DRM pathでbaseline libretro systemsを1 systemずつ追加・実機確認する。
-- [ ] `BUB-P6-02` PicoArch、standalone、Pyxel を component-scoped runtime として個別評価する。
-- [ ] `BUB-P6-03` GPU必須runtimeはvendor Mali componentまたは将来のopen GPU routeへ隔離する。
-- [ ] `BUB-P6-04` enabled system/core/BIOS/content policyをmanifest化し、存在しないruntimeをFEに表示しない。
-- [ ] `BUB-P6-05` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。
-- [ ] `BUB-P6-06` app/game終了時に同一sessionだけを回収し、frontend/device ownershipを復元する。
+- [x] `BUB-P6-00` 利用者ROMセットをread-onlyで棚卸しし、ファイル内容を取り込まず
+  top-level 33 directoryと共通plumOS catalogの対応境界を記録する。
+  - 27 directoryは直接対応し、`ATARI`と`_etc`は複数systemを内包、`msx2`はMSXへ対応する。
+    `bios`はgame scan対象外、`01`は他環境の管理tree、`3ds`は共通runtime未対応として扱う。
+- [ ] `BUB-P6-01` MF v1.0.4 (`0095017`) の97 system / 196 launch profileを
+  Bubble共通catalog baselineとして固定し、ROMセットのnested aliasを追加する。
+  - 97 common systemに可視`3ds: unsupported`を加えた98 system、196 profile、
+    `ATARI`/`_etc`/`msx2`のnested aliasをhost verifierで固定済み。実機一覧確認を残す。
+- [ ] `BUB-P6-02` catalogの114 source core、116 RetroArch core id、alias binaryを
+  pinned sourceからBubble用に再現buildし、全coreをcomponent manifestへ収録する。
+  - software core 108件をplain DRM baselineへ接続し、GLES必須6件はBubble GPU runtimeへ隔離する。
+  - 114/114 source recordをAArch64 buildし、全component checksum、実`dlopen`、
+    必須libretro ABI、API v1検査に合格。Flycast XtremeのOpenMP linkと
+    MBA Miniの欠落work queue/VBI objectをこのgateで修正した。Flycast Xtremeの
+    `libgomp.so.1`もapp-layerへ同梱済み。全coreの実機content試験を残す。
+- [ ] `BUB-P6-03` PicoArch 20 core id / 36導線、standalone 5導線、Pyxel、Portsを
+  Bubble固有display/input/audio/session wrapperでcomponent化する。
+  - PicoArch、PCSX-ReARMed、YabaSanshiro、PPSSPP、OpenBOR、Pyxel、PortMasterを
+    host build/checksum済み。DraSticは項目を維持し、`/dev/miyooio`非搭載理由付きで
+    visible unsupported。各runtimeの実機検証を残す。
+- [ ] `BUB-P6-04` package済みcoreからFE導線、FE導線からlauncher/coreを双方向検証し、
+  実行不能な導線も`未実装`/`未対応`理由付きで表示する。QuickNES-only app-layerはreleaseを拒否する。
+  - 98 system / 196 profile / RetroArch 116 id / PicoArch 20 id / standalone 5 idと
+    visible app launcherをhostで双方向検証済み。app-layerは7 component必須、
+    `all-114-source-records`以外を拒否し、`release_complete=false`/`publishable=false`を固定した。
+- [ ] `BUB-P6-05` BIOS requirement、content extension、renderer、loader/library、license、
+  save/state pathをcoreごとのmachine-readable coverage manifestへ固定する。
+- [ ] `BUB-P6-06` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。
+- [ ] `BUB-P6-07` app/game終了時に同一sessionだけを回収し、frontend/device ownershipを復元する。
+- [ ] `BUB-P6-08` 全system表示、全profile選択、全core load smoke、代表content起動をhostで通してから、
+  ROMセットを変更せず一括実機acceptanceを開始する。
+  - hostでは全system/profile解決と114/114 core load smokeまで合格。
+    contentを使う代表起動、画面・入力・音声・終了復帰は正式partition imageで一括実機試験する。
 
 ## P7: update, lifecycle and release
 
@@ -203,3 +230,9 @@
   - QuickNES ROM video/input/audio、speaker実聴、save/state、F/Mode menuを残す。
 - [x] 共通plumOS START項目を未実装を理由に削除しない方針を固定し、Bubbleへ
   UI設定、システム設定、ネットワーク設定、アプリ、ヘルプ、再起動、シャットダウンを復元する。
+- [ ] QuickNES単独の物理試験をここで打ち切り、正式partition provisioningを先に完成させる。
+  その後、97-system catalog、全core、PicoArch/standalone/Pyxel/PortsとFE導線を一括packageし、
+  host coverage gateに合格してからROM総合試験へ進む。
+  - 全runtimeのhost build、98 system / 196 profileの導線検証、114/114 core load smoke、
+    1.8 GiB app-layer checksumまで合格。次は現1.5 GiB診断用p3へlive deployせず、
+    first-boot拡張とp4生成をhost fixtureで通した正式seedへ統合する。

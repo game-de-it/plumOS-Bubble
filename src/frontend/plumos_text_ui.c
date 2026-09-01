@@ -3024,7 +3024,9 @@ static int build_launch_plan(struct launch_plan *plan, const char *plumos_root,
     const char *pyxel_command = NULL;
 
     copy_string(plan->kind, sizeof(plan->kind), "pyxel");
-    if (strcmp(pyxel_profile, "mf") == 0) {
+    if (strcmp(pyxel_profile, "bubble") == 0) {
+      launcher_name = "plumos-pyxel-bubble-launch";
+    } else if (strcmp(pyxel_profile, "mf") == 0) {
       launcher_name = "plumos-pyxel-mf-launch";
     } else if (strcmp(pyxel_profile, "a30") == 0) {
       launcher_name = "plumos-pyxel-a30-launch";

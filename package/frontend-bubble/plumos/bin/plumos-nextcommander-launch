@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+mkdir -p "$PLUMOS_ROOT/logs"
+printf '%s\n' \
+  'stage=A70_APP route=file-manager result=unavailable reason=Bubble-runtime-not-packaged todo=BUB-P6-04' \
+  >>"$PLUMOS_ROOT/logs/app-routes.log"
+printf '%s\n' 'File Manager is not implemented on Bubble yet (BUB-P6-04).'
+exit 78

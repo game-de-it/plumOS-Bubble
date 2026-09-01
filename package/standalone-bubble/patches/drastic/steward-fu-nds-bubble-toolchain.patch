@@ -1,0 +1,35 @@
+diff --git a/Makefile.base b/Makefile.base
+index 0bfb270..23efc3d 100644
+--- a/Makefile.base
++++ b/Makefile.base
+@@ -1,6 +1,7 @@
+ ifeq ($(NDS_GCC),1)
+ export CROSS=arm-linux-gnueabihf-
+-export PATH=/opt/mini/bin:$(shell echo $$PATH)
++export PATH=$(TOOLCHAIN_BIN):$(shell echo $$PATH)
++export NDS_INCLUDE_ROOT
+ endif
+ 
+ export CC=${CROSS}gcc
+diff --git a/sdl2/configure.ac b/sdl2/configure.ac
+index 7c6844a..4d121f7 100644
+--- a/sdl2/configure.ac
++++ b/sdl2/configure.ac
+@@ -2412,7 +2412,7 @@ CheckNDSVideo()
+         EXTRA_CFLAGS="$EXTRA_CFLAGS -I../detour"
+         EXTRA_CFLAGS="$EXTRA_CFLAGS -I../common"
+         EXTRA_CFLAGS="$EXTRA_CFLAGS -I../inc/sdl2"
+-        EXTRA_CFLAGS="$EXTRA_CFLAGS -I/opt/mini/arm-buildroot-linux-gnueabihf/sysroot/usr/include/SDL2"
++        EXTRA_CFLAGS="$EXTRA_CFLAGS -I$NDS_INCLUDE_ROOT/SDL2"
+ 
+         EXTRA_LDFLAGS="$EXTRA_LDFLAGS -lEGL"
+         EXTRA_LDFLAGS="$EXTRA_LDFLAGS -lGLESv2"
+@@ -2443,7 +2443,7 @@ CheckNDSVideo()
+ 
+     if test x$MOD = xmiyoo_flip; then
+         EXTRA_CFLAGS="$EXTRA_CFLAGS -DMIYOO_FLIP"
+-        EXTRA_CFLAGS="$EXTRA_CFLAGS -I/opt/mini/arm-buildroot-linux-gnueabihf/sysroot/usr/include/libdrm"
++        EXTRA_CFLAGS="$EXTRA_CFLAGS -I$NDS_INCLUDE_ROOT/libdrm"
+ 
+         EXTRA_LDFLAGS="$EXTRA_LDFLAGS -ldrm -lgbm"
+ 

@@ -1,0 +1,2 @@
+# Patch payloads intentionally preserve the source project's whitespace.
+*.patch -whitespace

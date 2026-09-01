@@ -7,8 +7,18 @@ if [[ ${1:-} != --inside ]]; then
     if [[ ${1:-} != --assemble-only ]]; then
         "$repo_root/scripts/build-bubble-frontend.sh"
         "$repo_root/scripts/build-bubble-retroarch.sh"
-        "$repo_root/scripts/build-bubble-quicknes.sh"
     fi
+    for required in \
+        output/libretro-cores/bubble-all/plumos \
+        output/picoarch/bubble/plumos \
+        output/standalone/bubble/plumos \
+        output/pyxel/bubble/plumos \
+        output/portmaster/bubble/plumos; do
+        [[ -d "$repo_root/$required" ]] || {
+            printf 'error: full emulator-stack input is missing: %s\n' "$required" >&2
+            exit 1
+        }
+    done
     exec docker run --rm --platform linux/arm64 \
         -e SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-}" \
         -e PLUMOS_BUBBLE_VERSION="${PLUMOS_BUBBLE_VERSION:-0.1.0-dev}" \
@@ -20,23 +30,35 @@ repo_root=/work
 out=$repo_root/output/app-layer/bubble
 root=$out/plumos
 version=${PLUMOS_BUBBLE_VERSION:-0.1.0-dev}
-source_ref=$(git -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
+source_ref=$(git -c safe.directory="$repo_root" -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
 epoch=${SOURCE_DATE_EPOCH:-}
-[[ -n $epoch ]] || epoch=$(git -C "$repo_root" show -s --format=%ct HEAD)
+[[ -n $epoch ]] || epoch=$(git -c safe.directory="$repo_root" -C "$repo_root" show -s --format=%ct HEAD)
 
 rm -rf "$out"
 mkdir -p "$root"
 cp -a "$repo_root/output/frontend/bubble/plumos/." "$root/"
 cp -a "$repo_root/output/retroarch/bubble/plumos/." "$root/"
-cp -a "$repo_root/output/libretro-cores/bubble/plumos/." "$root/"
+cp -a "$repo_root/output/libretro-cores/bubble-all/plumos/." "$root/"
+cp -a "$repo_root/output/picoarch/bubble/plumos/." "$root/"
+cp -a "$repo_root/output/standalone/bubble/plumos/." "$root/"
+cp -a "$repo_root/output/pyxel/bubble/plumos/." "$root/"
+cp -a "$repo_root/output/portmaster/bubble/plumos/." "$root/"
 mkdir -p "$root/config/frontend" "$root/config/system" "$root/config/retroarch" \
     "$root/state/frontend" "$root/logs" "$root/saves" "$root/states"
 
 for json in "$root"/config/frontend/*.json "$root"/factory-defaults/*/*.json \
     "$root"/components/*/manifest.json; do jq -e . "$json" >/dev/null; done
-for component in frontend retroarch libretro-cores; do
+PLUMOS_BUBBLE_APP_ROOT="$root" \
+    "$repo_root/scripts/verify-bubble-emulator-catalog.sh"
+for component in \
+    frontend retroarch libretro-cores picoarch standalone pyxel portmaster; do
     (cd "$root" && sha256sum -c "components/$component/checksums.sha256")
 done
+LD_LIBRARY_PATH="$root/emulator/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+    python3 "$repo_root/scripts/smoke-load-libretro-cores-bubble.py" \
+    --root "$root" >"$out/libretro-core-load-smoke.log"
+grep -Fqx 'bubble_libretro_load_smoke=result-ok pass=114 fail=0' \
+    "$out/libretro-core-load-smoke.log"
 
 cat >"$root/manifest.json" <<EOF
 {
@@ -45,13 +67,20 @@ cat >"$root/manifest.json" <<EOF
   "version": "$version",
   "source_ref": "$source_ref",
   "source_date_epoch": $epoch,
-  "managed_components": ["frontend", "retroarch", "libretro-cores"],
+  "managed_components": ["frontend", "retroarch", "libretro-cores", "picoarch", "standalone", "pyxel", "portmaster"],
   "frontend": "cpu-drm-dumb-buffer",
   "retroarch": "software-plain-drm-rgui",
-  "core_baseline": ["quicknes"],
+  "core_baseline": "all-114-source-records",
+  "catalog_complete": true,
+  "release_complete": false,
+  "catalog_systems": 98,
+  "catalog_launch_profile_occurrences": 196,
+  "coverage_manifest": "config/frontend/runtime-coverage.json",
   "mutable_paths": ["config/frontend/settings.json", "config/system/settings.json", "config/retroarch", "logs", "state", "saves", "states"],
-  "roms_bios_included": false,
-  "publishable": false
+  "user_media_included": false,
+  "managed_firmware_assets": ["blueMSX C-BIOS", "DraStic packaged BIOS (non-release-eligible)"],
+  "publishable": false,
+  "non_publishable_reasons": ["physical route matrix pending", "captured vendor Mali license pending", "DraStic Bubble input bridge missing", "3DS has no runtime"]
 }
 EOF
 (

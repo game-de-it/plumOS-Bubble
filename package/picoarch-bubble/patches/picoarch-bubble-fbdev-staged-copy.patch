@@ -1,0 +1,186 @@
+diff --git a/picoarch_v90s_fbdev.h b/picoarch_v90s_fbdev.h
+--- a/picoarch_v90s_fbdev.h
++++ b/picoarch_v90s_fbdev.h
+@@ -11,6 +11,9 @@
+ #include <sys/mman.h>
+ #include <unistd.h>
+ 
++#define PLUMOS_FBDEV_ENABLE_DRM 1
++#include "plumos_fbdev_renderer.h"
++
+ static int v90s_fb_fd = -1;
+ static uint8_t *v90s_fb_map;
+ static size_t v90s_fb_size;
+@@ -22,6 +22,7 @@
+ static pthread_mutex_t v90s_fb_mutex = PTHREAD_MUTEX_INITIALIZER;
+ static pthread_cond_t v90s_fb_cond = PTHREAD_COND_INITIALIZER;
+ static uint16_t *v90s_fb_frames[2];
++static uint32_t *v90s_fb_scanout;
++static struct plumos_fbdev_renderer v90s_drm;
++static int v90s_fb_use_drm;
+ static int v90s_fb_thread_started;
+ static int v90s_fb_thread_stop;
+ static int v90s_fb_active = -1;
+@@ -29,15 +30,18 @@
+ 
+ static void v90s_fb_present_pixels(const uint16_t *pixels)
+ {
++	struct fb_var_screeninfo next;
+ 	unsigned y;
+ 
+-	if (!v90s_fb_map || !pixels)
++	if ((!v90s_fb_use_drm && !v90s_fb_map) || !pixels || !v90s_fb_scanout)
+ 		return;
++
++	/* Convert outside scanout memory first. On Bubble fb0 has only one 640x480
++	 * page, so converting directly into it exposes the line-by-line update
++	 * and produces a persistent tear. */
+ 	for (y = 0; y < SCREEN_HEIGHT; y++) {
+ 		const uint16_t *src = pixels + y * SCREEN_WIDTH;
+-		uint32_t *dst = (uint32_t *)(v90s_fb_map +
+-			(v90s_fb_draw_yoffset + y) * v90s_fb_fix.line_length +
+-			v90s_fb_var.xoffset * 4);
++		uint32_t *dst = v90s_fb_use_drm
++			? (uint32_t *)(v90s_drm.mem + y * v90s_drm.fix.line_length)
++			: v90s_fb_scanout + y * SCREEN_WIDTH;
+ 		unsigned x;
+ 
+ 		for (x = 0; x < SCREEN_WIDTH; x++) {
+@@ -50,13 +54,21 @@
+ 			         ((g << 2 | g >> 4) << 8) | (b << 3 | b >> 2);
+ 		}
+ 	}
++
++	if (v90s_fb_use_drm) {
++		(void)plumos_fbdev_present(&v90s_drm);
++		return;
++	}
++
+ 	if (v90s_fb_double_buffer) {
+-		struct fb_var_screeninfo next = v90s_fb_var;
++		for (y = 0; y < SCREEN_HEIGHT; y++) {
++			void *dst = v90s_fb_map +
++				(v90s_fb_draw_yoffset + y) * v90s_fb_fix.line_length +
++				v90s_fb_var.xoffset * 4;
++			memcpy(dst, v90s_fb_scanout + y * SCREEN_WIDTH,
++			       SCREEN_WIDTH * sizeof(v90s_fb_scanout[0]));
++		}
++	}
++
++	if (v90s_fb_double_buffer) {
++		next = v90s_fb_var;
+ 		next.xoffset = 0;
+ 		next.yoffset = v90s_fb_draw_yoffset;
+-		/* The emulation/audio clock runs at the core's native rate. Waiting for
+-		 * the 58.955 Hz LCD here would drop one 60.10 Hz NES frame roughly once
+-		 * per second, so the presenter must remain nonblocking. */
+ 		next.activate = FB_ACTIVATE_NOW;
+ 		if (ioctl(v90s_fb_fd, FBIOPAN_DISPLAY, &next) == 0) {
+ 			v90s_fb_var = next;
+@@ -66,6 +78,15 @@
+ 			v90s_fb_draw_yoffset = v90s_fb_var.yoffset;
+ 		}
+ 	}
++	else {
++		/* The Bubble Rockchip DRM fbdev helper reports a timeout for its vblank
++		 * wait ioctl, so keep this path nonblocking. Converting the
++		 * whole frame in RAM first still reduces the visible update window
++		 * to one short copy without coupling the emulation/audio clock to
++		 * the 58.955 Hz panel. */
++		for (y = 0; y < SCREEN_HEIGHT; y++)
++			memcpy(v90s_fb_map + y * v90s_fb_fix.line_length,
++			       v90s_fb_scanout + y * SCREEN_WIDTH,
++			       SCREEN_WIDTH * sizeof(v90s_fb_scanout[0]));
++	}
+ }
+ 
+ static void *v90s_fb_present_thread(void *unused)
+@@ -98,32 +98,57 @@
+ static int v90s_fb_init(void)
+ {
++	const char *drm_path = getenv("PLUMOS_DRM_DEVICE");
++	char drm_error[256];
++
++	if (drm_path && drm_path[0] &&
++	    plumos_fbdev_renderer_init(&v90s_drm, "/dev/fb0",
++	                               drm_error, sizeof(drm_error)) &&
++	    v90s_drm.drm_active &&
++	    v90s_drm.var.bits_per_pixel == 32 &&
++	    v90s_drm.var.xres >= SCREEN_WIDTH &&
++	    v90s_drm.var.yres >= SCREEN_HEIGHT) {
++		v90s_fb_use_drm = 1;
++	}
++	else {
++		if (v90s_drm.drm_fd >= 0 || v90s_drm.drm_active)
++			plumos_fbdev_renderer_shutdown(&v90s_drm);
++		memset(&v90s_drm, 0, sizeof(v90s_drm));
++		v90s_drm.drm_fd = -1;
++		v90s_fb_use_drm = 0;
++	}
++
++	if (!v90s_fb_use_drm) {
+ 	v90s_fb_fd = open("/dev/fb0", O_RDWR);
+ 	if (v90s_fb_fd < 0 ||
+ 	    ioctl(v90s_fb_fd, FBIOGET_FSCREENINFO, &v90s_fb_fix) < 0 ||
+ 	    ioctl(v90s_fb_fd, FBIOGET_VSCREENINFO, &v90s_fb_var) < 0 ||
+ 	    v90s_fb_var.bits_per_pixel != 32 ||
+ 	    v90s_fb_var.xres < SCREEN_WIDTH ||
+ 	    v90s_fb_var.yres < SCREEN_HEIGHT ||
+ 	    v90s_fb_fix.line_length < (v90s_fb_var.xoffset + SCREEN_WIDTH) * 4) {
+ 		return -1;
+ 	}
+ 	v90s_fb_size = v90s_fb_fix.smem_len
+ 	                 ? v90s_fb_fix.smem_len
+ 	                 : (size_t)v90s_fb_fix.line_length * v90s_fb_var.yres_virtual;
+ 	if (v90s_fb_size < (size_t)v90s_fb_fix.line_length *
+ 	                    (v90s_fb_var.yoffset + SCREEN_HEIGHT)) {
+ 		return -1;
+ 	}
+ 	v90s_fb_map = mmap(NULL, v90s_fb_size, PROT_READ | PROT_WRITE,
+ 	                   MAP_SHARED, v90s_fb_fd, 0);
+ 	if (v90s_fb_map == MAP_FAILED) {
+ 		return -1;
+ 	}
++	}
+ 	v90s_fb_double_buffer = v90s_fb_var.yres_virtual >= v90s_fb_var.yres * 2;
+ 	v90s_fb_draw_yoffset = v90s_fb_double_buffer &&
+ 	                       v90s_fb_var.yoffset < v90s_fb_var.yres
+ 	                         ? v90s_fb_var.yres : 0;
+ 	v90s_fb_frames[0] = malloc(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(uint16_t));
+ 	v90s_fb_frames[1] = malloc(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(uint16_t));
+-	if (!v90s_fb_frames[0] || !v90s_fb_frames[1])
++	v90s_fb_scanout = malloc(SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(uint32_t));
++	if (!v90s_fb_frames[0] || !v90s_fb_frames[1] || !v90s_fb_scanout)
+ 		return -1;
+ 	v90s_fb_thread_stop = 0;
+ 	v90s_fb_active = -1;
+@@ -140,9 +165,9 @@
+ {
+ 	unsigned y;
+ 	int frame;
+ 
+-	if (!v90s_fb_map || !surface || !v90s_fb_thread_started)
++	if ((!v90s_fb_use_drm && !v90s_fb_map) || !surface || !v90s_fb_thread_started)
+ 		return;
+ 	pthread_mutex_lock(&v90s_fb_mutex);
+ 	frame = v90s_fb_active == 0 ? 1 : 0;
+@@ -169,6 +194,10 @@
+ 		pthread_join(v90s_fb_thread, NULL);
+ 		v90s_fb_thread_started = 0;
+ 	}
++	if (v90s_fb_use_drm) {
++		plumos_fbdev_renderer_shutdown(&v90s_drm);
++		v90s_fb_use_drm = 0;
++	}
+ 	if (v90s_fb_map && v90s_fb_map != MAP_FAILED) {
+ 		munmap(v90s_fb_map, v90s_fb_size);
+ 	}
+@@ -181,6 +210,8 @@
+ 	free(v90s_fb_frames[1]);
+ 	v90s_fb_frames[0] = NULL;
+ 	v90s_fb_frames[1] = NULL;
++	free(v90s_fb_scanout);
++	v90s_fb_scanout = NULL;
+ }
+ 
+ #endif

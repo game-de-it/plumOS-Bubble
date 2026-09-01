@@ -1,0 +1,99 @@
+diff --git a/src/osd/retro/libretro.c b/src/osd/retro/libretro.c
+index 0654483..d221a61 100644
+--- a/src/osd/retro/libretro.c
++++ b/src/osd/retro/libretro.c
+@@ -1315,6 +1315,82 @@ void osd_break_into_debugger(const char *message)
+ 	(void)message;
+ }
+ 
++/*
++ * The pinned MBA.mini fork omits the OSD work-queue implementation while
++ * its CHD reader still references that ABI.  Use the synchronous fallback
++ * used by the MAME 2010 libretro port: work is completed before queueing
++ * returns, which is safe for this reduced core and leaves no host symbols.
++ */
++struct _osd_work_item
++{
++	void *result;
++};
++
++osd_work_queue *osd_work_queue_alloc(int flags)
++{
++	(void)flags;
++	return (osd_work_queue *)1;
++}
++
++int osd_work_queue_items(osd_work_queue *queue)
++{
++	(void)queue;
++	return 0;
++}
++
++int osd_work_queue_wait(osd_work_queue *queue, osd_ticks_t timeout)
++{
++	(void)queue;
++	(void)timeout;
++	return TRUE;
++}
++
++void osd_work_queue_free(osd_work_queue *queue)
++{
++	(void)queue;
++}
++
++osd_work_item *osd_work_item_queue_multiple(osd_work_queue *queue,
++	osd_work_callback callback, INT32 numitems, void *parambase,
++	INT32 paramstep, UINT32 flags)
++{
++	osd_work_item *item;
++	INT32 itemnum;
++
++	(void)queue;
++	item = (osd_work_item *)osd_malloc(sizeof(*item));
++	if (item == NULL)
++		return NULL;
++	for (itemnum = 0; itemnum < numitems; itemnum++)
++	{
++		item->result = (*callback)(parambase, 0);
++		parambase = (UINT8 *)parambase + paramstep;
++	}
++	if (flags & WORK_ITEM_FLAG_AUTO_RELEASE)
++	{
++		osd_free(item);
++		item = NULL;
++	}
++	return item;
++}
++
++int osd_work_item_wait(osd_work_item *item, osd_ticks_t timeout)
++{
++	(void)item;
++	(void)timeout;
++	return TRUE;
++}
++
++void *osd_work_item_result(osd_work_item *item)
++{
++	return item->result;
++}
++
++void osd_work_item_release(osd_work_item *item)
++{
++	osd_free(item);
++}
++
+ //============================================================
+ // osd_wait_for_debugger
+ //============================================================
+diff --git a/makefile.common b/makefile.common
+index ae9ec16..a54ad1d 100644
+--- a/makefile.common
++++ b/makefile.common
+@@ -411,6 +411,7 @@ UTILOBJS = \
+ 	$(LIBOBJ)/util/unicode.o \
+ 	$(LIBOBJ)/util/unzip.o \
+ 	$(LIBOBJ)/util/xmlfile.o \
++	$(LIBOBJ)/util/vbiparse.o \
+ 	$(LIBOBJ)/util/zippath.o \
+ 
+ $(OBJ)/libutil.a: $(UTILOBJS)

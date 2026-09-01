@@ -19,9 +19,9 @@ bin=$root/bin
 lib=$root/frontend/lib
 component=$root/components/frontend
 version=${PLUMOS_BUBBLE_VERSION:-0.1.0-dev}
-source_ref=$(git -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
+source_ref=$(git -c safe.directory="$repo_root" -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
 epoch=${SOURCE_DATE_EPOCH:-}
-[[ -n $epoch ]] || epoch=$(git -C "$repo_root" show -s --format=%ct HEAD)
+[[ -n $epoch ]] || epoch=$(git -c safe.directory="$repo_root" -C "$repo_root" show -s --format=%ct HEAD)
 export SOURCE_DATE_EPOCH=$epoch
 
 rm -rf "$out"

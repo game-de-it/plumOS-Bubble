@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "device": "bubble",
+  "catalog": {
+    "source_repo": "plumOS-MF",
+    "source_ref": "0095017",
+    "common_systems": 97,
+    "bubble_visible_systems": 98,
+    "launch_profile_occurrences": 196,
+    "retroarch_core_ids": 116,
+    "picoarch_core_ids": 20,
+    "standalone_ids": 5
+  },
+  "release_complete": false,
+  "route_defaults": {
+    "retroarch": {
+      "state": "host-load-smoke-passed-114-of-114",
+      "physical_validation": "pending",
+      "todo": "BUB-P6-08"
+    },
+    "picoarch": {
+      "state": "host-built-route-resolved",
+      "physical_validation": "pending",
+      "todo": "BUB-P6-08"
+    },
+    "standalone": {
+      "state": "host-built-route-resolved",
+      "physical_validation": "pending",
+      "todo": "BUB-P6-08"
+    },
+    "pyxel": {
+      "state": "host-built-route-resolved",
+      "physical_validation": "pending",
+      "todo": "BUB-P6-08"
+    },
+    "external": {
+      "state": "host-built-compatibility-profile-unvalidated",
+      "physical_validation": "pending",
+      "todo": "BUB-P6-06"
+    }
+  },
+  "route_overrides": {
+    "retroarch:quicknes": {
+      "state": "physical-baseline-passed",
+      "release_sufficient": false,
+      "todo": "BUB-P6-02"
+    },
+    "retroarch:flycast": {
+      "state": "host-load-smoke-passed-captured-vendor-runtime",
+      "release_eligible": false,
+      "physical_validation": "pending",
+      "todo": "BUB-P4-D05"
+    },
+    "retroarch:flycast_xtreme": {
+      "state": "host-load-smoke-passed-captured-vendor-runtime",
+      "release_eligible": false,
+      "physical_validation": "pending",
+      "todo": "BUB-P4-D05"
+    },
+    "retroarch:km_duckswanstation_xtreme_amped": {
+      "state": "host-load-smoke-passed-captured-vendor-runtime",
+      "release_eligible": false,
+      "physical_validation": "pending",
+      "todo": "BUB-P4-D05"
+    },
+    "retroarch:mupen64plus_next": {
+      "state": "host-load-smoke-passed-captured-vendor-runtime",
+      "release_eligible": false,
+      "physical_validation": "pending",
+      "todo": "BUB-P4-D05"
+    },
+    "retroarch:parallel_n64": {
+      "state": "host-load-smoke-passed-captured-vendor-runtime",
+      "release_eligible": false,
+      "physical_validation": "pending",
+      "todo": "BUB-P4-D05"
+    },
+    "retroarch:yabasanshiro": {
+      "state": "host-load-smoke-passed-captured-vendor-runtime",
+      "release_eligible": false,
+      "physical_validation": "pending",
+      "todo": "BUB-P4-D05"
+    },
+    "standalone:drastic": {
+      "state": "visible-unsupported-missing-bubble-input-bridge",
+      "redistribution": "unresolved",
+      "release_eligible": false,
+      "todo": "BUB-P6-03"
+    }
+  },
+  "unsupported_systems": {
+    "3ds": {
+      "state": "unsupported",
+      "reason": "no-common-plumos-rk3566-runtime",
+      "todo": "BUB-P6-01"
+    }
+  },
+  "excluded_source_directories": {
+    "01": {
+      "reason": "foreign-device-management-tree"
+    },
+    "bios": {
+      "reason": "user-bios-source-not-game-content"
+    }
+  }
+}

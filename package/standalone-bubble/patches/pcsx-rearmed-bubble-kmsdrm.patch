@@ -1,0 +1,1492 @@
+diff --git a/frontend/main.c b/frontend/main.c
+index ee2de1c..0ca48b0 100644
+--- a/frontend/main.c
++++ b/frontend/main.c
+@@ -73,6 +73,7 @@ unsigned long gpuDisp;
+ char cfgfile_basename[MAXPATHLEN];
+ int state_slot;
+ enum sched_action emu_action, emu_action_old;
++volatile int plumos_mf_fast_forward;
+ char hud_msg[64];
+ int hud_new_msg;
+ 
+@@ -128,6 +129,7 @@ void emu_set_default_config(void)
+ 	pl_rearmed_cbs.gpu_unai.fast_lighting = 0;
+ 	pl_rearmed_cbs.gpu_unai.blending = 1;
+ 	memset(&pl_rearmed_cbs.gpu_peopsgl, 0, sizeof(pl_rearmed_cbs.gpu_peopsgl));
++	pl_rearmed_cbs.gpu_peopsgl.bOpaquePass = 1;
+ 	pl_rearmed_cbs.gpu_peopsgl.iVRamSize = 64;
+ 	pl_rearmed_cbs.gpu_peopsgl.iTexGarbageCollection = 1;
+ 
+@@ -748,16 +750,19 @@ static void toggle_fast_forward(int force_off)
+ 
+ 	fast_forward = !fast_forward;
+ 	if (fast_forward) {
++		plumos_mf_fast_forward = 1;
++		pl_rearmed_cbs.fast_forward = 1;
+ 		normal_g_opts = g_opts;
+ 		normal_frameskip = pl_rearmed_cbs.frameskip;
+ 		normal_enhancement_enable =
+ 			pl_rearmed_cbs.gpu_neon.enhancement_enable;
+ 
+ 		g_opts |= OPT_NO_FRAMELIM;
+-		if (normal_frameskip != 0)
+-			pl_rearmed_cbs.frameskip = 3;
++		pl_rearmed_cbs.frameskip = 3;
+ 		pl_rearmed_cbs.gpu_neon.enhancement_enable = 0;
+ 	} else {
++		plumos_mf_fast_forward = 0;
++		pl_rearmed_cbs.fast_forward = 0;
+ 		g_opts = normal_g_opts;
+ 		pl_rearmed_cbs.frameskip = normal_frameskip;
+ 		pl_rearmed_cbs.gpu_neon.enhancement_enable =
+@@ -769,6 +774,9 @@ static void toggle_fast_forward(int force_off)
+ 	if (!force_off)
+ 		snprintf(hud_msg, sizeof(hud_msg), "FAST FORWARD %s",
+ 			fast_forward ? "ON" : "OFF");
++	fprintf(stderr, "Bubble fast forward=%d frameskip=%d no_framelim=%d\n",
++		fast_forward, pl_rearmed_cbs.frameskip,
++		!!(g_opts & OPT_NO_FRAMELIM));
+ }
+ 
+ static void SignalExit(int sig) {
+diff --git a/frontend/menu.c b/frontend/menu.c
+index 0491908..a0eec54 100644
+--- a/frontend/menu.c
++++ b/frontend/menu.c
+@@ -2795,9 +2795,19 @@ void menu_notify_mode_change(int w, int h, int bpp)
+ 	last_vout_bpp = bpp;
+ }
+ 
++static int gpu_paused;
++
+ static void menu_leave_emu(void)
+ {
+-	if (GPU_close != NULL) {
++	gpu_paused = 0;
++	if (GPU_pause != NULL && GPU_resume != NULL) {
++		int ret = GPU_pause();
++		if (!ret)
++			gpu_paused = 1;
++		else
++			fprintf(stderr, "Warning: GPU_pause returned %d\n", ret);
++	}
++	if (!gpu_paused && GPU_close != NULL) {
+ 		int ret = GPU_close();
+ 		if (ret)
+ 			fprintf(stderr, "Warning: GPU_close returned %d\n", ret);
+@@ -2857,6 +2867,15 @@ void menu_prepare_emu(void)
+ 	// push config to GPU plugin
+ 	plugin_call_rearmed_cbs();
+ 
++	if (gpu_paused && GPU_resume != NULL) {
++		int ret = GPU_resume();
++		gpu_paused = 0;
++		if (!ret)
++			return;
++		fprintf(stderr, "Warning: GPU_resume returned %d\n", ret);
++		if (GPU_close != NULL)
++			GPU_close();
++	}
+ 	if (GPU_open != NULL) {
+ 		int ret = GPU_open(&gpuDisp, "PCSX", NULL);
+ 		if (ret)
+diff --git a/frontend/plat_sdl.c b/frontend/plat_sdl.c
+index ca0bdf7..3bcc4f3 100644
+--- a/frontend/plat_sdl.c
++++ b/frontend/plat_sdl.c
+@@ -92,6 +92,24 @@ static const struct in_default_bind in_sdl_defbinds[] = {
+   { SDLK_F8,     IN_BINDTYPE_EMU, SACTION_SWITCH_DISPMODE },
+   { SDLK_F11,    IN_BINDTYPE_EMU, SACTION_TOGGLE_FULLSCREEN },
+   { SDLK_BACKSPACE, IN_BINDTYPE_EMU, SACTION_FAST_FORWARD },
++  /* Bubble SDL joystick buttons from retrogame_joypad. */
++  { SDLK_WORLD_0,  IN_BINDTYPE_PLAYER12, DKEY_CIRCLE },
++  { SDLK_WORLD_1,  IN_BINDTYPE_PLAYER12, DKEY_CROSS },
++  { SDLK_WORLD_2,  IN_BINDTYPE_PLAYER12, DKEY_TRIANGLE },
++  { SDLK_WORLD_3,  IN_BINDTYPE_PLAYER12, DKEY_SQUARE },
++  { SDLK_WORLD_4,  IN_BINDTYPE_PLAYER12, DKEY_L1 },
++  { SDLK_WORLD_5,  IN_BINDTYPE_PLAYER12, DKEY_R1 },
++  { SDLK_WORLD_6,  IN_BINDTYPE_PLAYER12, DKEY_L2 },
++  { SDLK_WORLD_7,  IN_BINDTYPE_PLAYER12, DKEY_R2 },
++  { SDLK_WORLD_8,  IN_BINDTYPE_PLAYER12, DKEY_SELECT },
++  { SDLK_WORLD_9,  IN_BINDTYPE_PLAYER12, DKEY_START },
++  { SDLK_WORLD_10, IN_BINDTYPE_EMU, SACTION_ENTER_MENU },
++  { SDLK_WORLD_11, IN_BINDTYPE_PLAYER12, DKEY_L3 },
++  { SDLK_WORLD_12, IN_BINDTYPE_PLAYER12, DKEY_R3 },
++  { SDLK_WORLD_13, IN_BINDTYPE_PLAYER12, DKEY_UP },
++  { SDLK_WORLD_14, IN_BINDTYPE_PLAYER12, DKEY_DOWN },
++  { SDLK_WORLD_15, IN_BINDTYPE_PLAYER12, DKEY_LEFT },
++  { SDLK_WORLD_16, IN_BINDTYPE_PLAYER12, DKEY_RIGHT },
+   { 0, 0, 0 }
+ };
+ 
+@@ -121,6 +139,13 @@ const struct menu_keymap in_sdl_joy_map[] =
+   { SDLK_WORLD_1, PBTN_MBACK },
+   { SDLK_WORLD_2, PBTN_MA2 },
+   { SDLK_WORLD_3, PBTN_MA3 },
++  { SDLK_WORLD_4, PBTN_L },
++  { SDLK_WORLD_5, PBTN_R },
++  { SDLK_WORLD_10, PBTN_MENU },
++  { SDLK_WORLD_13, PBTN_UP },
++  { SDLK_WORLD_14, PBTN_DOWN },
++  { SDLK_WORLD_15, PBTN_LEFT },
++  { SDLK_WORLD_16, PBTN_RIGHT },
+ };
+ 
+ static const struct in_pdata in_sdl_platform_data = {
+diff --git a/frontend/plugin_lib.c b/frontend/plugin_lib.c
+index f17b6b4..655998f 100644
+--- a/frontend/plugin_lib.c
++++ b/frontend/plugin_lib.c
+@@ -33,6 +33,8 @@
+ #include "psemu_plugin_defs.h"
+ #include "../libpcsxcore/new_dynarec/new_dynarec.h"
+ #include "../libpcsxcore/psxmem_map.h"
++
++extern volatile int plumos_mf_fast_forward;
+ #include "../libpcsxcore/gpu.h"
+ #include "../libpcsxcore/r3000a.h"
+ #include "../libpcsxcore/psxcounters.h"
+@@ -773,9 +775,13 @@ void pl_gun_byte2(int port, unsigned char byte)
+ void pl_frame_limit(void)
+ {
+ 	static struct timeval tv_old, tv_expect;
++	static struct timeval mf_frame_old;
+ 	static int vsync_cnt_prev, drc_active_vsyncs;
++	static int mf_fast_forward_rate_reports;
++	static int mf_profile_seconds = -1;
++	static int mf_slow_frame_reports;
+ 	struct timeval now;
+-	int diff, usadj;
++	int diff, mf_frame_diff, usadj;
+ 
+ 	if (g_emu_resetting)
+ 		return;
+@@ -788,6 +794,17 @@ void pl_frame_limit(void)
+ 
+ 	pcnt_end(PCNT_ALL);
+ 	gettimeofday(&now, 0);
++	mf_frame_diff = mf_frame_old.tv_sec != 0 ?
++		tvdiff(now, mf_frame_old) : 0;
++	mf_frame_old = now;
++	if (!plumos_mf_fast_forward && mf_profile_seconds != 0 &&
++	    mf_frame_diff > 25000 && mf_slow_frame_reports < 64) {
++		fprintf(stderr,
++			"Bubble slow frame: elapsed_us=%d dynarec=%d presented=%u\n",
++			mf_frame_diff, ndrc_g.did_compile,
++			pl_rearmed_cbs.flip_cnt);
++		mf_slow_frame_reports++;
++	}
+ 
+ 	if (now.tv_sec != tv_old.tv_sec) {
+ 		diff = tvdiff(now, tv_old);
+@@ -796,6 +813,30 @@ void pl_frame_limit(void)
+ 			pl_rearmed_cbs.vsps_cur = 1000000.0f * (vsync_cnt - vsync_cnt_prev) / diff;
+ 		vsync_cnt_prev = vsync_cnt;
+ 
++		if (plumos_mf_fast_forward) {
++			if (mf_fast_forward_rate_reports < 8) {
++				fprintf(stderr,
++					"Bubble fast forward rate: emulated=%.1f presented=%u\n",
++					pl_rearmed_cbs.vsps_cur,
++					pl_rearmed_cbs.flip_cnt);
++				mf_fast_forward_rate_reports++;
++			}
++		}
++		else
++			mf_fast_forward_rate_reports = 0;
++
++		if (mf_profile_seconds < 0) {
++			const char *profile = getenv("PLUMOS_BUBBLE_PROFILE_SECONDS");
++			mf_profile_seconds = profile != NULL ? atoi(profile) : 0;
++		}
++		if (!plumos_mf_fast_forward && mf_profile_seconds > 0) {
++			fprintf(stderr,
++				"Bubble normal rate: emulated=%.1f presented=%u dynarec=%d\n",
++				pl_rearmed_cbs.vsps_cur, pl_rearmed_cbs.flip_cnt,
++				ndrc_g.did_compile);
++			mf_profile_seconds--;
++		}
++
+ 		if (g_opts & OPT_SHOWFPS)
+ 			pl_rearmed_cbs.flips_per_sec = pl_rearmed_cbs.flip_cnt;
+ 		pl_rearmed_cbs.flip_cnt = 0;
+diff --git a/frontend/plugin_lib.h b/frontend/plugin_lib.h
+index 4ff3ddf..069afba 100644
+--- a/frontend/plugin_lib.h
++++ b/frontend/plugin_lib.h
+@@ -70,6 +70,7 @@ struct rearmed_cbs {
+ 	void *gles_display, *gles_surface;
+ 	// gpu options
+ 	int   frameskip;
++	int   fast_forward;
+ 	int   fskip_advice;
+ 	int   fskip_force;
+ 	int   fskip_dirty;
+diff --git a/libpcsxcore/plugins.c b/libpcsxcore/plugins.c
+index d568aef..6762b0a 100644
+--- a/libpcsxcore/plugins.c
++++ b/libpcsxcore/plugins.c
+@@ -35,6 +35,8 @@ GPUinit               GPU_init;
+ GPUshutdown           GPU_shutdown;
+ GPUopen               GPU_open;
+ GPUclose              GPU_close;
++GPUpause              GPU_pause;
++GPUresume             GPU_resume;
+ GPUreadStatus         GPU_readStatus;
+ GPUreadData           GPU_readData;
+ GPUreadDataMem        GPU_readDataMem;
+@@ -140,6 +142,8 @@ static int LoadGPUplugin(const char *GPUdll) {
+ 	LoadGpuSym1(shutdown, "GPUshutdown");
+ 	LoadGpuSym1(open, "GPUopen");
+ 	LoadGpuSym1(close, "GPUclose");
++	LoadGpuSymN(pause, "GPUpause");
++	LoadGpuSymN(resume, "GPUresume");
+ 	LoadGpuSym1(readData, "GPUreadData");
+ 	LoadGpuSym1(readDataMem, "GPUreadDataMem");
+ 	LoadGpuSym1(readStatus, "GPUreadStatus");
+diff --git a/libpcsxcore/plugins.h b/libpcsxcore/plugins.h
+index fff2fdb..7a30ec2 100644
+--- a/libpcsxcore/plugins.h
++++ b/libpcsxcore/plugins.h
+@@ -51,6 +51,8 @@ typedef char *(CALLBACK* PSEgetLibName)(void);
+ typedef long (CALLBACK* GPUinit)(void);
+ typedef long (CALLBACK* GPUshutdown)(void);
+ typedef long (CALLBACK* GPUclose)(void);
++typedef long (CALLBACK* GPUpause)(void);
++typedef long (CALLBACK* GPUresume)(void);
+ typedef void (CALLBACK* GPUwriteStatus)(uint32_t);
+ typedef void (CALLBACK* GPUwriteData)(uint32_t);
+ typedef void (CALLBACK* GPUwriteDataMem)(uint32_t *, int);
+@@ -67,6 +69,8 @@ extern GPUinit          GPU_init;
+ extern GPUshutdown      GPU_shutdown; 
+ extern GPUopen          GPU_open;
+ extern GPUclose         GPU_close;
++extern GPUpause         GPU_pause;
++extern GPUresume        GPU_resume;
+ extern GPUreadStatus    GPU_readStatus;
+ extern GPUreadData      GPU_readData;
+ extern GPUreadDataMem   GPU_readDataMem;
+diff --git a/plugins/dfsound/alsa.c b/plugins/dfsound/alsa.c
+index 6b9f83e..f3915cc 100644
+--- a/plugins/dfsound/alsa.c
++++ b/plugins/dfsound/alsa.c
+@@ -16,7 +16,10 @@
+  ***************************************************************************/
+ 
+ #include <stdio.h>
++#include <stdlib.h>
++#include <stdint.h>
+ #include <string.h>
++#include <sys/time.h>
+ #define ALSA_PCM_NEW_HW_PARAMS_API
+ #define ALSA_PCM_NEW_SW_PARAMS_API
+ #include <alsa/asoundlib.h>
+@@ -24,6 +27,22 @@
+ 
+ static snd_pcm_t *handle = NULL;
+ static snd_pcm_uframes_t buffer_size;
++static FILE *audio_dump;
++static size_t audio_dump_bytes;
++static size_t audio_dump_limit;
++static FILE *audio_output_dump;
++static size_t audio_output_dump_bytes;
++static size_t audio_output_dump_limit;
++static unsigned int resample_input_rate = 44100;
++static const unsigned int resample_output_rate = 48000;
++static int16_t *resample_buffer;
++static size_t resample_capacity;
++static uint64_t resample_phase;
++static int16_t resample_previous[2];
++static int resample_have_previous;
++extern volatile int plumos_mf_fast_forward;
++static int fast_forward_muted;
++static int slow_audio_reports;
+ 
+ static void alsa_finish(void);
+ 
+@@ -37,8 +56,8 @@ static int alsa_init(void)
+  unsigned int pspeed;
+  int pchannels;
+  int format;
+- unsigned int buffer_time = 100000;
+- unsigned int period_time = buffer_time / 4;
++ snd_pcm_uframes_t buffer_frames = 4096;
++ snd_pcm_uframes_t period_frames = 1024;
+  const char *alsa_name = "default";
+  const char *name;
+  int retval = -1;
+@@ -73,7 +92,15 @@ static int alsa_init(void)
+ 
+  pchannels=2;
+ 
+- pspeed = 44100;
++ pspeed = resample_output_rate;
++ name = getenv("PLUMOS_PCSX_AUDIO_INPUT_RATE");
++ if (name != NULL)
++  {
++   char *end;
++   unsigned long configured = strtoul(name, &end, 10);
++   if (end != name && *end == '\0' && configured >= 8000 && configured <= 192000)
++    resample_input_rate = (unsigned int)configured;
++  }
+  format = SND_PCM_FORMAT_S16;
+ 
+  if ((err = snd_pcm_open(&handle, alsa_name, 
+@@ -121,15 +148,15 @@ static int alsa_init(void)
+    goto out;
+   }
+ 
+- if((err=snd_pcm_hw_params_set_buffer_time_near(handle, hwparams, &buffer_time, 0))<0)
++ if((err=snd_pcm_hw_params_set_period_size_near(handle, hwparams, &period_frames, 0))<0)
+   {
+-   printf("Buffer time error: %s\n", snd_strerror(err));
++   printf("Period size error: %s\n", snd_strerror(err));
+    goto out;
+   }
+ 
+- if((err=snd_pcm_hw_params_set_period_time_near(handle, hwparams, &period_time, 0))<0)
++ if((err=snd_pcm_hw_params_set_buffer_size_near(handle, hwparams, &buffer_frames))<0)
+   {
+-   printf("Period time error: %s\n", snd_strerror(err));
++   printf("Buffer size error: %s\n", snd_strerror(err));
+    goto out;
+   }
+ 
+@@ -147,6 +174,20 @@ static int alsa_init(void)
+   }
+ 
+  buffer_size = snd_pcm_status_get_avail(status);
++ name = getenv("PLUMOS_PCSX_AUDIO_DUMP");
++ if (name != NULL && name[0] != '\0')
++  {
++   audio_dump = fopen(name, "wb");
++   audio_dump_bytes = 0;
++   audio_dump_limit = 16 * 1024 * 1024;
++  }
++ name = getenv("PLUMOS_PCSX_AUDIO_OUTPUT_DUMP");
++ if (name != NULL && name[0] != '\0')
++  {
++   audio_output_dump = fopen(name, "wb");
++   audio_output_dump_bytes = 0;
++   audio_output_dump_limit = 16 * 1024 * 1024;
++  }
+  retval = 0;
+ 
+ out:
+@@ -158,6 +199,22 @@ out:
+ // REMOVE SOUND
+ static void alsa_finish(void)
+ {
++ if(audio_dump != NULL)
++  {
++   fclose(audio_dump);
++   audio_dump = NULL;
++  }
++ if(audio_output_dump != NULL)
++  {
++   fclose(audio_output_dump);
++   audio_output_dump = NULL;
++  }
++ free(resample_buffer);
++ resample_buffer = NULL;
++ resample_capacity = 0;
++ resample_phase = 0;
++ resample_have_previous = 0;
++ fast_forward_muted = 0;
+  if(handle != NULL)
+   {
+    snd_pcm_drop(handle);
+@@ -183,33 +240,171 @@ static int alsa_busy(void)
+ }
+ 
+ // FEED SOUND DATA
++static const int16_t *resample_audio(const int16_t *input,
++ snd_pcm_uframes_t frames, snd_pcm_uframes_t *output_frames)
++{
++ const uint64_t output_rate = resample_output_rate;
++ uint64_t limit;
++ size_t needed;
++ snd_pcm_uframes_t produced = 0;
++
++ if (resample_input_rate == output_rate || frames == 0)
++  {
++   *output_frames = frames;
++   return input;
++  }
++ if (!resample_have_previous)
++  {
++   resample_previous[0] = input[0];
++   resample_previous[1] = input[1];
++   resample_have_previous = 1;
++   input += 2;
++   frames--;
++   if (frames == 0)
++    {
++     *output_frames = 0;
++     return input;
++    }
++  }
++ needed = (size_t)(((uint64_t)frames * output_rate + resample_phase +
++  resample_input_rate - 1) / resample_input_rate + 2);
++ if (needed > resample_capacity)
++  {
++   int16_t *resized = realloc(resample_buffer, needed * 2 * sizeof(*resized));
++   if (resized == NULL)
++    {
++     *output_frames = frames;
++     return input;
++    }
++   resample_buffer = resized;
++   resample_capacity = needed;
++  }
++ limit = (uint64_t)frames * output_rate;
++ while (resample_phase < limit)
++  {
++   snd_pcm_uframes_t index = (snd_pcm_uframes_t)(resample_phase / output_rate);
++   uint64_t fraction = resample_phase % output_rate;
++   const int16_t *before = index == 0 ? resample_previous : input + (index - 1) * 2;
++   const int16_t *after = input + index * 2;
++   int channel;
++
++   for (channel = 0; channel < 2; channel++)
++    {
++     int64_t mixed = (int64_t)before[channel] *
++      (int64_t)(output_rate - fraction) +
++      (int64_t)after[channel] * (int64_t)fraction;
++     resample_buffer[produced * 2 + channel] =
++      (int16_t)(mixed / (int64_t)output_rate);
++    }
++   produced++;
++   resample_phase += resample_input_rate;
++  }
++ resample_phase -= limit;
++ resample_previous[0] = input[(frames - 1) * 2];
++ resample_previous[1] = input[(frames - 1) * 2 + 1];
++ *output_frames = produced;
++ return resample_buffer;
++}
++
+ static void alsa_feed(void *pSound, int lBytes)
+ {
+- char sbuf[4096];
++ struct timeval started,finished;
++ const int16_t *samples = pSound;
++ snd_pcm_sframes_t frames = lBytes / 4;
++ snd_pcm_uframes_t resampled_frames;
++ const char *data;
+ 
+  if (handle == NULL) return;
+-
+- if (snd_pcm_state(handle) == SND_PCM_STATE_XRUN)
++ gettimeofday(&started,NULL);
++ if (plumos_mf_fast_forward)
++  {
++   if (!fast_forward_muted)
++    {
++     snd_pcm_drop(handle);
++     snd_pcm_prepare(handle);
++     resample_phase = 0;
++     resample_have_previous = 0;
++     fast_forward_muted = 1;
++     printf("alsa: fast forward audio muted\n");
++    }
++   return;
++  }
++ if (fast_forward_muted)
+   {
+-   memset(sbuf, 0, sizeof(sbuf));
+    snd_pcm_prepare(handle);
+-   snd_pcm_writei(handle, sbuf, sizeof(sbuf) / 4);
+-   snd_pcm_writei(handle, sbuf, sizeof(sbuf) / 4);
+-   snd_pcm_writei(handle, sbuf, sizeof(sbuf) / 4);
++   fast_forward_muted = 0;
++   printf("alsa: fast forward audio resumed\n");
+   }
+- else
++
++ if (audio_dump != NULL && audio_dump_bytes < audio_dump_limit)
+   {
+-   int l = snd_pcm_avail(handle);
+-   if (l < lBytes / 4)
++   size_t remaining = audio_dump_limit - audio_dump_bytes;
++   size_t bytes = (size_t)lBytes < remaining ? (size_t)lBytes : remaining;
++   audio_dump_bytes += fwrite(pSound, 1, bytes, audio_dump);
++   if (audio_dump_bytes >= audio_dump_limit)
+     {
+-     if (l == 0)
+-      return;
++     fclose(audio_dump);
++     audio_dump = NULL;
++    }
++  }
+ 
+-     lBytes = l * 4;
++ samples = resample_audio(samples, (snd_pcm_uframes_t)frames,
++  &resampled_frames);
++ frames = (snd_pcm_sframes_t)resampled_frames;
++ data = (const char *)samples;
++ if (audio_output_dump != NULL &&
++     audio_output_dump_bytes < audio_output_dump_limit)
++  {
++   size_t remaining = audio_output_dump_limit - audio_output_dump_bytes;
++   size_t available = (size_t)frames * 4;
++   size_t bytes = available < remaining ? available : remaining;
++   audio_output_dump_bytes += fwrite(samples, 1, bytes, audio_output_dump);
++   if (audio_output_dump_bytes >= audio_output_dump_limit)
++    {
++     fclose(audio_output_dump);
++     audio_output_dump = NULL;
+     }
+   }
+ 
+- snd_pcm_writei(handle, pSound, lBytes / 4);
++ while (frames > 0)
++  {
++   snd_pcm_sframes_t written = snd_pcm_writei(handle, data, frames);
++
++   if (written == -EAGAIN)
++    {
++     snd_pcm_wait(handle, 100);
++     continue;
++    }
++   if (written < 0)
++    {
++     int err = snd_pcm_recover(handle, written, 1);
++     if (err < 0)
++      {
++       printf("Audio write recovery failed: %s\n", snd_strerror(err));
++       return;
++      }
++     continue;
++    }
++   if (written == 0)
++    {
++     snd_pcm_wait(handle, 100);
++     continue;
++    }
++
++   data += written * 4;
++   frames -= written;
++  }
++ gettimeofday(&finished,NULL);
++ {
++  int elapsed = (int)((finished.tv_sec-started.tv_sec)*1000000+
++   finished.tv_usec-started.tv_usec);
++  if(elapsed>5000 && slow_audio_reports<64)
++   {
++    fprintf(stderr,"Bubble slow audio feed: elapsed_us=%d bytes=%d\n",
++            elapsed,lBytes);
++    slow_audio_reports++;
++   }
++ }
+ }
+ 
+ void out_register_alsa(struct out_driver *drv)
+diff --git a/plugins/dfsound/out.c b/plugins/dfsound/out.c
+index 4443dae..0b82eff 100644
+--- a/plugins/dfsound/out.c
++++ b/plugins/dfsound/out.c
+@@ -1,5 +1,6 @@
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <string.h>
+ #include "out.h"
+ 
+ #define MAX_OUT_DRIVERS 5
+@@ -40,6 +41,11 @@ void SetupSound(void)
+ 	for (i = 0; i < driver_count; i++)
+ 		if (out_drivers[i].init() == 0)
+ 			break;
++	if (getenv("PLUMOS_PCSX_REQUIRE_ALSA") != NULL &&
++	    (i >= driver_count || strcmp(out_drivers[i].name, "alsa") != 0)) {
++		fprintf(stderr, "PCSX-ReARMed requires the plumOS ALSA route\n");
++		exit(1);
++	}
+ 
+ 	if (i < 0 || i >= driver_count) {
+ 		printf("the impossible happened\n");
+@@ -49,4 +55,3 @@ void SetupSound(void)
+ 	out_current = &out_drivers[i];
+ 	// printf("selected sound output driver: %s\n", out_current->name);
+ }
+-
+diff --git a/plugins/gpu-gles/Makefile b/plugins/gpu-gles/Makefile
+index 9e04687..e71a2f9 100644
+--- a/plugins/gpu-gles/Makefile
++++ b/plugins/gpu-gles/Makefile
+@@ -6,7 +6,7 @@ SRC_GPULIB += gpulib_if.c
+ 
+ CFLAGS += -I$(PREFIX)include
+ LDFLAGS += -Wl,--allow-multiple-definition
+-LDLIBS += -L$(PREFIX)lib
++LDLIBS += -L$(PREFIX)lib -lSDL
+ ifeq "$(PLATFORM)" "caanoo"
+ CFLAGS += -DFAKE_WINDOW
+ LDLIBS += -lopengles_lite -lstdc++
+diff --git a/plugins/gpu-gles/gpuDraw.c b/plugins/gpu-gles/gpuDraw.c
+index d6670ee..d609cd4 100644
+--- a/plugins/gpu-gles/gpuDraw.c
++++ b/plugins/gpu-gles/gpuDraw.c
+@@ -248,9 +248,11 @@ void CreateScanLines(void)
+ int use_fsaa = 0;
+ 
+ EGLDisplay display;
+-EGLSurface surface;
+-static EGLConfig  config;
+-static EGLContext context;
++EGLSurface surface;
++static EGLConfig  config;
++static EGLContext context;
++static EGLContext menu_context;
++static int created_external_context;
+ 
+ #if defined(USE_X11)
+ #include "X11/Xlib.h"
+@@ -437,21 +439,96 @@ static int initEGL(void)
+ 
+ static int created_gles_context;
+ 
+-int GLinitialize(void *ext_gles_display, void *ext_gles_surface)
++static int create_external_gles_context(void)
++{
++ EGLDisplay current_display;
++ EGLSurface current_surface;
++ EGLint config_id;
++ EGLint num_configs;
++ EGLint config_attrs[] = {
++  EGL_CONFIG_ID, 0,
++  EGL_RENDERABLE_TYPE, EGL_OPENGL_ES_BIT,
++  EGL_NONE
++ };
++ EGLint context_attrs[] = {
++  EGL_CONTEXT_CLIENT_VERSION, 1,
++  EGL_NONE
++ };
++
++ current_display = eglGetCurrentDisplay();
++ current_surface = eglGetCurrentSurface(EGL_DRAW);
++ menu_context = eglGetCurrentContext();
++ if (current_display != EGL_NO_DISPLAY)
++  display = current_display;
++ if (current_surface != EGL_NO_SURFACE)
++  surface = current_surface;
++ if (menu_context == EGL_NO_CONTEXT) {
++  fprintf(stderr, "Bubble EGL isolate: no menu context error=%x\n", eglGetError());
++  return -1;
++ }
++ if (!eglQueryContext(display, menu_context, EGL_CONFIG_ID, &config_id)) {
++  fprintf(stderr, "Bubble EGL isolate: query config failed error=%x\n", eglGetError());
++  return -1;
++ }
++ config_attrs[1] = config_id;
++ if (!eglChooseConfig(display, config_attrs, &config, 1, &num_configs) ||
++     num_configs < 1) {
++  fprintf(stderr, "Bubble EGL isolate: choose config failed id=%d error=%x\n",
++          config_id, eglGetError());
++  return -1;
++ }
++ context = eglCreateContext(display, config, EGL_NO_CONTEXT, context_attrs);
++ if (context == EGL_NO_CONTEXT) {
++  fprintf(stderr, "Bubble EGL isolate: create context failed error=%x\n", eglGetError());
++  return -1;
++ }
++ if (!eglMakeCurrent(display, surface, surface, context)) {
++  fprintf(stderr, "Bubble EGL isolate: make current failed error=%x\n", eglGetError());
++  eglDestroyContext(display, context);
++  context = EGL_NO_CONTEXT;
++  return -1;
++ }
++ fprintf(stderr, "Bubble EGL isolate: dedicated GLES1 context active\n");
++ created_external_context = 1;
++ return 0;
++}
++
++static int has_external_gles_context(void)
+ {
+- if(ext_gles_display != NULL && ext_gles_surface != NULL) { 
+-  display = (EGLDisplay)ext_gles_display;
+-  surface = (EGLSurface)ext_gles_surface;
++ return created_external_context;
++}
++
++static int switch_to_plugin_gles_context(void)
++{
++ if (!created_external_context)
++  return 0;
++ return eglMakeCurrent(display,surface,surface,context) ? 0 : -1;
++}
++
++static int switch_to_menu_gles_context(void)
++{
++ if (!created_external_context)
++  return 0;
++ return eglMakeCurrent(display,surface,surface,menu_context) ? 0 : -1;
++}
++
++int GLinitialize(void *ext_gles_display, void *ext_gles_surface)
++{
++ if(ext_gles_display != NULL && ext_gles_surface != NULL) { 
++  display = (EGLDisplay)ext_gles_display;
++  surface = (EGLSurface)ext_gles_surface;
++  if (create_external_gles_context() != 0)
++   return -1;
+  }
+  else {
+   if(initEGL()!=0)
+    return -1;
+-  created_gles_context=1;
+- }
+-
+- //----------------------------------------------------// 
+-
+- glDepthRangef(0.0f, 1.0f);glError();
++  created_gles_context=1;
++ }
++
++ //----------------------------------------------------// 
++
++ glDepthRangef(0.0f, 1.0f);glError();
+ 
+  glViewport(rRatioRect.left,                           // init viewport by ratio rect
+             iResY-(rRatioRect.top+rRatioRect.bottom),
+@@ -538,10 +615,22 @@ int GLinitialize(void *ext_gles_display, void *ext_gles_surface)
+ ////////////////////////////////////////////////////////////////////////
+ 
+ void GLcleanup() 
+-{                                                     
++{
++ if (created_external_context &&
++     switch_to_plugin_gles_context() != 0)
++  return;
++
+  CleanupTextureStore();                                // bye textures
+ 
+- if(created_gles_context) {
++ if(created_external_context) {
++  glFinish();
++  switch_to_menu_gles_context();
++  eglDestroyContext(display, context);
++  context = EGL_NO_CONTEXT;
++  menu_context = EGL_NO_CONTEXT;
++  created_external_context=0;
++ }
++ else if(created_gles_context) {
+   eglMakeCurrent( display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT );
+   eglDestroySurface( display, surface );
+   eglDestroyContext( display, context );
+diff --git a/plugins/gpu-gles/gpuTexture.c b/plugins/gpu-gles/gpuTexture.c
+index 5136682..6828a04 100644
+--- a/plugins/gpu-gles/gpuTexture.c
++++ b/plugins/gpu-gles/gpuTexture.c
+@@ -91,7 +91,7 @@ int           iTexGarbageCollection=1;
+ unsigned int  dwTexPageComp=0;
+ int           iVRamSize=0;
+ int           iClampType=GL_CLAMP_TO_EDGE;
+-int iFilter = GL_LINEAR;
++int iFilter = GL_NEAREST;
+ void               (*LoadSubTexFn) (int,int,short,short);
+ unsigned int       (*PalTexturedColourFn)  (unsigned int);
+ 
+@@ -522,6 +522,12 @@ void InitializeTextureStore()
+ {
+  int i,j;
+ 
++ dwTexPageComp=0;
++ usLRUTexPage=0;
++ iMaxTexWnds=0;
++ iTexWndTurn=0;
++ ubOpaqueDraw=0;
++
+  if(iGPUHeight==1024)
+   {
+    MAXTPAGES     = 64;
+diff --git a/plugins/gpu-gles/gpulib_if.c b/plugins/gpu-gles/gpulib_if.c
+index 993834a..e6ac921 100644
+--- a/plugins/gpu-gles/gpulib_if.c
++++ b/plugins/gpu-gles/gpulib_if.c
+@@ -17,12 +17,152 @@
+  ***************************************************************************/
+ 
+ #include "gpuStdafx.h"
++#include <sys/time.h>
++#include <SDL.h>
+ #include "gpuDraw.c"
+ #include "gpuTexture.c"
+ #include "gpuPrim.c"
+ #include "hud.c"
+ 
++static GLuint plumos_render_target_texture;
++static GLuint plumos_render_target_framebuffer;
++static int plumos_render_target_active;
++static void (*plumos_gl_bind_framebuffer)(GLenum target,GLuint framebuffer);
++static void (*plumos_gl_gen_framebuffers)(GLsizei count,GLuint *framebuffers);
++static void (*plumos_gl_delete_framebuffers)(GLsizei count,
++                                              const GLuint *framebuffers);
++static void (*plumos_gl_framebuffer_texture_2d)(GLenum target,
++                                                GLenum attachment,
++                                                GLenum texture_target,
++                                                GLuint texture,GLint level);
++static GLenum (*plumos_gl_check_framebuffer_status)(GLenum target);
++static int plumos_swap_slow_reports;
++static const GLfloat plumos_present_vertices[] = {
++ -1.0f,-1.0f,1.0f,-1.0f,-1.0f,1.0f,1.0f,1.0f
++};
++static const GLfloat plumos_present_texcoords[] = {
++ 0.0f,0.0f,1.0f,0.0f,0.0f,1.0f,1.0f,1.0f
++};
++
++static int plumos_time_diff(const struct timeval *end,
++                            const struct timeval *start)
++{
++ return (int)((end->tv_sec-start->tv_sec)*1000000+
++              end->tv_usec-start->tv_usec);
++}
++
++static void plumos_prepare_fullscreen_draw(GLuint texture)
++{
++ glViewport(0,0,iResX,iResY); glError();
++ glDisable(GL_SCISSOR_TEST); glError();
++ glDisable(GL_ALPHA_TEST); glError();
++ glDisable(GL_BLEND); glError();
++ glDisable(GL_DEPTH_TEST); glError();
++ glDisableClientState(GL_COLOR_ARRAY); glError();
++ glEnableClientState(GL_VERTEX_ARRAY); glError();
++ glEnableClientState(GL_TEXTURE_COORD_ARRAY); glError();
++ glEnable(GL_TEXTURE_2D); glError();
++ glBindTexture(GL_TEXTURE_2D,texture); glError();
++ glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_REPLACE); glError();
++ glMatrixMode(GL_TEXTURE); glError();
++ glLoadIdentity(); glError();
++ glMatrixMode(GL_PROJECTION); glError();
++ glLoadIdentity(); glError();
++ glMatrixMode(GL_MODELVIEW); glError();
++ glLoadIdentity(); glError();
++ glVertexPointer(2,GL_FLOAT,0,plumos_present_vertices); glError();
++ glTexCoordPointer(2,GL_FLOAT,0,plumos_present_texcoords); glError();
++}
++
++static void plumos_restore_render_state(void)
++{
++  glViewport(rRatioRect.left,
++             iResY-(rRatioRect.top+rRatioRect.bottom),
++             rRatioRect.right,rRatioRect.bottom); glError();
++  glScissor(rRatioRect.left,
++            iResY-(rRatioRect.top+rRatioRect.bottom),
++            rRatioRect.right,rRatioRect.bottom); glError();
++  glEnable(GL_SCISSOR_TEST); glError();
++
++#ifndef OWNSCALE
++  glMatrixMode(GL_TEXTURE); glError();
++  glLoadIdentity(); glError();
++  glScalef(1.0f/255.99f,1.0f/255.99f,1.0f); glError();
++#endif
++  glMatrixMode(GL_MODELVIEW); glError();
++  glLoadIdentity(); glError();
++  glMatrixMode(GL_PROJECTION); glError();
++  glLoadIdentity(); glError();
++  glOrtho(0,PSXDisplay.DisplayMode.x,
++          PSXDisplay.DisplayMode.y,0,-1,1); glError();
++
++  glBindTexture(GL_TEXTURE_2D,0); glError();
++  gTexName=0;
++  glTexEnvf(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE); glError();
++  glShadeModel(GL_FLAT); glError();
++  bOldSmoothShaded=FALSE;
++  glDisable(GL_BLEND); glError();
++  bBlendEnable=FALSE;
++  glDisable(GL_TEXTURE_2D); glError();
++  bTexEnabled=FALSE;
++  bUsingTWin=FALSE;
++  glDisableClientState(GL_TEXTURE_COORD_ARRAY); glError();
++  glDisableClientState(GL_VERTEX_ARRAY); glError();
++  glDisableClientState(GL_COLOR_ARRAY); glError();
++  glDisableClientState(GL_NORMAL_ARRAY); glError();
++  CSTEXTURE=CSVERTEX=CSCOLOR=0;
++  glEnable(GL_ALPHA_TEST); glError();
++  if(iZBufferDepth)
++  {
++   glEnable(GL_DEPTH_TEST); glError();
++   glDepthFunc(GL_ALWAYS); glError();
++   iDepthFunc=1;
++  }
++  else
++  {
++   glDisable(GL_DEPTH_TEST); glError();
++   iDepthFunc=0;
++  }
++  bSetClip=TRUE;
++  bDisplayNotSet=TRUE;
++}
++
++static void plumos_swap_buffers(void)
++{
++ struct timeval started,before_swap,after_swap,finished;
++
++ gettimeofday(&started,NULL);
++ plumos_gl_bind_framebuffer(GL_FRAMEBUFFER_OES,0); glError();
++ plumos_prepare_fullscreen_draw(plumos_render_target_texture);
++ glDrawArrays(GL_TRIANGLE_STRIP,0,4); glError();
++ gettimeofday(&before_swap,NULL);
++ SDL_GL_SwapBuffers();
++ gettimeofday(&after_swap,NULL);
++ plumos_gl_bind_framebuffer(GL_FRAMEBUFFER_OES,
++                            plumos_render_target_framebuffer); glError();
++ plumos_restore_render_state();
++
++ gettimeofday(&finished,NULL);
++ if(plumos_time_diff(&finished,&started)>5000 &&
++    plumos_swap_slow_reports<64)
++ {
++  fprintf(stderr,
++          "Bubble slow swap: total_us=%d copy_us=%d swap_us=%d restore_us=%d\n",
++          plumos_time_diff(&finished,&started),
++          plumos_time_diff(&before_swap,&started),
++          plumos_time_diff(&after_swap,&before_swap),
++          plumos_time_diff(&finished,&after_swap));
++  plumos_swap_slow_reports++;
++ }
++}
++
+ static int is_opened;
++static int is_paused;
++static int paused_config_changed;
++static void *opened_gles_display;
++static void *opened_gles_surface;
++static struct rearmed_cbs *cbs;
++long GPUclose(void);
+ 
+ static const short dispWidths[8] = {256,320,512,640,368,384,512,640};
+ short g_m1,g_m2,g_m3;
+@@ -89,6 +229,100 @@ static void PaintBlackBorders(void)
+ }
+ 
+ static void fps_update(void);
++static void plumos_destroy_render_target(void);
++
++static int plumos_create_render_target(void)
++{
++ const char *extensions=(const char *)glGetString(GL_EXTENSIONS);
++ GLenum status;
++
++ if(extensions==NULL ||
++    strstr(extensions,"GL_OES_framebuffer_object")==NULL)
++ {
++  fprintf(stderr,"Bubble GLES persistent target: unsupported\n");
++  return -1;
++ }
++
++ plumos_gl_bind_framebuffer=(void *)eglGetProcAddress("glBindFramebufferOES");
++ plumos_gl_gen_framebuffers=(void *)eglGetProcAddress("glGenFramebuffersOES");
++ plumos_gl_delete_framebuffers=
++  (void *)eglGetProcAddress("glDeleteFramebuffersOES");
++ plumos_gl_framebuffer_texture_2d=
++  (void *)eglGetProcAddress("glFramebufferTexture2DOES");
++ plumos_gl_check_framebuffer_status=
++  (void *)eglGetProcAddress("glCheckFramebufferStatusOES");
++ if(plumos_gl_bind_framebuffer==NULL ||
++    plumos_gl_gen_framebuffers==NULL ||
++    plumos_gl_delete_framebuffers==NULL ||
++    plumos_gl_framebuffer_texture_2d==NULL ||
++    plumos_gl_check_framebuffer_status==NULL)
++ {
++  fprintf(stderr,"Bubble GLES persistent target: missing FBO entrypoint\n");
++  return -1;
++ }
++
++ glGenTextures(1,&plumos_render_target_texture); glError();
++ glBindTexture(GL_TEXTURE_2D,plumos_render_target_texture); glError();
++ glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); glError();
++ glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST); glError();
++ glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE); glError();
++ glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE); glError();
++ glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,iResX,iResY,0,
++              GL_RGBA,GL_UNSIGNED_BYTE,NULL); glError();
++
++ plumos_gl_gen_framebuffers(1,&plumos_render_target_framebuffer); glError();
++ plumos_gl_bind_framebuffer(GL_FRAMEBUFFER_OES,
++                            plumos_render_target_framebuffer); glError();
++ plumos_gl_framebuffer_texture_2d(
++  GL_FRAMEBUFFER_OES,GL_COLOR_ATTACHMENT0_OES,
++  GL_TEXTURE_2D,plumos_render_target_texture,0);
++ glError();
++ status=plumos_gl_check_framebuffer_status(GL_FRAMEBUFFER_OES); glError();
++ if(status!=GL_FRAMEBUFFER_COMPLETE_OES)
++ {
++  fprintf(stderr,
++          "Bubble GLES persistent target: incomplete status=0x%x\n",status);
++  plumos_gl_bind_framebuffer(GL_FRAMEBUFFER_OES,0); glError();
++  plumos_gl_delete_framebuffers(1,&plumos_render_target_framebuffer);
++  glError();
++  glDeleteTextures(1,&plumos_render_target_texture); glError();
++  plumos_render_target_framebuffer=0;
++  plumos_render_target_texture=0;
++  return -1;
++ }
++
++ plumos_render_target_active=1;
++ glDisable(GL_SCISSOR_TEST); glError();
++ glClearColor(0.0f,0.0f,0.0f,0.0f); glError();
++ glClear(GL_COLOR_BUFFER_BIT); glError();
++ glEnable(GL_SCISSOR_TEST); glError();
++ glBindTexture(GL_TEXTURE_2D,0); glError();
++ gTexName=0;
++ bSetClip=TRUE;
++ bDisplayNotSet=TRUE;
++ fprintf(stderr,
++         "Bubble GLES persistent target: active size=%dx%d fbo=%u texture=%u\n",
++         iResX,iResY,plumos_render_target_framebuffer,
++         plumos_render_target_texture);
++ return 0;
++}
++
++static void plumos_destroy_render_target(void)
++{
++ if(plumos_render_target_framebuffer)
++ {
++  plumos_gl_bind_framebuffer(GL_FRAMEBUFFER_OES,0); glError();
++  plumos_gl_delete_framebuffers(1,&plumos_render_target_framebuffer);
++  glError();
++ }
++ if(plumos_render_target_texture)
++ {
++  glDeleteTextures(1,&plumos_render_target_texture); glError();
++ }
++ plumos_render_target_active=0;
++ plumos_render_target_framebuffer=0;
++ plumos_render_target_texture=0;
++}
+ 
+ void updateDisplay(void)
+ {
+@@ -128,7 +362,7 @@ void updateDisplay(void)
+  if(iDrawnSomething)
+  {
+   fps_update();
+-  eglSwapBuffers(display, surface);
++  plumos_swap_buffers();
+   iDrawnSomething=0;
+  }
+ 
+@@ -193,7 +427,7 @@ void updateFrontDisplay(void)
+  bRenderFrontBuffer=FALSE;
+ 
+  if(iDrawnSomething)                                  // linux:
+-  eglSwapBuffers(display, surface);
++  plumos_swap_buffers();
+ }
+ 
+ static void ChangeDispOffsetsX(void)                  // CENTER X
+@@ -280,10 +514,14 @@ if ((PSXDisplay.DisplayMode.y == PSXDisplay.DisplayModeNew.y) &&
+  }
+ else                                                  // some res change?
+  {
+-  glLoadIdentity(); glError();
+-  glOrtho(0,PSXDisplay.DisplayModeNew.x,              // -> new psx resolution
+-            PSXDisplay.DisplayModeNew.y, 0, -1, 1); glError();
+-  if(bKeepRatio) SetAspectRatio();
++  if (PSXDisplay.DisplayModeNew.x > 0 &&
++      PSXDisplay.DisplayModeNew.y > 0)
++   {
++    glLoadIdentity(); glError();
++    glOrtho(0,PSXDisplay.DisplayModeNew.x,             // -> new psx resolution
++              PSXDisplay.DisplayModeNew.y, 0, -1, 1); glError();
++    if(bKeepRatio) SetAspectRatio();
++   }
+  }
+ 
+ bDisplayNotSet = TRUE;                                // re-calc offsets/display area
+@@ -520,21 +758,107 @@ static void clear_gl_state_for_menu(void)
+  static const GLenum cstates[] = {
+   GL_COLOR_ARRAY, GL_NORMAL_ARRAY, GL_POINT_SIZE_ARRAY_OES
+  };
++ GLint max_clip_planes = 0;
++ GLint max_lights = 0;
+  size_t i;
+- for (i = 0; i < sizeof(caps) / sizeof(caps[0]); i++)
++ for (i = 0; i < sizeof(caps) / sizeof(caps[0]); i++) {
+   glDisable(caps[i]);
+- for (i = 0; i < 6; i++)
++  glError();
++ }
++ glGetIntegerv(GL_MAX_CLIP_PLANES, &max_clip_planes);
++ glError();
++ for (i = 0; i < (size_t)max_clip_planes; i++) {
+   glDisable(GL_CLIP_PLANE0 + i);
+- for (i = 0; i < 8; i++)
++  glError();
++ }
++ glGetIntegerv(GL_MAX_LIGHTS, &max_lights);
++ glError();
++ for (i = 0; i < (size_t)max_lights; i++) {
+   glDisable(GL_LIGHT0 + i);
+- for (i = 0; i < sizeof(cstates) / sizeof(cstates[0]); i++)
++  glError();
++ }
++ for (i = 0; i < sizeof(cstates) / sizeof(cstates[0]); i++) {
+   glDisableClientState(cstates[i]);
++  glError();
++ }
+ 
+  glColor4ub(255, 255, 255, 255);
++ glError();
+  glLoadIdentity();
++ glError();
+  glEnable(GL_TEXTURE_2D);
++ glError();
+  glEnableClientState(GL_TEXTURE_COORD_ARRAY);
++ glError();
+  glEnableClientState(GL_VERTEX_ARRAY);
++ glError();
++}
++
++static void restore_gl_state_after_menu(void)
++{
++ while (glGetError() != GL_NO_ERROR)
++  ;
++
++ glDepthRangef(0.0f, 1.0f); glError();
++ glViewport(rRatioRect.left,
++            iResY-(rRatioRect.top+rRatioRect.bottom),
++            rRatioRect.right, rRatioRect.bottom); glError();
++ glScissor(rRatioRect.left,
++           iResY-(rRatioRect.top+rRatioRect.bottom),
++           rRatioRect.right, rRatioRect.bottom); glError();
++ glEnable(GL_SCISSOR_TEST); glError();
++
++#ifndef OWNSCALE
++ glMatrixMode(GL_TEXTURE); glError();
++ glLoadIdentity(); glError();
++ glScalef(1.0f/255.99f, 1.0f/255.99f, 1.0f); glError();
++#endif
++ glMatrixMode(GL_MODELVIEW); glError();
++ glLoadIdentity(); glError();
++ glMatrixMode(GL_PROJECTION); glError();
++ glLoadIdentity(); glError();
++ glOrtho(0, PSXDisplay.DisplayMode.x,
++         PSXDisplay.DisplayMode.y, 0, -1, 1); glError();
++
++ if (iZBufferDepth) {
++  uiBufferBits = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
++  glEnable(GL_DEPTH_TEST); glError();
++  glDepthFunc(GL_ALWAYS); glError();
++  iDepthFunc = 1;
++ }
++ else {
++  uiBufferBits = GL_COLOR_BUFFER_BIT;
++  glDisable(GL_DEPTH_TEST); glError();
++  iDepthFunc = 0;
++ }
++
++ glBindTexture(GL_TEXTURE_2D, 0); glError();
++ gTexName = 0;
++ glShadeModel(GL_FLAT); glError();
++ bOldSmoothShaded = FALSE;
++ glDisable(GL_BLEND); glError();
++ bBlendEnable = FALSE;
++ glDisable(GL_TEXTURE_2D); glError();
++ bTexEnabled = FALSE;
++ bUsingTWin = FALSE;
++ glDisableClientState(GL_TEXTURE_COORD_ARRAY); glError();
++ glDisableClientState(GL_VERTEX_ARRAY); glError();
++ glDisableClientState(GL_COLOR_ARRAY); glError();
++ glDisableClientState(GL_NORMAL_ARRAY); glError();
++ CSTEXTURE = CSVERTEX = CSCOLOR = 0;
++
++ SetExtGLFuncs();
++ glEnable(GL_ALPHA_TEST); glError();
++ glDisable(GL_FOG); glError();
++ glDisable(GL_LIGHTING); glError();
++ glDisable(GL_STENCIL_TEST); glError();
++ glDisable(GL_CULL_FACE); glError();
++ glClearColor(0.0f, 0.0f, 0.0f, 0.0f); glError();
++ glClear(uiBufferBits); glError();
++ glFlush(); glError();
++ glFinish(); glError();
++ if (bKeepRatio)
++  SetAspectRatio();
+ }
+ 
+ void renderer_finish(void)
+@@ -551,12 +875,18 @@ extern const unsigned char cmd_lengths[256];
+ int renderer_do_cmd_list(uint32_t *list, int list_len, uint32_t *ex_regs,
+  int *cycles_sum_out, int *cycles_last, int *last_cmd)
+ {
++  static int plumos_render_slow_reports;
++  struct timeval started,finished;
+   unsigned int cmd, len;
+   unsigned int *list_start = list;
+   unsigned int *list_end = list + list_len;
++  int cyc_sum = 0;
++  int cyc = *cycles_last;
+ 
++  gettimeofday(&started,NULL);
+   for (; list < list_end; list += 1 + len)
+   {
++    const int16_t *slist = (const int16_t *)list;
+     cmd = *list >> 24;
+     len = cmd_lengths[cmd];
+     if (list + 1 + len > list_end) {
+@@ -575,6 +905,39 @@ int renderer_do_cmd_list(uint32_t *list, int list_len, uint32_t *ex_regs,
+ 
+     switch(cmd)
+     {
++      case 0x02:
++        gput_sum(cyc_sum,cyc,
++                 gput_fill(((slist[4]&0x3ff)+0xf)&~0xf,
++                           slist[5]&0x1ff));
++        break;
++      case 0x20 ... 0x23:
++        gput_sum(cyc_sum,cyc,gput_poly_base());
++        break;
++      case 0x24 ... 0x27:
++        gput_sum(cyc_sum,cyc,gput_poly_base_t());
++        break;
++      case 0x28 ... 0x2b:
++        gput_sum(cyc_sum,cyc,gput_quad_base());
++        break;
++      case 0x2c ... 0x2f:
++        gput_sum(cyc_sum,cyc,gput_quad_base_t());
++        break;
++      case 0x30 ... 0x33:
++        gput_sum(cyc_sum,cyc,gput_poly_base_g());
++        break;
++      case 0x34 ... 0x37:
++        gput_sum(cyc_sum,cyc,gput_poly_base_gt());
++        break;
++      case 0x38 ... 0x3b:
++        gput_sum(cyc_sum,cyc,gput_quad_base_g());
++        break;
++      case 0x3c ... 0x3f:
++        gput_sum(cyc_sum,cyc,gput_quad_base_gt());
++        break;
++      case 0x40 ... 0x47:
++      case 0x50 ... 0x57:
++        gput_sum(cyc_sum,cyc,gput_line(0));
++        break;
+       case 0x48 ... 0x4F:
+       {
+         uint32_t num_vertexes = 2;
+@@ -595,6 +958,8 @@ int renderer_do_cmd_list(uint32_t *list, int list_len, uint32_t *ex_regs,
+         }
+ 
+         len += (num_vertexes - 2);
++        while(num_vertexes-- > 1)
++          gput_sum(cyc_sum,cyc,gput_line(0));
+         break;
+       }
+ 
+@@ -618,8 +983,27 @@ int renderer_do_cmd_list(uint32_t *list, int list_len, uint32_t *ex_regs,
+         }
+ 
+         len += (num_vertexes - 2) * 2;
++        while(num_vertexes-- > 1)
++          gput_sum(cyc_sum,cyc,gput_line(0));
+         break;
+       }
++      case 0x60 ... 0x63:
++        gput_sum(cyc_sum,cyc,
++                 gput_sprite(slist[4]&0x3ff,slist[5]&0x1ff));
++        break;
++      case 0x64 ... 0x67:
++        gput_sum(cyc_sum,cyc,
++                 gput_sprite(slist[6]&0x3ff,slist[7]&0x1ff));
++        break;
++      case 0x68 ... 0x6b:
++        gput_sum(cyc_sum,cyc,gput_sprite(1,1));
++        break;
++      case 0x70 ... 0x77:
++        gput_sum(cyc_sum,cyc,gput_sprite(8,8));
++        break;
++      case 0x78 ... 0x7f:
++        gput_sum(cyc_sum,cyc,gput_sprite(16,16));
++        break;
+ 
+ #ifdef TEST
+       case 0xA0:          //  sys -> vid
+@@ -640,7 +1024,17 @@ breakloop:
+   ex_regs[1] &= ~0x1ff;
+   ex_regs[1] |= lGPUstatusRet & 0x1ff;
+ 
++  *cycles_sum_out += cyc_sum;
++  *cycles_last = cyc;
+   *last_cmd = cmd;
++  gettimeofday(&finished,NULL);
++  if(plumos_time_diff(&finished,&started)>5000 &&
++     plumos_render_slow_reports<64)
++  {
++   fprintf(stderr,"Bubble slow GLES command list: elapsed_us=%d words=%d\n",
++           plumos_time_diff(&finished,&started),list_len);
++   plumos_render_slow_reports++;
++  }
+   return list - list_start;
+ }
+ 
+@@ -708,8 +1102,6 @@ void vout_set_config(const struct rearmed_cbs *cbs)
+ {
+ }
+ 
+-static struct rearmed_cbs *cbs;
+-
+ long GPUopen(unsigned long *disp, char *cap, char *cfg)
+ {
+  int ret;
+@@ -731,20 +1123,81 @@ long GPUopen(unsigned long *disp, char *cap, char *cfg)
+  InitializeTextureStore();                             // init texture mem
+ 
+  ret = GLinitialize(cbs->gles_display, cbs->gles_surface);
++ if (ret) {
++  CleanupTextureStore();
++  return ret;
++ }
++ opened_gles_display = cbs->gles_display;
++ opened_gles_surface = cbs->gles_surface;
+  MakeDisplayLists();
++ if(plumos_create_render_target()!=0)
++ {
++  KillDisplayLists();
++  GLcleanup();
++  return -1;
++ }
+ 
+  is_opened = 1;
++ is_paused = 0;
++ paused_config_changed = 0;
+  return ret;
+ }
+ 
++long GPUpause(void)
++{
++ if (!is_opened)
++  return -1;
++ if (is_paused)
++  return 0;
++
++ glFinish();
++ if (has_external_gles_context()) {
++  if (switch_to_menu_gles_context() != 0)
++   return -1;
++ }
++ else
++  clear_gl_state_for_menu();
++ is_paused = 1;
++ return 0;
++}
++
++long GPUresume(void)
++{
++ if (!is_opened || !is_paused)
++  return -1;
++
++ if (paused_config_changed) {
++  is_paused = 0;
++  GPUclose();
++  return GPUopen(NULL, NULL, NULL);
++ }
++ if (has_external_gles_context()) {
++  if (switch_to_plugin_gles_context() != 0)
++   return -1;
++  if (bKeepRatio)
++   SetAspectRatio();
++ }
++ else
++  restore_gl_state_after_menu();
++ is_paused = 0;
++ return 0;
++}
++
+ long GPUclose(void)
+ {
+  if (!is_opened)
+   return 0;
+  is_opened = 0;
++ is_paused = 0;
++ paused_config_changed = 0;
++ opened_gles_display = NULL;
++ opened_gles_surface = NULL;
+ 
++ switch_to_plugin_gles_context();
++ plumos_destroy_render_target();
+  KillDisplayLists();
+- clear_gl_state_for_menu();
++ if (!has_external_gles_context())
++  clear_gl_state_for_menu();
+  GLcleanup();                                          // close OGL
+  return 0;
+ }
+@@ -759,6 +1212,19 @@ void renderer_set_config(const struct rearmed_cbs *cbs_)
+  iFrameReadType = 0;
+  bKeepRatio = TRUE;
+ 
++ if (is_paused &&
++     (dwActFixes != cbs->gpu_peopsgl.dwActFixes ||
++      bDrawDither != cbs->gpu_peopsgl.bDrawDither ||
++      iFilterType != cbs->gpu_peopsgl.iFilterType ||
++      iFrameTexType != cbs->gpu_peopsgl.iFrameTexType ||
++      iUseMask != cbs->gpu_peopsgl.iUseMask ||
++      bOpaquePass != cbs->gpu_peopsgl.bOpaquePass ||
++      bAdvancedBlend != cbs->gpu_peopsgl.bAdvancedBlend ||
++      bUseFastMdec != cbs->gpu_peopsgl.bUseFastMdec ||
++      iTexGarbageCollection != cbs->gpu_peopsgl.iTexGarbageCollection ||
++      iVRamSize != cbs->gpu_peopsgl.iVRamSize))
++  paused_config_changed = 1;
++
+  dwActFixes = cbs->gpu_peopsgl.dwActFixes;
+  bDrawDither = cbs->gpu_peopsgl.bDrawDither;
+  iFilterType = cbs->gpu_peopsgl.iFilterType;
+@@ -774,7 +1240,8 @@ void renderer_set_config(const struct rearmed_cbs *cbs_)
+   cbs->pl_set_gpu_caps(GPU_CAP_OWNS_DISPLAY);
+ 
+  if (is_opened && cbs->gles_display != NULL && cbs->gles_surface != NULL) {
+-  if (cbs->gles_display != display || cbs->gles_surface != surface) {
++  if (cbs->gles_display != opened_gles_display ||
++      cbs->gles_surface != opened_gles_surface) {
+    // HACK...
+    fprintf(stderr, "gles reinit hack\n");
+    GPUclose();
+@@ -788,7 +1255,8 @@ void renderer_set_config(const struct rearmed_cbs *cbs_)
+ void SetAspectRatio(void)
+ {
+  if (cbs->pl_get_layer_pos)
+-  cbs->pl_get_layer_pos(&rRatioRect.left, &rRatioRect.top, &rRatioRect.right, &rRatioRect.bottom);
++  cbs->pl_get_layer_pos(&rRatioRect.left,&rRatioRect.top,
++                        &rRatioRect.right,&rRatioRect.bottom);
+ 
+  glScissor(rRatioRect.left,
+            iResY-(rRatioRect.top+rRatioRect.bottom),
+diff --git a/plugins/gpulib/gpu.c b/plugins/gpulib/gpu.c
+index 0e967d6..258f72e 100644
+--- a/plugins/gpulib/gpu.c
++++ b/plugins/gpulib/gpu.c
+@@ -250,7 +250,10 @@ static noinline void check_draw_to_display(struct psx_gpu *gpu)
+   gpu->state.draw_display_intersect = !no_intersect;
+   // no frameskip if it decides to draw to display area,
+   // but not for interlace since it'll most likely always do that
+-  gpu->frameskip.allow = no_intersect || (gpu->status & PSX_GPU_STATUS_INTERLACE);
++  gpu->frameskip.allow =
++    (gpu->frameskip.fast_forward != NULL &&
++     *gpu->frameskip.fast_forward) ||
++    no_intersect || (gpu->status & PSX_GPU_STATUS_INTERLACE);
+ }
+ 
+ static void flush_cmd_buffer(struct psx_gpu *gpu);
+@@ -1202,6 +1205,7 @@ void GPUrearmedCallbacks(const struct rearmed_cbs *cbs)
+   gpu.frameskip.set = cbs->frameskip;
+   gpu.frameskip.advice = &cbs->fskip_advice;
+   gpu.frameskip.force = &cbs->fskip_force;
++  gpu.frameskip.fast_forward = &cbs->fast_forward;
+   gpu.frameskip.dirty = (void *)&cbs->fskip_dirty;
+   gpu.frameskip.active = 0;
+   gpu.frameskip.frame_ready = 1;
+diff --git a/plugins/gpulib/gpu.h b/plugins/gpulib/gpu.h
+index 371706a..164dd64 100644
+--- a/plugins/gpulib/gpu.h
++++ b/plugins/gpulib/gpu.h
+@@ -119,6 +119,7 @@ struct psx_gpu {
+     uint32_t ecmds_dirty_renderer:1;
+     const int *advice;
+     const int *force;
++    const int *fast_forward;
+     int *dirty;
+     uint32_t last_flip_frame;
+     uint32_t pending_fill[3];

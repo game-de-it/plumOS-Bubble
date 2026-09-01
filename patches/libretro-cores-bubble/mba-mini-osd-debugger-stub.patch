@@ -1,0 +1,19 @@
+diff --git a/src/osd/retro/libretro.c b/src/osd/retro/libretro.c
+index 8144697..0654483 100644
+--- a/src/osd/retro/libretro.c
++++ b/src/osd/retro/libretro.c
+@@ -1307,6 +1307,14 @@ void retro_run(void)
+ }
+ 
+ 
++//============================================================
++// osd_break_into_debugger
++//============================================================
++void osd_break_into_debugger(const char *message)
++{
++	(void)message;
++}
++
+ //============================================================
+ // osd_wait_for_debugger
+ //============================================================

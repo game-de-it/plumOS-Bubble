@@ -1,0 +1,112 @@
+FROM debian:bookworm-slim@sha256:60eac759739651111db372c07be67863818726f754804b8707c90979bda511df
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CC=gcc
+ENV STRIP=strip
+
+RUN dpkg --add-architecture armhf \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends \
+    bash \
+    autoconf \
+    automake \
+    bison \
+    busybox-static \
+    build-essential \
+    ca-certificates \
+    clang \
+    cmake \
+    curl \
+    dosfstools \
+    dpkg-dev \
+    file \
+    flex \
+    gawk \
+    gettext \
+    git \
+    gcc-arm-linux-gnueabihf \
+    g++-arm-linux-gnueabihf \
+    e2fsprogs \
+    jq \
+    android-libbase-dev \
+    android-libboringssl-dev \
+    android-libcutils-dev \
+    android-liblog-dev \
+    android-libutils-dev \
+    alsa-utils \
+    libasound2-dev \
+    libboost-date-time-dev \
+    libboost-filesystem-dev \
+    libboost-locale-dev \
+    libboost-system-dev \
+    libbrotli-dev \
+    libbz2-dev \
+    libcurl4-openssl-dev \
+    libdrm-dev \
+    libegl-dev \
+    libexpat1-dev \
+    libfmt-dev \
+    libfreetype6-dev \
+    libharfbuzz-dev \
+    libicu-dev \
+    libinih-dev \
+    libjpeg-dev \
+    libflac-dev \
+    liblhasa-dev \
+    liblzma-dev \
+    liblzo2-2 \
+    liblzo2-dev \
+    libmad0-dev \
+    libmpg123-dev \
+    libncurses-dev \
+    libogg-dev \
+    libopus-dev \
+    libopusfile-dev \
+    libpixman-1-dev \
+    libpng-dev \
+    libreadline-dev \
+    libsamplerate0-dev \
+    libsdl1.2-dev \
+    libsdl2-dev \
+    libsdl2-gfx-dev \
+    libsdl2-image-dev \
+    libsdl2-mixer-dev \
+    libsdl2-net-dev \
+    libsdl2-ttf-dev \
+    libsndfile1-dev \
+    libspeexdsp-dev \
+    libsqlite3-dev \
+    libssl-dev \
+    libswresample-dev \
+    libtool \
+    libusb-1.0-0-dev \
+    libvorbis-dev \
+    libxmp-dev \
+    libxml2-dev \
+    libcap-dev \
+    libselinux1-dev \
+    libudev-dev \
+    meson \
+    ninja-build \
+    openssh-sftp-server \
+    patch \
+    pkg-config \
+    python3-pip \
+    python3-venv \
+    rsync \
+    samba \
+    samba-common-bin \
+    samba-libs \
+    squashfs-tools \
+    unzip \
+    xz-utils \
+    zip \
+    zlib1g-dev \
+    libjson-c-dev:armhf \
+    libdrm-dev:armhf \
+    libgbm-dev:armhf \
+    libegl-dev:armhf \
+    libgles2-mesa-dev:armhf \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace

@@ -1,0 +1,82 @@
+diff --git a/yabause/src/retro_arena/InputManager.cpp b/yabause/src/retro_arena/InputManager.cpp
+--- a/yabause/src/retro_arena/InputManager.cpp
++++ b/yabause/src/retro_arena/InputManager.cpp
+@@ -202,11 +202,45 @@ int setDefalutSettings( void * padbits ){
+     return 0;
+ }
+ 
++static bool mapBubbleBuiltInController(){
++  for( int i = 0; i < SDL_NumJoysticks(); i++ ){
++    const char * name = SDL_JoystickNameForIndex(i);
++    if( name == NULL || strcmp(name, "retrogame_joypad") != 0 ) continue;
++
++    SDL_Joystick * joy = SDL_JoystickOpen(i);
++    if( joy == NULL ) return false;
++    SDL_JoystickID joyId = SDL_JoystickInstanceID(joy);
++    void * padbits = PerPadAdd(&PORTDATA1);
++    const uint32_t buttonBase = joyId << 18;
++
++    PerSetKey(MAKE_PAD(0, buttonBase | 13), PERPAD_UP, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 14), PERPAD_DOWN, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 15), PERPAD_LEFT, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 16), PERPAD_RIGHT, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 9), PERPAD_START, padbits);
++
++    PerSetKey(MAKE_PAD(0, buttonBase | 0), PERPAD_A, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 1), PERPAD_B, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 2), PERPAD_C, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 3), PERPAD_X, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 4), PERPAD_Y, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 5), PERPAD_Z, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 6), PERPAD_LEFT_TRIGGER, padbits);
++    PerSetKey(MAKE_PAD(0, buttonBase | 7), PERPAD_RIGHT_TRIGGER, padbits);
++
++    if (SDL_JoystickGetAttached(joy)) SDL_JoystickClose(joy);
++    return true;
++  }
++  return false;
++}
++
+ int mapKeys( const json & configs ){
+   void * padbits;
+   int user = 0;
+   PerPortReset();
+ 
++  if( mapBubbleBuiltInController() ) return 0;
++
+   if( SDL_NumJoysticks() == 0 ){
+ 
+     PADLOG("No joy stic is found force to keyboard\n");
+@@ -653,7 +653,18 @@ void InputManager::addJoystickByDeviceIndex(int id)
+ 
+   // create the InputConfig
+   mInputConfigs[joyId] = new InputConfig(joyId, SDL_JoystickName(joy), guid);
+-  if(!loadInputConfig(mInputConfigs[joyId]))
+-  {
++  if( SDL_JoystickName(joy) != NULL && strcmp(SDL_JoystickName(joy), "retrogame_joypad") == 0 )
++  {
++    InputConfig * cfg = mInputConfigs[joyId];
++    cfg->mapInput("up", Input(joyId, TYPE_BUTTON, 13, 1, true));
++    cfg->mapInput("down", Input(joyId, TYPE_BUTTON, 14, 1, true));
++    cfg->mapInput("left", Input(joyId, TYPE_BUTTON, 15, 1, true));
++    cfg->mapInput("right", Input(joyId, TYPE_BUTTON, 16, 1, true));
++    cfg->mapInput("a", Input(joyId, TYPE_BUTTON, 0, 1, true));
++    cfg->mapInput("b", Input(joyId, TYPE_BUTTON, 1, 1, true));
++    cfg->mapInput("start", Input(joyId, TYPE_BUTTON, 9, 1, true));
++    cfg->mapInput("select", Input(joyId, TYPE_BUTTON, 10, 1, true));
++    cout << "Added Bubble menu mapping for retrogame_joypad (instance ID: " << joyId << ")." << endl;
++  }else if(!loadInputConfig(mInputConfigs[joyId])){
+     cout << "Added unconfigured joystick " << SDL_JoystickName(joy) << " (GUID: " << guid << ", instance ID: " << joyId << ", device index: " << id << ")." << endl;
+   }else{
+diff --git a/yabause/src/retro_arena/MenuScreen.cpp b/yabause/src/retro_arena/MenuScreen.cpp
+--- a/yabause/src/retro_arena/MenuScreen.cpp
++++ b/yabause/src/retro_arena/MenuScreen.cpp
+@@ -85,6 +85,8 @@ MenuScreen::MenuScreen( SDL_Window* pwindow, int rwidth, int rheight, const std:
+   imageView->setFixedWidth(image_pix_size_w);
+   imageView->setFixedHeight(image_pix_size_h);
+   imageWindow->center();
++  imageWindow->dispose();
++  imageWindow = nullptr;
+   //imageWindow->setModal(true);
+ 
+   std::string title = "Yaba Sanshiro "+ std::string(YAB_VERSION) +" Menu";

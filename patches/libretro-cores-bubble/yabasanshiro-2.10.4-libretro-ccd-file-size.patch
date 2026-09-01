@@ -1,0 +1,40 @@
+diff --git a/yabause/src/cd-libretro.c b/yabause/src/cd-libretro.c
+--- a/yabause/src/cd-libretro.c
++++ b/yabause/src/cd-libretro.c
+@@ -1313,6 +1313,7 @@ static int LoadCCD(const char *ccd_filename, RFILE *iso_file)
+ 	char img_filename[512];
+ 	char *ext;
+ 	RFILE *fp;
++	int img_file_size;
+    size_t ccd_filename_len = strlen(ccd_filename);
+ 
+    if (ccd_filename_len >= 512)
+@@ -1337,6 +1338,19 @@ static int LoadCCD(const char *ccd_filename, RFILE *iso_file)
+ 		}
+ 	}
+ 
++	/* file_offset is absolute within the shared IMG.  The pinned source
++	 * calculated file_size before each track's fad_end was known, making the
++	 * first track negative and clamping the first sector read to an invalid
++	 * offset.  Keep the real backing-file size on every track instead. */
++	filestream_seek(fp, 0, RETRO_VFS_SEEK_POSITION_END);
++	img_file_size = filestream_tell(fp);
++	filestream_seek(fp, 0, RETRO_VFS_SEEK_POSITION_START);
++	if (img_file_size <= 0) {
++		filestream_close(fp);
++		YabSetError(YAB_ERR_FILEREAD, img_filename);
++		return -1;
++	}
++
+ 	filestream_seek(iso_file, 0, RETRO_VFS_SEEK_POSITION_START);
+ 
+ 	// Load CCD file as dictionary
+@@ -1439,7 +1451,7 @@ static int LoadCCD(const char *ccd_filename, RFILE *iso_file)
+ 			track->file_offset = plba*2352;
+ 			track->sector_size = 2352;
+ 			track->fp = fp;
+-			track->file_size = (track->fad_end+1-track->fad_start)*2352;
++			track->file_size = img_file_size;
+ 			track->file_id = 0;
+ 			track->interleaved_sub = 0;
+ 		}

@@ -1,0 +1,691 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/storage/plumos}"
+PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-/storage}"
+PLUMOS_ROM_ROOT="${PLUMOS_ROM_ROOT:-$PLUMOS_SDCARD_ROOT/Roms}"
+PLUMOS_BIOS_ROOT="${PLUMOS_BIOS_ROOT:-$PLUMOS_SDCARD_ROOT/BIOS}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+BB="${PLUMOS_BUSYBOX:-/bin/busybox}"
+emulator_id="${1:-}"
+content="${2:-}"
+cpu_policy="${PLUMOS_STANDALONE_CPU_POLICY:-performance}"
+cpu_control="$PLUMOS_ROOT/bin/plumos-cpu-control"
+audio_output="$PLUMOS_ROOT/bin/plumos-audio-output"
+audio_log="$PLUMOS_ROOT/logs/standalone-audio.log"
+route_log="$PLUMOS_ROOT/logs/standalone-route.log"
+alsa_device="${PLUMOS_ALSA_DEVICE:-default}"
+cpu_snapshot=""
+cpu_snapshot_active=0
+
+[ -x "$BB" ] || BB=/bin/busybox
+[ "$#" -eq 2 ] || {
+    printf 'plumos-standalone-launch: emulator and content are required\n' >&2
+    exit 2
+}
+[ "$emulator_id" = pcsx_rearmed ] ||
+    [ "$emulator_id" = yabasanshiro ] ||
+    [ "$emulator_id" = drastic ] ||
+    [ "$emulator_id" = ppsspp ] ||
+    [ "$emulator_id" = openbor ] || {
+    printf 'plumos-standalone-launch: unsupported emulator: %s\n' \
+        "$emulator_id" >&2
+    exit 2
+}
+
+rom_root="$("$BB" readlink -f "$PLUMOS_ROM_ROOT")"
+content_resolved="$("$BB" readlink -f "$content")"
+case "$content_resolved" in
+    "$rom_root"/*) content="$content_resolved" ;;
+    *)
+        printf 'plumos-standalone-launch: rejected content path: %s\n' \
+            "$content" >&2
+        exit 2
+        ;;
+esac
+[ -f "$content" ] || {
+    printf 'plumos-standalone-launch: content is missing\n' >&2
+    exit 1
+}
+"$BB" mkdir -p "$PLUMOS_ROOT/logs"
+printf 'stage=S60_STANDALONE_ROUTE emulator=%s content=%s\n' \
+    "$emulator_id" "${content##*/}" >>"$route_log"
+if [ -x "$audio_output" ]; then
+    "$BB" sh "$audio_output" prepare >>"$audio_log" 2>&1 || {
+        printf 'stage=S61_AUDIO result=failed router=managed\n' >>"$route_log"
+        printf 'plumos-standalone-launch: audio route preparation failed\n' >&2
+        exit 1
+    }
+    export ALSA_CONFIG_PATH="$RUNTIME_ROOT/audio/asound.conf"
+    printf 'stage=S61_AUDIO result=ok router=managed\n' >>"$route_log"
+else
+    export ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf"
+    printf 'stage=S61_AUDIO result=ok router=direct-hw device=%s\n' \
+        "$alsa_device" >>"$route_log"
+fi
+[ ! -d "$PLUMOS_ROOT/lib/alsa-lib" ] ||
+    export ALSA_PLUGIN_DIR="$PLUMOS_ROOT/lib/alsa-lib"
+
+if [ "$emulator_id" = ppsspp ]; then
+    runtime="$PLUMOS_ROOT/emulator/standalone/ppsspp"
+    ppsspp="$runtime/bin/PPSSPPSDL"
+    config_root="$PLUMOS_ROOT/config/standalone/ppsspp"
+    active_system="$config_root/ppsspp/PSP/SYSTEM"
+    factory_system="$PLUMOS_ROOT/factory-defaults/standalone/ppsspp/PSP/SYSTEM"
+    state_root="$PLUMOS_ROOT/state/standalone/ppsspp"
+    cache_root="$RUNTIME_ROOT/cache/standalone/ppsspp"
+    log="$PLUMOS_ROOT/logs/ppsspp-standalone.log"
+    ppsspp_pid=""
+
+    [ -x "$ppsspp" ] && [ -d "$runtime/assets" ] &&
+        [ -f "$PLUMOS_ROOT/emulator/lib/libstdc++.so.6" ] || {
+        printf 'plumos-standalone-launch: PPSSPP runtime is missing\n' >&2
+        exit 1
+    }
+    [ -c /dev/dri/card0 ] && [ -c /dev/mali0 ] &&
+        [ -r "$PLUMOS_ROOT/emulator/lib/libmali.so.1" ] || {
+        printf 'plumos-standalone-launch: PPSSPP Bubble devices are unavailable\n' >&2
+        exit 1
+    }
+
+    "$BB" mkdir -p "$active_system" "$state_root/data" "$cache_root" \
+        "$PLUMOS_ROOT/logs" "$RUNTIME_ROOT/standalone"
+    if [ ! -s "$active_system/ppsspp.ini" ]; then
+        for config_name in controls.ini ppsspp.ini; do
+            [ -s "$factory_system/$config_name" ] || {
+                printf 'plumos-standalone-launch: PPSSPP factory config is missing: %s\n' \
+                    "$config_name" >&2
+                exit 1
+            }
+            "$BB" cp "$factory_system/$config_name" \
+                "$active_system/$config_name.next"
+        done
+        "$BB" sync
+        for config_name in controls.ini ppsspp.ini; do
+            "$BB" mv "$active_system/$config_name.next" \
+                "$active_system/$config_name"
+        done
+    fi
+    if "$BB" grep -q '^DisplayAspectRatio = 1.777778$' \
+        "$active_system/ppsspp.ini"; then
+        # The first Bubble factory candidate treated this PPSSPP correction factor
+        # as a literal 16:9 ratio and rendered PSP output at only 480x272.
+        # Migrate only that exact plumOS value and preserve every other setting.
+        "$BB" sed 's/^DisplayAspectRatio = 1.777778$/DisplayAspectRatio = 1.000000/' \
+            "$active_system/ppsspp.ini" \
+            >"$active_system/ppsspp.ini.next"
+        "$BB" sync
+        "$BB" mv "$active_system/ppsspp.ini.next" \
+            "$active_system/ppsspp.ini"
+    fi
+    if ! "$BB" pidof PPSSPPSDL >/dev/null 2>&1; then
+        "$BB" rm -f /dev/shm/PPSSPP_ID /run/shm/PPSSPP_ID \
+            >/dev/null 2>&1 || true
+    fi
+
+    restore_cpu_policy() {
+        if [ "$cpu_snapshot_active" -eq 1 ]; then
+            "$BB" sh "$cpu_control" restore "$cpu_snapshot" >/dev/null 2>&1 || true
+            cpu_snapshot_active=0
+        fi
+    }
+    restore_ppsspp_runtime() {
+        if [ -n "$ppsspp_pid" ] &&
+            kill -0 "$ppsspp_pid" >/dev/null 2>&1; then
+            kill -TERM "$ppsspp_pid" >/dev/null 2>&1 || true
+            wait "$ppsspp_pid" >/dev/null 2>&1 || true
+        fi
+        ppsspp_pid=""
+        restore_cpu_policy
+    }
+    trap restore_ppsspp_runtime EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    cpu_snapshot="$RUNTIME_ROOT/standalone/cpu-governors.$$"
+    if [ -x "$cpu_control" ] &&
+        "$BB" sh "$cpu_control" snapshot "$cpu_snapshot"; then
+        cpu_snapshot_active=1
+        "$BB" sh "$cpu_control" apply "$cpu_policy" >/dev/null 2>&1 ||
+            restore_cpu_policy
+    else
+        "$BB" rm -f "$cpu_snapshot"
+    fi
+
+    if [ -x "$PLUMOS_ROOT/bin/plumos-volume-control" ]; then
+        "$BB" sh "$PLUMOS_ROOT/bin/plumos-volume-control" apply >>"$log" 2>&1 || true
+    fi
+    printf 'ppsspp_start=renderer-mali-g52-gles content-%s\n' \
+        "${content##*/}" >>"$log"
+    set +e
+    (
+        cd "$runtime"
+        export HOME="$state_root"
+        export XDG_CONFIG_HOME="$config_root"
+        export XDG_DATA_HOME="$state_root/data"
+        export XDG_CACHE_HOME="$cache_root"
+        export LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib:$runtime/lib:/usr/lib"
+        export SDL_VIDEODRIVER=kmsdrm
+        export SDL_AUDIODRIVER=alsa
+        export AUDIODEV="$alsa_device"
+        export SDL_VIDEO_KMSDRM_DEVICE_INDEX=0
+        export SDL_GAMECONTROLLERCONFIG='190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b10,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,'
+        exec "$ppsspp" --fullscreen --graphics=gles2.0 \
+            --pause-menu-exit "$content"
+    ) >>"$log" 2>&1 &
+    ppsspp_pid=$!
+
+    # Keep the latency-sensitive SDL/render thread away from PPSSPP's
+    # EmuThread and the Mali command backend.  Wait until both workers exist,
+    # constrain the current worker set to CPU0-2 in one operation, then move
+    # only the process leader/render thread to CPU3.  Threads created later by
+    # either worker inherit CPU0-2.  This bounded startup step avoids a
+    # resident affinity monitor during gameplay.
+    affinity_applied=0
+    affinity_settled=0
+    if "$BB" --list 2>/dev/null | "$BB" grep -qx taskset; then
+        affinity_wait=0
+        while [ "$affinity_wait" -lt 50 ] &&
+            kill -0 "$ppsspp_pid" >/dev/null 2>&1; do
+            emu_thread_ready=0
+            mali_thread_ready=0
+            mali_compiler_ready=0
+            for comm_path in /proc/"$ppsspp_pid"/task/*/comm; do
+                [ -r "$comm_path" ] || continue
+                task_name=""
+                IFS= read -r task_name <"$comm_path" || true
+                case "$task_name" in
+                    EmuThread) emu_thread_ready=1 ;;
+                    mali-cmar-backe) mali_thread_ready=1 ;;
+                    mali-compiler) mali_compiler_ready=1 ;;
+                esac
+            done
+            if [ "$affinity_applied" -eq 0 ] &&
+                [ "$emu_thread_ready" -eq 1 ] &&
+                [ "$mali_thread_ready" -eq 1 ]; then
+                if "$BB" taskset -ap 7 "$ppsspp_pid" >>"$log" 2>&1 &&
+                    "$BB" taskset -p 8 "$ppsspp_pid" >>"$log" 2>&1; then
+                    affinity_applied=1
+                    printf 'ppsspp_affinity=render-cpu3 workers-cpu0-2 pid-%s\n' \
+                        "$ppsspp_pid" >>"$log"
+                else
+                    "$BB" taskset -ap f "$ppsspp_pid" >/dev/null 2>&1 ||
+                        true
+                    printf 'ppsspp_affinity=fallback-all-cpus reason-apply-failed\n' \
+                        >>"$log"
+                    break
+                fi
+            fi
+            if [ "$affinity_applied" -eq 1 ] &&
+                [ "$mali_compiler_ready" -eq 1 ]; then
+                if "$BB" taskset -ap 7 "$ppsspp_pid" >>"$log" 2>&1 &&
+                    "$BB" taskset -p 8 "$ppsspp_pid" >>"$log" 2>&1; then
+                    affinity_settled=1
+                    printf 'ppsspp_affinity=late-mali-compiler-cpu0-2 pid-%s\n' \
+                        "$ppsspp_pid" >>"$log"
+                else
+                    "$BB" taskset -ap f "$ppsspp_pid" >/dev/null 2>&1 ||
+                        true
+                    affinity_applied=0
+                    printf 'ppsspp_affinity=fallback-all-cpus reason-settle-failed\n' \
+                        >>"$log"
+                fi
+                break
+            fi
+            affinity_wait=$((affinity_wait + 1))
+            "$BB" usleep 100000
+        done
+        if [ "$affinity_applied" -eq 0 ] &&
+            [ "$affinity_wait" -ge 50 ]; then
+            printf 'ppsspp_affinity=fallback-all-cpus reason-readiness-timeout\n' \
+                >>"$log"
+        fi
+        if [ "$affinity_applied" -eq 1 ] &&
+            [ "$affinity_settled" -eq 0 ] &&
+            [ "$affinity_wait" -ge 50 ]; then
+            printf 'ppsspp_affinity=render-cpu3 workers-cpu0-2 late-mali-compiler-not-seen\n' \
+                >>"$log"
+        fi
+    else
+        printf 'ppsspp_affinity=fallback-all-cpus reason-taskset-missing\n' \
+            >>"$log"
+    fi
+
+    wait "$ppsspp_pid"
+    rc=$?
+    ppsspp_pid=""
+    set -e
+    printf 'ppsspp_exit=rc-%s\n' "$rc" >>"$log"
+    restore_cpu_policy
+    trap - EXIT HUP INT TERM
+    "$BB" sync
+    exit "$rc"
+fi
+
+if [ "$emulator_id" = openbor ]; then
+    runtime="$PLUMOS_ROOT/emulator/standalone/openbor"
+    openbor="$runtime/bin/OpenBOR"
+    config_root="$PLUMOS_ROOT/config/standalone/openbor"
+    state_root="$config_root/data"
+    work="$RUNTIME_ROOT/standalone/openbor-work.$$"
+    log="$PLUMOS_ROOT/logs/openbor-standalone.log"
+
+    [ -x "$openbor" ] &&
+        [ -f "$runtime/lib/libSDL2_gfx-1.0.so.0" ] || {
+        printf 'plumos-standalone-launch: OpenBOR runtime is missing\n' >&2
+        exit 1
+    }
+    [ -c /dev/dri/card0 ] || {
+        printf 'plumos-standalone-launch: OpenBOR KMSDRM device is unavailable\n' >&2
+        exit 1
+    }
+
+    "$BB" mkdir -p \
+        "$state_root/Saves" \
+        "$state_root/Logs" \
+        "$state_root/ScreenShots" \
+        "$work/Paks" \
+        "$PLUMOS_ROOT/logs" \
+        "$RUNTIME_ROOT/standalone"
+    for openbor_dir in Saves Logs ScreenShots; do
+        "$BB" ln -s "$state_root/$openbor_dir" "$work/$openbor_dir"
+    done
+    pak_name="${content##*/}"
+    "$BB" ln -s "$content" "$work/Paks/$pak_name"
+
+    restore_openbor_runtime() {
+        if [ "$cpu_snapshot_active" -eq 1 ]; then
+            "$BB" sh "$cpu_control" restore "$cpu_snapshot" >/dev/null 2>&1 ||
+                true
+            cpu_snapshot_active=0
+        fi
+        "$BB" find "$work" -mindepth 1 -maxdepth 2 -type l -delete \
+            >/dev/null 2>&1 || true
+        "$BB" rmdir "$work/Paks" "$work" >/dev/null 2>&1 || true
+    }
+    trap restore_openbor_runtime EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
+    cpu_snapshot="$RUNTIME_ROOT/standalone/cpu-governors.$$"
+    if [ -x "$cpu_control" ] &&
+        "$BB" sh "$cpu_control" snapshot "$cpu_snapshot"; then
+        cpu_snapshot_active=1
+        "$BB" sh "$cpu_control" apply "$cpu_policy" >/dev/null 2>&1 ||
+            restore_openbor_runtime
+    else
+        "$BB" rm -f "$cpu_snapshot"
+    fi
+    if [ -x "$PLUMOS_ROOT/bin/plumos-volume-control" ]; then
+        "$BB" sh "$PLUMOS_ROOT/bin/plumos-volume-control" apply >>"$log" 2>&1 || true
+    fi
+
+    printf 'openbor_start=renderer-stock-sdl2-kmsdrm content-%s\n' \
+        "$pak_name" >>"$log"
+    set +e
+    (
+        cd "$work"
+        HOME="$config_root" \
+        XDG_CONFIG_HOME="$config_root" \
+        XDG_DATA_HOME="$state_root" \
+        LD_LIBRARY_PATH="$runtime/lib:$PLUMOS_ROOT/emulator/lib:/usr/lib" \
+        SDL_VIDEODRIVER=kmsdrm \
+        SDL_RENDER_DRIVER=software \
+        SDL_AUDIODRIVER=alsa \
+        AUDIODEV="$alsa_device" \
+        SDL_VIDEO_KMSDRM_DEVICE_INDEX=0 \
+        SDL_GAMECONTROLLERCONFIG='190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b10,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,' \
+            "$openbor"
+    ) >>"$log" 2>&1
+    rc=$?
+    set -e
+    printf 'openbor_exit=rc-%s\n' "$rc" >>"$log"
+    restore_openbor_runtime
+    trap - EXIT HUP INT TERM
+    "$BB" sync
+    exit "$rc"
+fi
+
+if [ "$emulator_id" = drastic ]; then
+    runtime="$PLUMOS_ROOT/emulator/standalone/drastic"
+    loader="$runtime/runtime/ld-linux-armhf.so.3"
+    drastic="$runtime/drastic"
+    config_root="$PLUMOS_ROOT/config/standalone/drastic"
+    work="$config_root/work"
+    log="$PLUMOS_ROOT/logs/drastic-standalone.log"
+    drastic_mounts=""
+    setarch_bb=""
+
+    [ -x "$loader" ] && [ -x "$drastic" ] &&
+        [ -f "$runtime/lib/libSDL2-2.0.so.0" ] &&
+        [ -f "$runtime/lib/libdrastic_mmap_compat.so" ] || {
+        printf 'plumos-standalone-launch: DraStic runtime is missing\n' >&2
+        exit 1
+    }
+    [ -c /dev/miyooio ] || {
+        printf 'stage=S62_RUNTIME result=unsupported emulator=drastic reason=missing-miyooio-input-bridge\n' \
+            >>"$route_log"
+        printf 'plumos-standalone-launch: DraStic is visible but unsupported: Bubble has no /dev/miyooio input bridge\n' >&2
+        exit 1
+    }
+    [ -c /dev/dri/card0 ] && [ -c /dev/mali0 ] || {
+        printf 'plumos-standalone-launch: DraStic Bubble graphics devices are unavailable\n' >&2
+        exit 1
+    }
+    for candidate in "$BB"; do
+        [ -x "$candidate" ] || continue
+        if "$candidate" --list 2>/dev/null |
+            "$BB" grep -qx setarch; then
+            setarch_bb="$candidate"
+            break
+        fi
+    done
+    [ -n "$setarch_bb" ] || {
+        printf 'plumos-standalone-launch: setarch-capable BusyBox is missing\n' >&2
+        exit 1
+    }
+
+    "$BB" mkdir -p \
+        "$work/backup" \
+        "$work/config" \
+        "$work/input_record" \
+        "$work/profiles" \
+        "$work/savestates" \
+        "$work/system" \
+        "$work/unzip_cache" \
+        "$PLUMOS_ROOT/logs" \
+        "$RUNTIME_ROOT/standalone"
+    for mutable_dir in \
+        backup \
+        config \
+        input_record \
+        profiles \
+        savestates \
+        system \
+        unzip_cache; do
+        "$BB" mkdir -p "$runtime/$mutable_dir"
+    done
+    for factory_config in "$runtime"/config/*; do
+        [ -f "$factory_config" ] || continue
+        config_name="${factory_config##*/}"
+        [ -e "$work/config/$config_name" ] ||
+            "$BB" cp -p "$factory_config" "$work/config/$config_name"
+    done
+    drastic_config="$work/config/drastic.cfg"
+    if "$BB" grep -qF \
+        'controls_b[CONTROL_INDEX_MENU] = 1154' "$drastic_config"; then
+        "$BB" sed \
+            's/^controls_b\[CONTROL_INDEX_MENU\] = 1154$/controls_b[CONTROL_INDEX_MENU] = 1034/' \
+            "$drastic_config" >"$drastic_config.next"
+        "$BB" sync
+        "$BB" mv "$drastic_config.next" "$drastic_config"
+    fi
+    for factory_bios in "$runtime"/system/*; do
+        [ -f "$factory_bios" ] || continue
+        bios_name="${factory_bios##*/}"
+        [ -e "$work/system/$bios_name" ] ||
+            "$BB" cp -p "$factory_bios" "$work/system/$bios_name"
+    done
+
+    restore_drastic_runtime() {
+        for mount_target in $drastic_mounts; do
+            "$BB" umount "$mount_target" >/dev/null 2>&1 || true
+        done
+        drastic_mounts=""
+        if [ "$cpu_snapshot_active" -eq 1 ]; then
+            "$BB" sh "$cpu_control" restore "$cpu_snapshot" >/dev/null 2>&1 || true
+            cpu_snapshot_active=0
+        fi
+    }
+    trap restore_drastic_runtime EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
+    cpu_snapshot="$RUNTIME_ROOT/standalone/cpu-governors.$$"
+    if [ -x "$cpu_control" ] &&
+        "$BB" sh "$cpu_control" snapshot "$cpu_snapshot"; then
+        cpu_snapshot_active=1
+        "$BB" sh "$cpu_control" apply "$cpu_policy" >/dev/null 2>&1 ||
+            restore_drastic_runtime
+    else
+        "$BB" rm -f "$cpu_snapshot"
+    fi
+    # DraStic reads the compatibility /dev/miyooio bridge directly. Bubble does
+    # not currently provide that bridge, so the gate above keeps this route
+    # visible without pretending that controller input has been implemented.
+    if [ -x "$PLUMOS_ROOT/bin/plumos-volume-control" ]; then
+        "$BB" sh "$PLUMOS_ROOT/bin/plumos-volume-control" apply >>"$log" 2>&1 || true
+    fi
+    for mutable_dir in \
+        backup \
+        config \
+        input_record \
+        profiles \
+        savestates \
+        system \
+        unzip_cache; do
+        "$BB" mount --bind "$work/$mutable_dir" "$runtime/$mutable_dir" ||
+            exit 1
+        drastic_mounts="$runtime/$mutable_dir $drastic_mounts"
+    done
+
+    printf 'drastic_start=armhf-private-runtime content-%s\n' \
+        "${content##*/}" >>"$log"
+    set +e
+    (
+        cd "$runtime"
+        SDL_VIDEODRIVER=NDS \
+        SDL_AUDIODRIVER=alsa \
+        ALSA_PLUGIN_DIR="$PLUMOS_ROOT/lib/alsa-lib-armhf" \
+        AUDIODEV="$alsa_device" \
+        NDS_DEBUG_LEVEL=INFO \
+            "$setarch_bb" setarch linux32 -R \
+            "$loader" \
+            --preload "$runtime/lib/libdrastic_mmap_compat.so" \
+            --library-path "$runtime/lib:$runtime/runtime/lib32" \
+            "$drastic" "$content"
+    ) >>"$log" 2>&1
+    rc=$?
+    set -e
+    printf 'drastic_exit=rc-%s\n' "$rc" >>"$log"
+    restore_drastic_runtime
+    trap - EXIT HUP INT TERM
+    "$BB" sync
+    exit "$rc"
+fi
+
+if [ "$emulator_id" = yabasanshiro ]; then
+    runtime="$PLUMOS_ROOT/emulator/standalone/yabasanshiro"
+    yabasanshiro="$runtime/yabasanshiro"
+    config_root="$PLUMOS_ROOT/config/standalone/yabasanshiro"
+    home="$config_root/home"
+    keymap_dir="$home/.yabasanshiro"
+    factory_keymap="$PLUMOS_ROOT/factory-defaults/standalone/yabasanshiro/keymapv2.json"
+    active_keymap="$keymap_dir/keymapv2.json"
+    log="$PLUMOS_ROOT/logs/yabasanshiro-standalone.log"
+    [ -x "$yabasanshiro" ] || {
+        printf 'plumos-standalone-launch: YabaSanshiro runtime is missing\n' >&2
+        exit 1
+    }
+    [ -c /dev/mali0 ] &&
+        [ -r "$PLUMOS_ROOT/emulator/lib/libmali.so.1" ] || {
+        printf 'plumos-standalone-launch: vendor Mali runtime is unavailable\n' >&2
+        exit 1
+    }
+
+    "$BB" mkdir -p "$keymap_dir" "$config_root/cache" "$PLUMOS_ROOT/logs" \
+        "$RUNTIME_ROOT/standalone"
+    if [ ! -s "$active_keymap" ]; then
+        "$BB" cp "$factory_keymap" "$active_keymap.next"
+        "$BB" sync
+        "$BB" mv "$active_keymap.next" "$active_keymap"
+    fi
+
+    restore_cpu_policy() {
+        if [ "$cpu_snapshot_active" -eq 1 ]; then
+            "$BB" sh "$cpu_control" restore "$cpu_snapshot" >/dev/null 2>&1 || true
+            cpu_snapshot_active=0
+        fi
+    }
+    trap restore_cpu_policy EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    cpu_snapshot="$RUNTIME_ROOT/standalone/cpu-governors.$$"
+    if [ -x "$cpu_control" ] &&
+        "$BB" sh "$cpu_control" snapshot "$cpu_snapshot"; then
+        cpu_snapshot_active=1
+        "$BB" sh "$cpu_control" apply "$cpu_policy" >/dev/null 2>&1 ||
+            restore_cpu_policy
+    else
+        "$BB" rm -f "$cpu_snapshot"
+    fi
+
+    bios_arg=''
+    for bios in \
+        "$PLUMOS_BIOS_ROOT/saturn_bios.bin" \
+        "$PLUMOS_BIOS_ROOT/sega_101.bin" \
+        "$PLUMOS_BIOS_ROOT/mpr-17933.bin" \
+        "$PLUMOS_BIOS_ROOT/saturn/mpr-17933.bin"; do
+        [ -f "$bios" ] || continue
+        bios_arg="$bios"
+        break
+    done
+    if [ -x "$PLUMOS_ROOT/bin/plumos-volume-control" ]; then
+        "$BB" sh "$PLUMOS_ROOT/bin/plumos-volume-control" apply \
+            >>"$log" 2>&1 || true
+    fi
+    printf 'yabasanshiro_start=renderer-mali-g52-gles content-%s\n' \
+        "${content##*/}" >>"$log"
+    if [ -n "$bios_arg" ]; then
+        set -- --iso "$content" --resolution_mode 0 --keep_aspect_rate \
+            --bios "$bios_arg"
+    else
+        set -- --iso "$content" --resolution_mode 0 --keep_aspect_rate
+    fi
+    set +e
+    HOME="$home" \
+    XDG_CACHE_HOME="$config_root/cache" \
+    LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib:$runtime/lib:/usr/lib" \
+    SDL_VIDEODRIVER=kmsdrm \
+    SDL_AUDIODRIVER=alsa \
+    AUDIODEV="$alsa_device" \
+    PLUMOS_AUDIO_POLL_PROXY=0 \
+    SDL_VIDEO_KMSDRM_DEVICE_INDEX=0 \
+    SDL_GAMECONTROLLERCONFIG='190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b10,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,' \
+        "$yabasanshiro" "$@" >>"$log" 2>&1
+    rc=$?
+    set -e
+    printf 'yabasanshiro_exit=rc-%s\n' "$rc" >>"$log"
+    restore_cpu_policy
+    trap - EXIT HUP INT TERM
+    "$BB" sync
+    exit "$rc"
+fi
+
+runtime="$PLUMOS_ROOT/emulator/standalone/pcsx_rearmed"
+pcsx="$runtime/pcsx"
+config_root="$PLUMOS_ROOT/config/standalone/pcsx_rearmed"
+home="$config_root/home"
+profile="$home/.pcsx"
+factory_config="$PLUMOS_ROOT/factory-defaults/standalone/pcsx_rearmed/pcsx.cfg"
+active_config="$profile/pcsx.cfg"
+log="$PLUMOS_ROOT/logs/pcsx-rearmed-standalone.log"
+
+[ -x "$pcsx" ] && [ -f "$runtime/plugins/gpu_gles.so" ] || {
+    printf 'plumos-standalone-launch: PCSX runtime is missing\n' >&2
+    exit 1
+}
+"$BB" mkdir -p \
+    "$profile" \
+    "$profile/bios" \
+    "$profile/memcards" \
+    "$config_root/cache" \
+    "$PLUMOS_ROOT/logs" \
+    "$RUNTIME_ROOT/standalone"
+if [ ! -s "$active_config" ]; then
+    "$BB" cp "$factory_config" "$active_config.next"
+    "$BB" sync
+    "$BB" mv "$active_config.next" "$active_config"
+fi
+configured_gpu="$("$BB" awk '
+    $1 == "Gpu3" && $2 == "=" {
+        print $3
+        exit
+    }
+' "$active_config")"
+case "$configured_gpu" in
+    gpu_gles.so)
+        [ -c /dev/mali0 ] &&
+            [ -r "$PLUMOS_ROOT/emulator/lib/libmali.so.1" ] || {
+            printf 'plumos-standalone-launch: optional PCSX GLES runtime is unavailable\n' >&2
+            exit 1
+        }
+        renderer_name=mali-g52-gles
+        picofe_gl_context=1
+        ;;
+    *)
+        renderer_name=neon-mali-present
+        picofe_gl_context=0
+        ;;
+esac
+for bios in "$PLUMOS_BIOS_ROOT"/*.bin; do
+    [ -f "$bios" ] || continue
+    bios_name="${bios##*/}"
+    [ -e "$profile/bios/$bios_name" ] ||
+        "$BB" cp -p "$bios" "$profile/bios/$bios_name"
+done
+
+restore_cpu_policy() {
+    if [ "$cpu_snapshot_active" -eq 1 ]; then
+        "$BB" sh "$cpu_control" restore "$cpu_snapshot" >/dev/null 2>&1 || true
+        cpu_snapshot_active=0
+    fi
+}
+trap restore_cpu_policy EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+cpu_snapshot="$RUNTIME_ROOT/standalone/cpu-governors.$$"
+if [ -x "$cpu_control" ] &&
+   "$BB" sh "$cpu_control" snapshot "$cpu_snapshot"; then
+    cpu_snapshot_active=1
+    if ! "$BB" sh "$cpu_control" apply "$cpu_policy"; then
+        restore_cpu_policy
+    fi
+else
+    "$BB" rm -f "$cpu_snapshot"
+fi
+
+if [ -x "$PLUMOS_ROOT/bin/plumos-volume-control" ]; then
+    "$BB" sh "$PLUMOS_ROOT/bin/plumos-volume-control" apply \
+        >>"$log" 2>&1 || true
+fi
+
+printf 'pcsx_start=renderer-%s content-%s\n' \
+    "$renderer_name" "${content##*/}" >>"$log"
+set +e
+HOME="$home" \
+XDG_CACHE_HOME="$config_root/cache" \
+LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib:$runtime/lib:/usr/lib" \
+SDL_VIDEODRIVER=kmsdrm \
+SDL_RENDER_DRIVER=opengles2 \
+SDL_AUDIODRIVER=alsa \
+AUDIODEV="$alsa_device" \
+PLUMOS_PCSX_AUDIO_INPUT_RATE=44100 \
+PLUMOS_PCSX_REQUIRE_ALSA=1 \
+PLUMOS_PCSX_GLES_BATCH="${PLUMOS_PCSX_GLES_BATCH:-1}" \
+SDL_VIDEO_KMSDRM_DEVICE_INDEX=0 \
+PICOFE_SDL_GL_CONTEXT="$picofe_gl_context" \
+SDL_GAMECONTROLLERCONFIG='190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b10,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,' \
+    "$pcsx" -cdfile "$content" >>"$log" 2>&1
+rc=$?
+set -e
+printf 'pcsx_exit=rc-%s\n' "$rc" >>"$log"
+restore_cpu_policy
+trap - EXIT HUP INT TERM
+"$BB" sync
+exit "$rc"

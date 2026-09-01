@@ -1,0 +1,27 @@
+--- a/core.c
++++ b/core.c
+@@ -607,15 +607,15 @@ static bool pa_environment(unsigned cmd, void *data) {
+ 		}
+ 		break;
+ 	}
+-	case RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK: { /* 62 */
+-		const struct retro_audio_buffer_status_callback *cb =
+-			(const struct retro_audio_buffer_status_callback *)data;
+-		if (cb) {
+-			current_core.retro_audio_buffer_status = cb->callback;
+-		} else {
+-			current_core.retro_audio_buffer_status = NULL;
+-		}
+-		break;
++	case RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK: { /* 62 */
++		/*
++		 * PicoArch's immediately consumed SDL ring buffer cannot provide the
++		 * predictive underrun signal required by this interface. Advertising
++		 * it caused auto-frameskip cores to skip every video frame while the
++		 * buffer remained below the arbitrary occupancy threshold.
++		 */
++		current_core.retro_audio_buffer_status = NULL;
++		return false;
+ 	}
+ 	case RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY: { /* 63 */
+ 		const unsigned *latency_ms = (const unsigned *)data;

@@ -1,0 +1,71 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+PLUMOS_ROM_ROOT=${PLUMOS_ROM_ROOT:-/storage/Roms}
+PLUMOS_BIOS_ROOT=${PLUMOS_BIOS_ROOT:-/storage/BIOS}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+SYSTEM_ID=${PLUMOS_PICOARCH_SYSTEM:-unknown}
+CORE_ID=${1:-}
+CONTENT=${2:-}
+PICOARCH=$PLUMOS_ROOT/picoarch/bin/picoarch
+CORE=$PLUMOS_ROOT/cores/${CORE_ID}_libretro.so
+LOG=$PLUMOS_ROOT/logs/picoarch-${SYSTEM_ID}-${CORE_ID}.log
+
+[ "$#" -eq 2 ] || {
+    echo 'plumos-picoarch-launch: core and content are required' >&2
+    exit 2
+}
+case "$SYSTEM_ID:$CORE_ID" in
+    *[!A-Za-z0-9._:-]*|*:)
+        echo 'plumos-picoarch-launch: invalid system or core id' >&2
+        exit 2
+        ;;
+esac
+case "$CORE_ID" in
+    flycast|flycast_xtreme|km_duckswanstation_xtreme_amped|mupen64plus_next|parallel_n64|yabasanshiro)
+        echo "plumos-picoarch-launch: hardware-render core requires RetroArch: $CORE_ID" >&2
+        exit 2
+        ;;
+esac
+case "$CONTENT" in
+    "$PLUMOS_ROM_ROOT"/*) ;;
+    *) echo 'plumos-picoarch-launch: content escaped configured ROM root' >&2; exit 2 ;;
+esac
+[ -x "$PICOARCH" ] && [ -f "$CORE" ] && { [ -f "$CONTENT" ] || [ -d "$CONTENT" ]; } || {
+    echo 'plumos-picoarch-launch: runtime, core, or content is missing' >&2
+    exit 1
+}
+
+$BB mkdir -p "$PLUMOS_ROOT/logs" "$PLUMOS_ROOT/state/picoarch/$SYSTEM_ID" \
+    "$PLUMOS_ROOT/saves/$SYSTEM_ID" "$RUNTIME_ROOT/picoarch"
+RGB565_BYTESWAP=0
+case "$CORE_ID" in
+    mednafen_ngp|mednafen_supergrafx|mednafen_supafaust) RGB565_BYTESWAP=1 ;;
+esac
+SYSTEM_DIR=$PLUMOS_BIOS_ROOT
+if [ "$CORE_ID" = scummvm ] && [ -f "$PLUMOS_ROOT/share/libretro-system/scummvm/extra/sky.cpt" ]; then
+    SYSTEM_DIR=$PLUMOS_ROOT/share/libretro-system
+fi
+
+printf 'picoarch=stage-P10 system=%s core=%s\n' "$SYSTEM_ID" "$CORE_ID" \
+    >>"$PLUMOS_ROOT/logs/session.log"
+set +e
+HOME="$PLUMOS_ROOT/state/picoarch/$SYSTEM_ID" \
+PLUMOS_PICOARCH_SYSTEM="$SYSTEM_ID" \
+PLUMOS_PICOARCH_SAVE_ROOT="$PLUMOS_ROOT/saves" \
+PLUMOS_PICOARCH_BIOS_DIR="$SYSTEM_DIR" \
+PLUMOS_PICOARCH_RGB565_BYTESWAP="$RGB565_BYTESWAP" \
+SDL_VIDEODRIVER=dummy \
+SDL_AUDIODRIVER=alsa \
+PLUMOS_DRM_DEVICE=/dev/dri/card0 \
+ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf" \
+LD_LIBRARY_PATH="$PLUMOS_ROOT/picoarch/lib:$PLUMOS_ROOT/emulator/lib:/usr/lib" \
+    "$PICOARCH" "$CORE" "$CONTENT" NONE >>"$LOG" 2>&1
+rc=$?
+set -e
+printf 'picoarch=stage-P19 system=%s core=%s rc=%s\n' \
+    "$SYSTEM_ID" "$CORE_ID" "$rc" >>"$PLUMOS_ROOT/logs/session.log"
+$BB sync
+exit "$rc"

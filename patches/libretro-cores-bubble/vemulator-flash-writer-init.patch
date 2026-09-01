@@ -1,0 +1,10 @@
+--- a/flash.cpp
++++ b/flash.cpp
+@@ -27,6 +27,7 @@ extern "C" {
+ 
+ VE_VMS_FLASH::VE_VMS_FLASH(VE_VMS_RAM *_ram)
+ {
++	flashWriter  = NULL;
+ 	userData      = new byte[0x19000];
+ 	directory     = new byte[0x1A00];
+ 	FAT           = new byte[0x200];

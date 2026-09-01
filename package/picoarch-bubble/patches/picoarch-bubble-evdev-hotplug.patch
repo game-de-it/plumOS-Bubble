@@ -1,0 +1,146 @@
+diff --git a/libpicofe/input.c b/libpicofe/input.c
+--- a/libpicofe/input.c
++++ b/libpicofe/input.c
+@@ -326,6 +326,11 @@ static int in_update_kc_async(int *dev_id_out, int *is_down_out, int timeout_ms
+ 				continue;
+ 
+ 			result = DRV(d->drv_id).update_keycode(d->drv_data, &is_down);
++			if (result == -2) {
++				lprintf("input: \"%s\" disconnected, removing.\n", d->name);
++				in_unprobe(d);
++				continue;
++			}
+ 			if (result == -1)
+ 				continue;
+ 
+diff --git a/libpicofe/linux/in_evdev.c b/libpicofe/linux/in_evdev.c
+--- a/libpicofe/linux/in_evdev.c
++++ b/libpicofe/linux/in_evdev.c
+@@ -49,6 +49,8 @@ typedef struct {
+ 	int abs_mult[MAX_ABS_DEVS]; /* 16.16 multiplier to IN_ABS_RANGE */
+ 	int abs_adj[MAX_ABS_DEVS];  /* adjust for centering */
+ 	unsigned int abs_to_digital:1;
++	unsigned int disconnected:1;
++	unsigned int disconnect_reported:1;
+ 
+ 	const in_drv_t *drv;
+ } in_evdev_t;
+@@ -355,6 +357,22 @@ static void or_binds(const int *binds, int key, int *result)
+ 		result[t] |= binds[IN_BIND_OFFS(key, t)];
+ }
+ 
++static int in_evdev_is_disconnect_error(int error)
++{
++	return error == ENODEV || error == ENXIO || error == EBADF;
++}
++
++static void in_evdev_mark_disconnected(in_evdev_t *dev, const char *operation)
++{
++	if (dev->disconnected)
++		return;
++
++	dev->disconnected = 1;
++	if (dev->kbits != NULL)
++		memset(dev->kbits, 0, KEY_CNT * sizeof(dev->kbits[0]));
++	fprintf(stderr, "in_evdev: device disconnected during %s\n", operation);
++}
++
+ /* ORs result with binds of pressed buttons
+  * XXX: should measure performance hit of this func, might need to optimize */
+ static int in_evdev_update(void *drv_data, const int *binds, int *result)
+@@ -366,9 +384,16 @@ static int in_evdev_update(void *drv_data, const int *binds, int *result)
+ 	in_evdev_t *dev = drv_data;
+ 	int rd, ret, u, lzone;
+ 
++	if (dev->disconnected)
++		return 0;
++
+ 	if (dev->kbits == NULL) {
+ 		ret = ioctl(dev->fd, EVIOCGKEY(sizeof(keybits_)), keybits_);
+ 		if (ret == -1) {
++			if (in_evdev_is_disconnect_error(errno)) {
++				in_evdev_mark_disconnected(dev, "key-state query");
++				return 0;
++			}
+ 			perror("in_evdev: ioctl failed");
+ 			return -1;
+ 		}
+@@ -378,7 +403,10 @@ static int in_evdev_update(void *drv_data, const int *binds, int *result)
+ 		while (1) {
+ 			rd = read(dev->fd, ev, sizeof(ev));
+ 			if (rd < (int)sizeof(ev[0])) {
+-				if (errno != EAGAIN)
++				if (rd == 0 ||
++				    (rd < 0 && in_evdev_is_disconnect_error(errno)))
++					in_evdev_mark_disconnected(dev, "event read");
++				else if (rd < 0 && errno != EAGAIN)
+ 					perror("in_evdev: read failed");
+ 				break;
+ 			}
+@@ -392,6 +420,9 @@ static int in_evdev_update(void *drv_data, const int *binds, int *result)
+ 			}
+ 		}
+ 	}
++
++	if (dev->disconnected)
++		return 0;
+ 
+ 	for (u = dev->kc_first; u <= dev->kc_last; u++) {
+ 		if (KEYBITS_BIT(u))
+@@ -447,12 +478,15 @@ static int in_evdev_update_analog(void *drv_data, int axis_id, int *result)
+ 	in_evdev_t *dev = drv_data;
+ 	int ret;
+ 
+-	if ((unsigned int)axis_id >= MAX_ABS_DEVS)
++	if (dev->disconnected || (unsigned int)axis_id >= MAX_ABS_DEVS)
+ 		return -1;
+ 
+ 	ret = ioctl(dev->fd, EVIOCGABS(axis_id), &ainfo);
+-	if (ret != 0)
++	if (ret != 0) {
++		if (in_evdev_is_disconnect_error(errno))
++			in_evdev_mark_disconnected(dev, "analog query");
+ 		return ret;
++	}
+ 
+ 	*result = (ainfo.value + dev->abs_adj[axis_id]) * dev->abs_mult[axis_id];
+ 	*result >>= 16;
+@@ -464,6 +498,9 @@ static int in_evdev_set_blocking(in_evdev_t *dev, int y)
+ 	long flags;
+ 	int ret;
+ 
++	if (dev->disconnected)
++		return -1;
++
+ 	flags = (long)fcntl(dev->fd, F_GETFL);
+ 	if ((int)flags == -1) {
+ 		perror("in_evdev: F_GETFL fcntl failed");
+@@ -539,14 +576,26 @@ static int in_evdev_update_keycode(void *data, int *is_down)
+ 	in_evdev_t *dev = data;
+ 	struct input_event ev;
+ 	int rd;
++
++	if (dev->disconnected) {
++		if (!dev->disconnect_reported) {
++			dev->disconnect_reported = 1;
++			return -2;
++		}
++		return -1;
++	}
+ 
+ 	/* do single event, the caller sometimes wants
+ 	 * to do select() in blocking mode */
+ 	rd = read(dev->fd, &ev, sizeof(ev));
+ 	if (rd < (int) sizeof(ev)) {
+-		if (errno != EAGAIN) {
++		if (rd == 0 || (rd < 0 && in_evdev_is_disconnect_error(errno))) {
++			in_evdev_mark_disconnected(dev, "keycode read");
++			dev->disconnect_reported = 1;
++			ret_kc = -2;
++		}
++		else if (rd < 0 && errno != EAGAIN) {
+ 			perror("in_evdev: error reading");
+-			//sleep(1);
+ 			ret_kc = -2;
+ 		}
+ 		goto out;

@@ -2,6 +2,7 @@
 set -eu
 
 PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+PLUMOS_ROM_ROOT=${PLUMOS_ROM_ROOT:-/storage/Roms}
 RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 system=
@@ -17,9 +18,17 @@ while [ "$#" -gt 0 ]; do
         *) echo "plumos-retroarch-launch: unknown argument: $1" >&2; exit 2 ;;
     esac
 done
-[ "$system" = nes ] || { echo 'only NES is enabled in this bring-up image' >&2; exit 2; }
-[ "$core" = "$PLUMOS_ROOT/cores/quicknes_libretro.so" ] || { echo 'unexpected core path' >&2; exit 2; }
-case "$rom" in /storage/Roms/*) ;; *) echo 'ROM path escaped /storage/Roms' >&2; exit 2 ;; esac
+case "$system" in
+    ''|*[!A-Za-z0-9._-]*) echo 'invalid system id' >&2; exit 2 ;;
+esac
+case "$core" in
+    "$PLUMOS_ROOT"/cores/*_libretro.so) ;;
+    *) echo 'core path escaped managed core directory' >&2; exit 2 ;;
+esac
+case "$rom" in
+    "$PLUMOS_ROM_ROOT"/*) ;;
+    *) echo 'ROM path escaped configured ROM root' >&2; exit 2 ;;
+esac
 [ -f "$core" ] && [ -f "$rom" ] || exit 1
 config=$PLUMOS_ROOT/config/retroarch/retroarch-bubble.cfg
 factory=$PLUMOS_ROOT/factory-defaults/retroarch/retroarch-bubble.cfg
@@ -34,11 +43,14 @@ fi
 export LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib"
 export ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf"
 export XDG_CONFIG_HOME="$PLUMOS_ROOT/config"
-printf 'retroarch_game=stage-S70 system=%s core=quicknes\n' "$system" >>"$PLUMOS_ROOT/logs/session.log"
+core_id=${core##*/}
+core_id=${core_id%_libretro.so}
+printf 'retroarch_game=stage-S70 system=%s core=%s\n' "$system" "$core_id" >>"$PLUMOS_ROOT/logs/session.log"
 set +e
 "$PLUMOS_ROOT/bin/retroarch" -v -c "$config" -L "$core" "$rom" \
-    >>"$PLUMOS_ROOT/logs/retroarch-game.log" 2>&1
+    >>"$PLUMOS_ROOT/logs/retroarch-${system}-${core_id}.log" 2>&1
 rc=$?
 set -e
-printf 'retroarch_game=stage-S79 rc=%s\n' "$rc" >>"$PLUMOS_ROOT/logs/session.log"
+printf 'retroarch_game=stage-S79 system=%s core=%s rc=%s\n' \
+    "$system" "$core_id" "$rc" >>"$PLUMOS_ROOT/logs/session.log"
 exit "$rc"

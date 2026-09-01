@@ -1,0 +1,315 @@
+diff --git a/gl.c b/gl.c
+index 3b74c18..ad7ad59 100644
+--- a/gl.c
++++ b/gl.c
+@@ -5,6 +5,7 @@
+ 
+ #include <EGL/egl.h>
+ #include <GLES/gl.h>
++#include <SDL.h>
+ #include "gl_loader.h"
+ #include "gl_platform.h"
+ #include "gl.h"
+@@ -12,6 +13,7 @@
+ static EGLDisplay edpy = EGL_NO_DISPLAY;
+ static EGLSurface esfc = EGL_NO_SURFACE;
+ static EGLContext ectxt = EGL_NO_CONTEXT;
++static int sdl_owns_egl;
+ 
+ static GLuint texture_name;
+ 
+@@ -43,6 +45,14 @@ static int gles_have_error(const char *name)
+ 	return 0;
+ }
+ 
++static void swap_buffers(void)
++{
++	if (sdl_owns_egl)
++		SDL_GL_SwapBuffers();
++	else
++		eglSwapBuffers(edpy, esfc);
++}
++
+ int gl_init(void *display, int *quirks)
+ {
+ 	int retval = -1;
+@@ -54,6 +64,11 @@ int gl_init(void *display, int *quirks)
+ 		return retval;
+ 	}
+ 
++	edpy = eglGetCurrentDisplay();
++	if (edpy != EGL_NO_DISPLAY) {
++		sdl_owns_egl = 1;
++		return 0;
++	}
+ 	edpy = eglGetDisplay((EGLNativeDisplayType)display);
+ 	if (edpy == EGL_NO_DISPLAY) {
+ 		fprintf(stderr, "Failed to get EGL display\n");
+@@ -101,17 +116,26 @@ int gl_create(void *window, int *quirks, int w, int h)
+ 	}
+ 	memset(tex_mem, 0, tex_w * tex_h * 2);
+ 
+-	if (!eglChooseConfig(edpy, config_attr, &ecfg, 1, &num_config)) {
++	if (sdl_owns_egl) {
++		esfc = eglGetCurrentSurface(EGL_DRAW);
++		ectxt = eglGetCurrentContext();
++		if (esfc == EGL_NO_SURFACE || ectxt == EGL_NO_CONTEXT) {
++			fprintf(stderr, "SDL EGL context is not current\n");
++			goto out;
++		}
++	}
++	else if (!eglChooseConfig(edpy, config_attr, &ecfg, 1, &num_config)) {
+ 		fprintf(stderr, "Failed to choose config (%x)\n", eglGetError());
+ 		goto out;
+ 	}
+ 
+-	if (ecfg == NULL || num_config == 0) {
++	if (!sdl_owns_egl && (ecfg == NULL || num_config == 0)) {
+ 		fprintf(stderr, "No EGL configs available\n");
+ 		goto out;
+ 	}
+ 
+-	esfc = eglCreateWindowSurface(edpy, ecfg,
++	if (!sdl_owns_egl)
++		esfc = eglCreateWindowSurface(edpy, ecfg,
+ 		(EGLNativeWindowType)window, NULL);
+ 	if (esfc == EGL_NO_SURFACE) {
+ 		fprintf(stderr, "Unable to create EGL surface (%x)\n",
+@@ -119,7 +143,8 @@ int gl_create(void *window, int *quirks, int w, int h)
+ 		goto out;
+ 	}
+ 
+-	ectxt = eglCreateContext(edpy, ecfg, EGL_NO_CONTEXT, NULL);
++	if (!sdl_owns_egl)
++		ectxt = eglCreateContext(edpy, ecfg, EGL_NO_CONTEXT, NULL);
+ 	if (ectxt == EGL_NO_CONTEXT) {
+ 		fprintf(stderr, "Unable to create EGL context (%x)\n",
+ 			eglGetError());
+@@ -137,7 +162,7 @@ int gl_create(void *window, int *quirks, int w, int h)
+ 		}
+ 	}
+ 
+-	ret = eglMakeCurrent(edpy, esfc, esfc, ectxt);
++	ret = sdl_owns_egl || eglMakeCurrent(edpy, esfc, esfc, ectxt);
+ 	if (!ret) {
+ 		fprintf(stderr, "eglMakeCurrent: %x\n", eglGetError());
+ 		goto out;
+@@ -244,7 +269,7 @@ int gl_flip_v(const void *fb, int w, int h, const float *vertices)
+ 	if (gl_have_error("glDrawArrays"))
+ 		return -1;
+ 
+-	eglSwapBuffers(edpy, esfc);
++	swap_buffers();
+ 	if (gles_have_error("eglSwapBuffers"))
+ 		return -1;
+ 
+@@ -261,9 +286,9 @@ void gl_clear(void)
+ {
+ 	glClearColor(0, 0, 0, 0);
+ 	glClear(GL_COLOR_BUFFER_BIT);
+-	eglSwapBuffers(edpy, esfc);
++	swap_buffers();
+ 	glClear(GL_COLOR_BUFFER_BIT);
+-	eglSwapBuffers(edpy, esfc);
++	swap_buffers();
+ 	glClear(GL_COLOR_BUFFER_BIT);
+ 	gl_have_error("glClear");
+ }
+@@ -284,15 +309,15 @@ void gl_destroy(void)
+ 		texture_name = 0;
+ 	}
+ 
+-	eglMakeCurrent(edpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+-	if (esfc != EGL_NO_SURFACE) {
+-		eglDestroySurface(edpy, esfc);
+-		esfc = EGL_NO_SURFACE;
+-	}
+-	if (ectxt != EGL_NO_CONTEXT) {
+-		eglDestroyContext(edpy, ectxt);
+-		ectxt = EGL_NO_CONTEXT;
++	if (!sdl_owns_egl) {
++		eglMakeCurrent(edpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
++		if (esfc != EGL_NO_SURFACE)
++			eglDestroySurface(edpy, esfc);
++		if (ectxt != EGL_NO_CONTEXT)
++			eglDestroyContext(edpy, ectxt);
+ 	}
++	esfc = EGL_NO_SURFACE;
++	ectxt = EGL_NO_CONTEXT;
+ 
+ 	gl_es_surface = (void *)esfc;
+ 
+@@ -305,9 +330,11 @@ void gl_destroy(void)
+ void gl_shutdown(void)
+ {
+ 	if (edpy != EGL_NO_DISPLAY) {
+-		eglTerminate(edpy);
++		if (!sdl_owns_egl)
++			eglTerminate(edpy);
+ 		edpy = EGL_NO_DISPLAY;
+ 	}
++	sdl_owns_egl = 0;
+ 
+ 	gl_es_display = (void *)edpy;
+ 
+diff --git a/gl_loader.c b/gl_loader.c
+index efc6589..970de4b 100644
+--- a/gl_loader.c
++++ b/gl_loader.c
+@@ -14,6 +14,9 @@ static void *libgles;
+ FPTR(eglGetError);
+ FPTR(eglBindAPI);
+ FPTR(eglGetDisplay);
++FPTR(eglGetCurrentDisplay);
++FPTR(eglGetCurrentSurface);
++FPTR(eglGetCurrentContext);
+ FPTR(eglInitialize);
+ FPTR(eglChooseConfig);
+ FPTR(eglCreateWindowSurface);
+@@ -73,6 +76,9 @@ int gl_load(void)
+ 	LOADSYM(libegl, eglGetError);
+ 	LOADSYM(libegl, eglBindAPI);
+ 	LOADSYM(libegl, eglGetDisplay);
++	LOADSYM(libegl, eglGetCurrentDisplay);
++	LOADSYM(libegl, eglGetCurrentSurface);
++	LOADSYM(libegl, eglGetCurrentContext);
+ 	LOADSYM(libegl, eglInitialize);
+ 	LOADSYM(libegl, eglChooseConfig);
+ 	LOADSYM(libegl, eglCreateWindowSurface);
+diff --git a/gl_loader.h b/gl_loader.h
+index 60ba9f8..b3b3eac 100644
+--- a/gl_loader.h
++++ b/gl_loader.h
+@@ -8,6 +8,9 @@ void gl_unload(void);
+ extern FPTR(eglGetError);
+ extern FPTR(eglBindAPI);
+ extern FPTR(eglGetDisplay);
++extern FPTR(eglGetCurrentDisplay);
++extern FPTR(eglGetCurrentSurface);
++extern FPTR(eglGetCurrentContext);
+ extern FPTR(eglInitialize);
+ extern FPTR(eglChooseConfig);
+ extern FPTR(eglCreateWindowSurface);
+@@ -42,6 +45,9 @@ extern FPTR(glFrontFace);
+ #define eglGetError peglGetError
+ #define eglBindAPI peglBindAPI
+ #define eglGetDisplay peglGetDisplay
++#define eglGetCurrentDisplay peglGetCurrentDisplay
++#define eglGetCurrentSurface peglGetCurrentSurface
++#define eglGetCurrentContext peglGetCurrentContext
+ #define eglInitialize peglInitialize
+ #define eglChooseConfig peglChooseConfig
+ #define eglCreateWindowSurface peglCreateWindowSurface
+diff --git a/in_sdl.c b/in_sdl.c
+index 93fe22d..96dad78 100644
+--- a/in_sdl.c
++++ b/in_sdl.c
+@@ -347,13 +347,14 @@ static int handle_joy_event(struct in_sdl_state *state, SDL_Event *event,
+ 			return -2;
+ 		if (event->jaxis.value < -16384) {
+ 			if (state->abs_to_udlr && event->jaxis.axis < 2)
+-				kc = event->jaxis.axis ? SDLK_UP : SDLK_LEFT;
++				kc = event->jaxis.axis ? SDLK_UP : SDLK_LEFT, down = 1;
+ 			// some pressure sensitive buttons appear as an axis that goes
+ 			// from -32768 (released) to 32767 (pressed) and there is no
+ 			// way to distinguish from ones centered at 0? :(
+ 			else if (!(state->joy_axis_as_btn & (1u << event->jaxis.axis)))
+-				kc = kc_axis_base + event->jaxis.axis * 2;
+-			down = 1;
++				kc = kc_axis_base + event->jaxis.axis * 2, down = 1;
++			else
++				down = 0;
+ 		}
+ 		else if (event->jaxis.value > 16384) {
+ 			if (state->abs_to_udlr && event->jaxis.axis < 2)
+@@ -685,7 +686,9 @@ static int in_sdl_clean_binds(void *drv_data, int *binds, int *def_binds)
+ 	for (t = 0; t < IN_BINDTYPE_COUNT; t++) {
+ 		for (i = 0; i < SDLK_LAST; i++) {
+ 			int offs = IN_BIND_OFFS(i, t);
+-			if (state->joy && i < SDLK_WORLD_0)
++			if (state->joy && i < SDLK_WORLD_0 &&
++			    i != SDLK_UP && i != SDLK_DOWN &&
++			    i != SDLK_LEFT && i != SDLK_RIGHT)
+ 				binds[offs] = def_binds[offs] = 0;
+ 			if (binds[offs]) {
+ 				if (t == IN_BINDTYPE_EMU)
+diff --git a/plat_sdl.c b/plat_sdl.c
+index 031e162..e635516 100644
+--- a/plat_sdl.c
++++ b/plat_sdl.c
+@@ -11,6 +11,8 @@
+ 
+ #include <stdio.h>
+ #include <stdint.h>
++#include <stdlib.h>
++#include <dlfcn.h>
+ #include <SDL.h>
+ #include <SDL_syswm.h>
+ 
+@@ -48,7 +50,10 @@ static Uint32 screen_flags =
+ static Uint32 get_screen_flags(void)
+ {
+   Uint32 flags = screen_flags;
++  const char *sdl_gl_context = getenv("PICOFE_SDL_GL_CONTEXT");
+   flags &= ~(SDL_FULLSCREEN | SDL_RESIZABLE);
++  if (sdl_gl_context != NULL && atoi(sdl_gl_context) != 0)
++    flags |= SDL_OPENGL;
+   if (plat_target.vout_fullscreen && fs_w && fs_h)
+     flags |= SDL_FULLSCREEN;
+   else if (window_b)
+@@ -56,6 +61,45 @@ static Uint32 get_screen_flags(void)
+   return flags;
+ }
+ 
++static int set_sdl2_gles1_attributes(void)
++{
++  typedef int (*sdl2_gl_set_attribute_t)(int attr, int value);
++  sdl2_gl_set_attribute_t set_attribute;
++  void *sdl2;
++
++  sdl2 = dlopen("libSDL2-2.0.so.0", RTLD_LAZY | RTLD_NOLOAD);
++  if (sdl2 == NULL)
++    sdl2 = dlopen("libSDL2-2.0.so.0", RTLD_LAZY);
++  if (sdl2 == NULL) {
++    fprintf(stderr, "failed to load SDL2 for GLES1 attributes: %s\n", dlerror());
++    return -1;
++  }
++
++  set_attribute = (sdl2_gl_set_attribute_t)dlsym(sdl2, "SDL_GL_SetAttribute");
++  if (set_attribute == NULL) {
++    fprintf(stderr, "failed to resolve SDL2 SDL_GL_SetAttribute: %s\n",
++      dlerror());
++    dlclose(sdl2);
++    return -1;
++  }
++
++  /*
++   * SDL2 SDL_GLattr values. SDL 1.2 does not expose context-version or
++   * profile attributes, so set them on the SDL2 instance used by
++   * sdl12-compat before its first SDL_SetVideoMode().
++   */
++  if (set_attribute(21, 4) != 0 ||  /* PROFILE_MASK = PROFILE_ES */
++      set_attribute(17, 1) != 0 ||  /* CONTEXT_MAJOR_VERSION */
++      set_attribute(18, 1) != 0) {  /* CONTEXT_MINOR_VERSION */
++    fprintf(stderr, "failed to request SDL2 GLES 1.1 context\n");
++    dlclose(sdl2);
++    return -1;
++  }
++
++  dlclose(sdl2);
++  return 0;
++}
++
+ static void update_wm_display_window(void)
+ {
+   // get x11 display/window for GL
+@@ -233,6 +277,9 @@ int plat_sdl_init(void)
+     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+     return -1;
+   }
++  if ((get_screen_flags() & SDL_OPENGL) != 0 &&
++      set_sdl2_gles1_attributes() != 0)
++    goto fail;
+ 
+   info = SDL_GetVideoInfo();
+   if (info != NULL) {

@@ -1,0 +1,109 @@
+diff --git a/libpicofe/linux/in_evdev.c b/libpicofe/linux/in_evdev.c
+--- a/libpicofe/linux/in_evdev.c
++++ b/libpicofe/linux/in_evdev.c
+@@ -35,8 +35,14 @@ typedef struct {
+ 	int abs_lzone;
+ 	int abs_lastx;
+ 	int abs_lasty;
++	int abs_lastz;
++	int abs_lastrz;
++	int abs_trigger_z;
++	int abs_trigger_rz;
+ 	unsigned int has_hat0x:1;
+ 	unsigned int has_hat0y:1;
++	unsigned int has_abs_z:1;
++	unsigned int has_abs_rz:1;
+ 	int kc_first;
+ 	int kc_last;
+ 	unsigned int abs_count;
+@@ -255,6 +261,36 @@ static void in_evdev_probe(const in_drv_t *drv)
+ 				/* V90S adc_gamepad exposes its d-pad as HAT0X/HAT0Y. */
+ 				have_abs = 1;
+ 				dev->abs_to_digital = 1;
++			}
++			dev->has_abs_z = !!ABSBITS_BIT(ABS_Z);
++			if (dev->has_abs_z) {
++				ret = ioctl(fd, EVIOCGABS(ABS_Z), &ainfo);
++				if (ret == -1 || ainfo.maximum <= ainfo.minimum)
++					dev->has_abs_z = 0;
++				else {
++					dev->abs_trigger_z =
++						ainfo.minimum + (ainfo.maximum - ainfo.minimum) / 2;
++					have_abs = 1;
++					if (BTN_TL2 < kc_first)
++						kc_first = BTN_TL2;
++					if (BTN_TL2 > kc_last)
++						kc_last = BTN_TL2;
++				}
++			}
++			dev->has_abs_rz = !!ABSBITS_BIT(ABS_RZ);
++			if (dev->has_abs_rz) {
++				ret = ioctl(fd, EVIOCGABS(ABS_RZ), &ainfo);
++				if (ret == -1 || ainfo.maximum <= ainfo.minimum)
++					dev->has_abs_rz = 0;
++				else {
++					dev->abs_trigger_rz =
++						ainfo.minimum + (ainfo.maximum - ainfo.minimum) / 2;
++					have_abs = 1;
++					if (BTN_TR2 < kc_first)
++						kc_first = BTN_TR2;
++					if (BTN_TR2 > kc_last)
++						kc_last = BTN_TR2;
++				}
+ 			}
+ 			for (u = 0; u < MAX_ABS_DEVS; u++) {
+ 				ret = ioctl(fd, EVIOCGABS(u), &ainfo);
+@@ -391,6 +427,16 @@ static int in_evdev_update(void *drv_data, const int *binds, int *result)
+ 			if (ainfo.value > 0) or_binds(binds, KEY_DOWN, result);
+ 		}
+ 	}
++	if (dev->has_abs_z) {
++		ret = ioctl(dev->fd, EVIOCGABS(ABS_Z), &ainfo);
++		if (ret != -1 && ainfo.value > dev->abs_trigger_z)
++			or_binds(binds, BTN_TL2, result);
++	}
++	if (dev->has_abs_rz) {
++		ret = ioctl(dev->fd, EVIOCGABS(ABS_RZ), &ainfo);
++		if (ret != -1 && ainfo.value > dev->abs_trigger_rz)
++			or_binds(binds, BTN_TR2, result);
++	}
+ 
+ 	return 0;
+ }
+@@ -516,6 +562,25 @@ static int in_evdev_update_keycode(void *data, int *is_down)
+ 	else if (ev.type == EV_ABS && dev->abs_to_digital)
+ 	{
+ 		int lzone = dev->abs_lzone, down = 0, *last;
++
++		if (ev.code == ABS_Z && dev->has_abs_z) {
++			down = ev.value > dev->abs_trigger_z;
++			if (down == dev->abs_lastz)
++				goto out;
++			dev->abs_lastz = down;
++			ret_kc = BTN_TL2;
++			ret_down = down;
++			goto out;
++		}
++		if (ev.code == ABS_RZ && dev->has_abs_rz) {
++			down = ev.value > dev->abs_trigger_rz;
++			if (down == dev->abs_lastrz)
++				goto out;
++			dev->abs_lastrz = down;
++			ret_kc = BTN_TR2;
++			ret_down = down;
++			goto out;
++		}
+ 
+ 		// map absolute to up/down/left/right
+ 		if (ev.code == ABS_HAT0X) {
+@@ -633,6 +698,10 @@ static int in_evdev_clean_binds(void *drv_data, int *binds, int *def_binds)
+ 		KEYBITS_BIT_SET(KEY_UP);
+ 		KEYBITS_BIT_SET(KEY_DOWN);
+ 	}
++	if (dev->has_abs_z)
++		KEYBITS_BIT_SET(BTN_TL2);
++	if (dev->has_abs_rz)
++		KEYBITS_BIT_SET(BTN_TR2);
+ 
+ 	for (i = 0; i < KEY_CNT; i++) {
+ 		for (t = 0; t < IN_BINDTYPE_COUNT; t++) {

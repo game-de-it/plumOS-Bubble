@@ -1,0 +1,32 @@
+--- a/plat_sdl.c
++++ b/plat_sdl.c
+@@ -231,10 +231,12 @@ static const void *prepare_rgb565_frame(const void *data, unsigned width,
+ {
+ 	size_t pixel_count;
+ 	unsigned y;
++	const char *byteswap = getenv("PLUMOS_PICOARCH_RGB565_BYTESWAP");
++	int swap_rgb565 = byteswap && byteswap[0] == '1' && !byteswap[1];
+ 
+ 	if (!data || !width || !height || !output_pitch)
+ 		return NULL;
+-	if (core_pixel_format == RETRO_PIXEL_FORMAT_RGB565) {
++	if (core_pixel_format == RETRO_PIXEL_FORMAT_RGB565 && !swap_rgb565) {
+ 		*output_pitch = pitch;
+ 		return data;
+ 	}
+@@ -251,7 +253,14 @@ static const void *prepare_rgb565_frame(const void *data, unsigned width,
+ 		uint16_t *dst = converted_frame + (size_t)y * width;
+ 		unsigned x;
+ 
+-		if (core_pixel_format == RETRO_PIXEL_FORMAT_XRGB8888) {
++		if (core_pixel_format == RETRO_PIXEL_FORMAT_RGB565) {
++			const uint16_t *src = (const uint16_t *)((const uint8_t *)data +
++			                                                (size_t)y * pitch);
++			for (x = 0; x < width; x++) {
++				uint16_t pixel = src[x];
++				dst[x] = (uint16_t)((pixel >> 8) | (pixel << 8));
++			}
++		} else if (core_pixel_format == RETRO_PIXEL_FORMAT_XRGB8888) {
+ 			const uint32_t *src = (const uint32_t *)((const uint8_t *)data +
+ 			                                                (size_t)y * pitch);
+ 			for (x = 0; x < width; x++) {

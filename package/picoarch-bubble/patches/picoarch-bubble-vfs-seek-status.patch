@@ -1,0 +1,10 @@
+--- a/picoarch_v90s_host.c
++++ b/picoarch_v90s_host.c
+@@ -145,6 +145,6 @@ static int64_t v90s_vfs_seek(struct retro_vfs_file_handle *stream, int64_t offs
+   if (!stream || !stream->file || fseeko(stream->file, (off_t)offset, seek_position) != 0)
+     return -1;
+-  return v90s_vfs_tell(stream);
++  return 0;
+ }
+ 
+ static int64_t v90s_vfs_size(struct retro_vfs_file_handle *stream) {
