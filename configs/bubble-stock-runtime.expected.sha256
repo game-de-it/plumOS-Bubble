@@ -1,0 +1,15 @@
+# 2026-09-01 Bubble stockOS-based CFW runtime ABI inputs.
+# Captures are analysis-only until provenance and redistribution rights are resolved.
+451239de032024550908580f81f361eb68d21a604f54a13c30b028c41ff437c3  config.gz
+5ea527f8ab546914f1aecd4cc5674e1ac4243847b18badce68aaa89d8f9e72ac  runtime.dtb
+fd8abaada4aed3ef140e778e344316a1727b0c8d7d9d83d0aee51e3d008297f4  modules/bcmdhd.ko
+e7e8bc20098908c67d9c521285addc352d42b1c5d4c18c0233a7529af224df9f  modules/dwc3.ko
+7f0cf5782bc2340b8000373bcffcf3799505df3ee5c53e13182530d745246b68  modules/udc-core.ko
+1148a5d7ba40168cb70b5b7b7614739143a4d84c4b9ea483b44fb3c2120e0005  modules/dwc3-of-simple.ko
+c587abd06865aab98290e1bdd1e9185cfb5c30f89af329c77e0202afe4b932c1  firmware/fw_bcm43438a1.bin
+68952ca377ea4f629c7d01042ba6d95e2c74f347a893c4d49a4d3c3f38a5bf1b  firmware/nvram_AP6330.txt
+56e37253ef3c217932aa947734399203614dfa6046a077444d4c76fd29ea5be2  gpu/libmali-aarch64.so.1.9.0
+bbe45b17ec872897a0039a685ba25e87ea8fa2244f3a36648c37acf9fdb55d34  gpu/libmali-armhf.so.1.9.0
+# Hashes of ignored, complete file inventories (SHA-256, size, absolute stock path).
+c8b5c18c8e220eee26c5bafe05d79a5ae31a1940d5df6031de36b10acaeb39b0  modules-all.tsv
+cd146030322fbd0b2fb568bcdbf3a17823f33bf29913a0953dd8c0379dc6deb4  firmware-all.tsv

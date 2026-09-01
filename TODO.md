@@ -23,13 +23,16 @@
 - [ ] `BUB-P1-03` ROM SD は filesystem metadata と dirty state だけを read-only で確認し、ROM/BIOS/save 内容を repository や build artifact に取り込まない。
 - [ ] `BUB-P1-04` raw Rockchip prefix、IDBLoader/SPL、U-Boot、environment の offset/size/hash を特定する。
   - 先頭16 MiBをread-only取得し、exact size、SHA-256、RKNS/FIT/BL3X主要headerを確認済み。
-  - U-Boot environmentの保存場所、冗長性、boot source selectionは未確認。
+  - prefix内のdefault文字列では`mmc1 -> mmc0 -> usb0 -> pxe -> dhcp`と
+    `boot.scr.uimg`/`boot.scr`探索を確認したが、active environmentの保存場所と冗長性は未確認。
 - [ ] `BUB-P1-05` `Image`、`SYSTEM`、`boot.scr/cmd`、`uEnv.txt`、全 DTB/DTBO の hash/provenance manifest を作成する。
   - active `Image`、通常/HDMI DTB、適用overlay/fixup、U-Boot DTB、boot scriptをhash照合してlocal artifactへ取得済み。
   - stock `SYSTEM`はanalysis-only hashだけを記録し、vendor/release outputへコピーしていない。
   - 未選択を含む全DTB/DTBO inventoryとlicense/provenanceは未完了。
-- [ ] `BUB-P1-06` runtime device tree を採取し、selected `rk3566-gkd-geek-bbg.dtb` + overlays と比較する。
-- [ ] `BUB-P1-07` `/proc/config.gz`、module、firmware、vendor Mali userspace の ABI inventory を固定する。
+- [x] `BUB-P1-06` runtime device tree を採取し、selected `rk3566-gkd-geek-bbg.dtb` + overlays と比較する。
+- [x] `BUB-P1-07` `/proc/config.gz`、module、firmware、vendor Mali userspace の ABI inventory を固定する。
+  - module 556 files、firmware 322 filesのsize/hash inventoryと、起動に関係する固定ABI候補を取得済み。
+  - vendor artifactのsource identity/license/redistribution判断は`BUB-P3-02`と`BUB-P4-D05`で行う。
 - [ ] `BUB-P1-07A` 現SYSTEMと生成plumOS Systemの実サイズからp1 A/B容量を計算し、
   Bubble U-Boot/recovery proofからp2容量・形式を固定する。
 - [ ] `BUB-P1-08` sector image から複製 OS SD を作り、write後block readbackを実施する。
@@ -127,5 +130,5 @@
 
 ## Next action
 
-- [ ] boot artifact captureを完了し、OS SDを実機へ戻してruntime DTB/kernel ABIをread-only採取する。
+- [ ] U-Boot active environment、initrd handoff、起動中process/library/device ownershipをread-onlyで特定する。
 - [ ] 別の複製用SDを用意し、original OS SDのdevice-to-device cloneとreadbackを行う。

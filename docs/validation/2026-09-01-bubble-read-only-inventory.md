@@ -70,10 +70,8 @@ ROM SD は boot log で dirty volume と報告されている。現段階では�
 `boot.cmd` は kernel、DTB、overlay、initrd 変数を U-Boot 環境から組み立て、`booti` する。
 ただし次はまだ未確認である。
 
-- SD 先頭 16 MiB にある Rockchip IDBLoader/U-Boot の正確な配置と hash
 - U-Boot environment の保存場所、fallback、SD 選択規則
-- `initrdimg` / `initrdsize` の実値と初期 userspace handoff
-- runtime に適用済みの exact DTB と `/flash` 上 DTB の一致
+- built-in initramfs内のexact init/pivot処理
 
 ### macOS raw prefix capture
 
@@ -96,10 +94,62 @@ FIT header、`0xc00000`に`BL3X` headerがあり、RK3566 DDR初期化、U-Boot 
 ATF/U-Boot文字列を確認した。したがって16 MiB全体をexact immutable vendor inputとして扱い、
 個別領域へ分解して再配置する前に複製SDでboot equivalenceを証明する。
 
+prefix内のU-Boot default文字列には`boot_targets=mmc1 mmc0 usb0 pxe dhcp`、
+`bootcmd=run distro_bootcmd`、`boot.scr.uimg`/`boot.scr`探索が含まれる。これは現行の
+FAT p1 file bootと整合するが、保存済みactive environmentを読んだ結果ではない。
+したがってV90S型raw p2 bootへ切り替える前に、複製SDでactive selectionとfallbackを証明する。
+
+runtime cmdlineは`initrd=`が空で、kernel configは`CONFIG_INITRAMFS_SOURCE`にvendor build host上の
+`emuelec-init`構成を指定している。このため外部initrdではなく、kernelへ組み込まれたinitramfsが
+ext4 p2を初期rootとして処理し、p1 `SYSTEM`をloop/SquashFS rootへhandoffしていると判断できる。
+起動後はp1が`/flash` read-only、p2が`/storage` read-write、`SYSTEM` loopが`/` read-onlyである。
+exact init/pivot scriptはまだ抽出できていない。
+
 FAT p1はread-only mountしてhashを取得した。active boot inputのexpected hashは
 `configs/bubble-stock-active-boot.expected.sha256`に記録した。p1にはuser-owned ROM fileも
 存在するため、boot artifact captureでは明示したkernel/DTB/scriptだけを対象にし、ROM treeを
 コピーまたはhash inventoryへ含めない。
+
+### Runtime DTB と kernel ABI
+
+起動後の`/sys/firmware/fdt`をexact 147,584 bytesで採取した。SHA-256は
+`5ea527f8ab546914f1aecd4cc5674e1ac4243847b18badce68aaa89d8f9e72ac`である。
+`scripts/compare-fdt.py`でselected base DTBとproperty単位に比較したところ、base 4,225、
+runtime 4,230 propertiesのうち差分は6件だけだった。
+
+- bootloaderが追加するserial number、`/chosen/bootargs`、memory type/ranges
+- boot logo用reserved-memoryの実address/size
+- `/reserved-memory/rknpu:status = "disabled"`
+
+最後の差分は選択済み`rk3568-disable-npu` overlayと一致する。その他に予期しないnode/propertyの
+変更はなく、runtime treeはselected base DTBへboot時情報と選択overlayを反映したものと判断できる。
+
+kernelは`4.19.193-g5a07852a55cf-dirty`で、`/proc/config.gz`は33,182 bytes、SHA-256
+`451239de032024550908580f81f361eb68d21a604f54a13c30b028c41ff437c3`だった。
+module treeは`/usr/lib/kernel-overlays/base/lib/modules/<kernel>`にあり、556 files、
+合計23,745,072 bytesをpath/size/SHA-256で一覧化した。firmware treeも322 files、
+合計32,153,018 bytesを同様に一覧化した。inventory自体のSHA-256はそれぞれ
+`c8b5c18c8e220eee26c5bafe05d79a5ae31a1940d5df6031de36b10acaeb39b0`、
+`cd146030322fbd0b2fb568bcdbf3a17823f33bf29913a0953dd8c0379dc6deb4`である。
+
+起動中に必要性を確認した固定ABI候補は次の通りである。
+
+| Artifact | Size | SHA-256 |
+| --- | ---: | --- |
+| `bcmdhd.ko` | 3,625,144 | `fd8abaada4aed3ef140e778e344316a1727b0c8d7d9d83d0aee51e3d008297f4` |
+| `dwc3.ko` | 119,368 | `e7e8bc20098908c67d9c521285addc352d42b1c5d4c18c0233a7529af224df9f` |
+| `udc-core.ko` | 43,872 | `7f0cf5782bc2340b8000373bcffcf3799505df3ee5c53e13182530d745246b68` |
+| `dwc3-of-simple.ko` | 16,240 | `1148a5d7ba40168cb70b5b7b7614739143a4d84c4b9ea483b44fb3c2120e0005` |
+| `fw_bcm43438a1.bin` | 414,579 | `c587abd06865aab98290e1bdd1e9185cfb5c30f89af329c77e0202afe4b932c1` |
+| `nvram_AP6330.txt` | 1,522 | `68952ca377ea4f629c7d01042ba6d95e2c74f347a893c4d49a4d3c3f38a5bf1b` |
+| AArch64 `libmali.so.1.9.0` | 43,489,296 | `56e37253ef3c217932aa947734399203614dfa6046a077444d4c76fd29ea5be2` |
+| ARMhf `libmali.so.1.9.0` | 42,431,936 | `bbe45b17ec872897a0039a685ba25e87ea8fa2244f3a36648c37acf9fdb55d34` |
+
+`bcmdhd.ko`のvermagicはkernel releaseと一致し、実際のWi-Fi firmwareはboot log上
+`fw_bcm43438a1.bin`だった。vendor Maliは64-bit/32-bit双方が存在し、root userspaceは
+glibc 2.38である。これらのcaptureは解析専用で、source identity、license、再配布権を
+確認するまでplumOS image/releaseへ含めない。expected hashは
+`configs/bubble-stock-runtime.expected.sha256`に記録した。
 
 ### Display と GPU
 
@@ -116,6 +166,11 @@ FAT p1はread-only mountしてhashを取得した。active boot inputのexpected
 libdrm、PipeWire/PulseAudio を map している。したがって GPU userspace は kernel ABI と
 組で扱う必要がある。plumOS の初期 bring-up は software DRM/KMS path を先に通し、
 vendor GPU を採用するかはライセンス・再配布・ABI・性能を別 gate で決める。
+
+process/fd readbackではEmulationStationが`event0..3`も直接openしていた。別processの
+`input_sense`は`evtest`を`event0..2`へ接続しており、stock環境はfrontendとsystem helperが
+同じinput sourceを並行監視する構成である。plumOSではこの構成をそのままコピーせず、
+hotkey/power監視とfrontend/game inputの所有境界を一つに定める必要がある。
 
 ### Input
 
