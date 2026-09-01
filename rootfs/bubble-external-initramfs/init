@@ -1,0 +1,211 @@
+#!/bin/sh
+set -u
+
+bb=/bin/busybox
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PATH HOME=/root HOSTNAME=plumos-bubble-initramfs
+
+boot_start=32768
+boot_sectors=1048576
+matching_start=1081344
+matching_sectors=131072
+runtime_start=1212416
+runtime_sectors=3145728
+
+console_log=/run/plumos-external-initramfs.log
+runtime_mount=/mnt/plumos-runtime
+flash_mount=/mnt/plumos-flash
+matching_device=
+runtime_device=
+flash_device=
+os_disk=
+persistent_log=
+
+mounted() {
+    $bb grep -qs " $1 " /proc/mounts 2>/dev/null
+}
+
+log() {
+    message="plumos-bubble-external-initramfs=$*"
+    printf '%s\n' "$message" >/dev/console 2>/dev/null || true
+    printf '%s\n' "$message" >/dev/kmsg 2>/dev/null || true
+    printf '%s\n' "$message" >>"$console_log" 2>/dev/null || true
+    if [ -n "$persistent_log" ]; then
+        printf '%s\n' "$message" >>"$persistent_log" 2>/dev/null || true
+    fi
+}
+
+persist_console_log() {
+    [ -n "$persistent_log" ] || return 0
+    $bb cp "$console_log" "$persistent_log" 2>/dev/null || true
+    $bb sync
+}
+
+show_shared_logo() {
+    if [ -c /dev/fb0 ] && [ -r /usr/share/plumos/plumos-640x480-xrgb8888.raw ]; then
+        $bb cat /usr/share/plumos/plumos-640x480-xrgb8888.raw \
+            >/dev/fb0 2>/dev/null || true
+    fi
+}
+
+fail() {
+    stage=$1
+    detail=$2
+    log "stage=$stage detail=$detail"
+    persist_console_log
+    $bb sync
+    mounted "$flash_mount" && $bb umount "$flash_mount" 2>/dev/null || true
+    mounted /mnt/plumos-system/flash && \
+        $bb umount /mnt/plumos-system/flash 2>/dev/null || true
+    if mounted "$runtime_mount"; then
+        $bb mount -o remount,ro "$runtime_mount" 2>/dev/null || true
+    fi
+    if mounted /mnt/plumos-system/storage; then
+        $bb mount -o remount,ro /mnt/plumos-system/storage 2>/dev/null || true
+    fi
+    show_shared_logo
+    log "stage=${stage}_RECOVERY_CONSOLE"
+    exec $bb sh
+}
+
+label_of() {
+    /usr/sbin/blkid -s LABEL -o value "$1" 2>/dev/null || true
+}
+
+geometry_value() {
+    field=$1
+    device_name=${2##*/}
+    $bb cat "/sys/class/block/$device_name/$field" 2>/dev/null || true
+}
+
+check_geometry() {
+    device=$1
+    expected_start=$2
+    expected_size=$3
+    actual_start=$(geometry_value start "$device")
+    actual_size=$(geometry_value size "$device")
+    [ "$actual_start" = "$expected_start" ] && [ "$actual_size" = "$expected_size" ]
+}
+
+cmdline_value() {
+    key=$1
+    for argument in $($bb cat /proc/cmdline 2>/dev/null); do
+        case "$argument" in
+            "$key"=*) printf '%s\n' "${argument#*=}"; return 0 ;;
+        esac
+    done
+    return 1
+}
+
+verify_file() {
+    file=$1
+    expected_file=$2
+    expected=$($bb awk 'NF >= 1 {print $1; exit}' "$expected_file" 2>/dev/null || true)
+    actual=$($bb sha256sum "$file" 2>/dev/null | $bb awk '{print $1}' || true)
+    [ -n "$expected" ] && [ "$actual" = "$expected" ]
+}
+
+$bb mkdir -p /proc /sys /dev /dev/pts /run /tmp /root \
+    "$flash_mount" "$runtime_mount" /mnt/plumos-system
+mounted /proc || $bb mount -t proc proc /proc || exec $bb sh
+mounted /sys || $bb mount -t sysfs sysfs /sys || exec $bb sh
+mounted /dev || $bb mount -t devtmpfs devtmpfs /dev || exec $bb sh
+$bb [ -c /dev/console ] || $bb mknod /dev/console c 5 1
+exec </dev/console >/dev/console 2>&1
+$bb mkdir -p /dev/pts /dev/shm
+mounted /dev/pts || $bb mount -t devpts devpts /dev/pts 2>/dev/null || true
+$bb mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run 2>/dev/null || true
+$bb mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp 2>/dev/null || true
+$bb hostname "$HOSTNAME" 2>/dev/null || true
+
+log 'stage=S21_EXTERNAL_INITRAMFS_ENTRY'
+show_shared_logo
+log 'stage=S22_PSEUDO_FILESYSTEMS_READY'
+
+count=0
+while [ "$count" -lt 50 ]; do
+    for candidate in /dev/mmcblk*p1; do
+        [ -b "$candidate" ] || continue
+        if [ "$(label_of "$candidate")" = PLUMBOOT ]; then
+            flash_device=$candidate
+            os_disk=${candidate%p1}
+            matching_device=${os_disk}p2
+            runtime_device=${os_disk}p3
+            break 2
+        fi
+    done
+    $bb sleep 0.1
+    count=$((count + 1))
+done
+[ -n "$os_disk" ] || fail E23 OS_DISK_NOT_FOUND
+[ -b "$matching_device" ] || fail E23 MATCHING_PARTITION_MISSING
+[ -b "$runtime_device" ] || fail E23 RUNTIME_PARTITION_MISSING
+[ ! -b "${os_disk}p4" ] || fail E23 UNEXPECTED_P4_PRESENT
+[ "$(label_of "$runtime_device")" = PLUMOS_SYS ] || fail E23 RUNTIME_LABEL_MISMATCH
+log "stage=S23_OS_DISK_RESOLVED disk=$os_disk flash=$flash_device matching=$matching_device runtime=$runtime_device"
+
+check_geometry "$flash_device" "$boot_start" "$boot_sectors" || \
+    fail E24 P1_GEOMETRY_MISMATCH
+check_geometry "$matching_device" "$matching_start" "$matching_sectors" || \
+    fail E24 P2_GEOMETRY_MISMATCH
+check_geometry "$runtime_device" "$runtime_start" "$runtime_sectors" || \
+    fail E24 P3_GEOMETRY_MISMATCH
+log "stage=S24_PROVISIONAL_GEOMETRY_VALIDATED p1=${boot_start}+${boot_sectors} p2=${matching_start}+${matching_sectors} p3=${runtime_start}+${runtime_sectors}"
+
+$bb mount -t vfat -o ro "$flash_device" "$flash_mount" || fail E25 P1_MOUNT_FAILED
+$bb mount -t ext4 -o rw,noatime "$runtime_device" "$runtime_mount" || \
+    fail E25 P3_MOUNT_FAILED
+$bb mkdir -p "$runtime_mount/plumos/logs"
+persistent_log=$runtime_mount/plumos/logs/external-initramfs.log
+persist_console_log
+[ -f "$flash_mount/plumos-probe/external-initramfs-authorized.txt" ] || \
+    fail E25 P1_AUTHORIZATION_MARKER_MISSING
+[ -f "$runtime_mount/plumos/external-initramfs-probe.manifest" ] || \
+    fail E25 P3_PROBE_MANIFEST_MISSING
+$bb grep -qx 'authorized=yes' \
+    "$runtime_mount/plumos/external-initramfs-probe.manifest" || \
+    fail E25 P3_AUTHORIZATION_MISSING
+log 'stage=S25_PROBE_MEDIA_MOUNTED'
+
+expected_matching_sha=$(cmdline_value plumos_probe_p2_sha256 || true)
+[ -n "$expected_matching_sha" ] || fail E26 P2_EXPECTED_SHA_MISSING
+actual_matching_sha=$($bb sha256sum "$matching_device" 2>/dev/null | \
+    $bb awk '{print $1}' || true)
+[ "$actual_matching_sha" = "$expected_matching_sha" ] || fail E26 P2_SHA_MISMATCH
+matching_magic=$($bb dd if="$matching_device" bs=1 count=6 2>/dev/null || true)
+[ "$matching_magic" = 070701 ] || fail E26 P2_RAW_NEWC_MAGIC_MISMATCH
+log "stage=S26_RAW_MATCHING_BUNDLE_VERIFIED sha256=$actual_matching_sha"
+
+active_slot=$($bb cat "$flash_mount/System/active-slot" 2>/dev/null || true)
+case "$active_slot" in a|b) ;; *) fail E27 ACTIVE_SLOT_INVALID ;; esac
+for slot in a b; do
+    image=$flash_mount/System/system-$slot.squashfs
+    checksum=$flash_mount/System/system-$slot.sha256
+    [ -f "$image" ] && [ -f "$checksum" ] || fail E27 SYSTEM_SLOT_MISSING
+    verify_file "$image" "$checksum" || fail E27 SYSTEM_SLOT_SHA_MISMATCH
+done
+selected_system=$flash_mount/System/system-$active_slot.squashfs
+log "stage=S27_SYSTEM_AB_VERIFIED active_slot=$active_slot"
+
+[ -b /dev/loop0 ] || $bb mknod /dev/loop0 b 7 0
+$bb losetup /dev/loop0 "$selected_system" || fail E28 LOOP_SETUP_FAILED
+$bb mount -t squashfs -o ro /dev/loop0 /mnt/plumos-system || \
+    fail E28 SYSTEM_MOUNT_FAILED
+for required in init flash storage proc sys dev run tmp; do
+    [ -e "/mnt/plumos-system/$required" ] || fail E28 SYSTEM_CONTRACT_MISSING
+done
+log 'stage=S28_SYSTEM_MOUNTED'
+
+persist_console_log
+log 'stage=S29_SWITCH_ROOT'
+$bb sync
+$bb mount --move "$flash_mount" /mnt/plumos-system/flash || fail E29 FLASH_MOVE_FAILED
+$bb mount --move "$runtime_mount" /mnt/plumos-system/storage || fail E29 STORAGE_MOVE_FAILED
+persistent_log=/mnt/plumos-system/storage/plumos/logs/external-initramfs.log
+$bb mount --move /proc /mnt/plumos-system/proc || fail E29 PROC_MOVE_FAILED
+$bb mount --move /sys /mnt/plumos-system/sys || fail E29 SYS_MOVE_FAILED
+$bb mount --move /run /mnt/plumos-system/run || fail E29 RUN_MOVE_FAILED
+console_log=/mnt/plumos-system/run/plumos-external-initramfs.log
+$bb mount --move /tmp /mnt/plumos-system/tmp || fail E29 TMP_MOVE_FAILED
+$bb mount --move /dev /mnt/plumos-system/dev || fail E29 DEV_MOVE_FAILED
+exec $bb switch_root /mnt/plumos-system /init

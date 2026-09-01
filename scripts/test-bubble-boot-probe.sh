@@ -20,11 +20,15 @@ trap cleanup EXIT HUP INT TERM
     "$repo_root/scripts/install-bubble-system-boot-probe-over-ssh.sh" \
     "$repo_root/scripts/build-bubble-tools-image.sh" \
     "$repo_root/scripts/build-bubble-minimal-system.sh" \
+    "$repo_root/scripts/build-bubble-external-initramfs.sh" \
+    "$repo_root/scripts/build-bubble-external-initramfs-probe-image.sh" \
     "$repo_root/scripts/build-bubble-seed-image.sh" \
     "$repo_root/scripts/capture-bubble-boot-substrate-over-ssh.sh" \
     "$repo_root/scripts/personalize-bubble-seed-wifi.sh" \
+    "$repo_root/scripts/verify-bubble-external-initramfs-probe-image.sh" \
     "$repo_root/scripts/verify-bubble-seed-image.sh" \
     "$repo_root/scripts/write-bubble-seed-image-macos.sh" \
+    "$repo_root/rootfs/bubble-external-initramfs/init" \
     "$repo_root/rootfs/bubble-minimal/init" \
     "$repo_root/rootfs/bubble-minimal/usr/share/udhcpc/default.script"
 
@@ -32,6 +36,7 @@ python3 -m py_compile \
     "$repo_root/scripts/mkimage-uboot-script.py" \
     "$repo_root/scripts/instrument-bubble-boot-script.py" \
     "$repo_root/scripts/inspect-bubble-stock-initramfs.py" \
+    "$repo_root/scripts/pack-bubble-initramfs.py" \
     "$repo_root/scripts/generate-bubble-fb-marker.py"
 
 python3 "$repo_root/scripts/inspect-bubble-stock-initramfs.py" \
@@ -71,6 +76,17 @@ for stage in S10 S11 S12 E12 S13 E13 S14 S19 E20; do
 done
 ! grep -q 'fatwrite' "$test_dir/instrumented/boot.cmd"
 ! grep -q 'uboot-stage.txt' "$test_dir/instrumented/boot.cmd"
+
+python3 "$repo_root/scripts/instrument-bubble-boot-script.py" \
+    --external-initramfs \
+    "$repo_root/artifacts/vendor/bubble-stock-source/boot/boot.cmd" \
+    "$test_dir/external-instrumented"
+for stage in S10 S11 S12 E12 S13 E13 S14 E14 S15 S19 E20; do
+    grep -q "$stage" "$test_dir/external-instrumented/boot.cmd"
+done
+grep -q '^if load .*ramdisk_addr_r.*initrdimg' \
+    "$test_dir/external-instrumented/boot.cmd"
+! grep -q 'fatwrite' "$test_dir/external-instrumented/boot.cmd"
 test "$(grep -c 'diskutil unmountDisk "\$target"' \
     "$repo_root/scripts/write-bubble-seed-image-macos.sh")" -ge 3
 grep -q 'safe removal verified' \
@@ -93,5 +109,12 @@ grep -q '/usr/sbin/wpa_cli' "$repo_root/rootfs/bubble-minimal/init"
 grep -q 'fat_value network-address.txt' "$repo_root/rootfs/bubble-minimal/init"
 ! find "$repo_root/rootfs/bubble-minimal" -type f -exec \
     grep -El '^[[:space:]]*(ssid|psk)=' {} + | grep -q .
+
+for stage in S21 S22 S23 S24 S25 S26 S27 S28 S29 \
+    E23 E24 E25 E26 E27 E28 E29; do
+    grep -q "$stage" "$repo_root/rootfs/bubble-external-initramfs/init"
+done
+! grep -Eq '(^|[[:space:]])(parted|sfdisk|fdisk|mkfs|resize2fs|growpart)([[:space:]]|$)' \
+    "$repo_root/rootfs/bubble-external-initramfs/init"
 
 echo "Bubble boot probe tests passed"

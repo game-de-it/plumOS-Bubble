@@ -34,7 +34,7 @@ def replace_once(text: str, old: str, new: str) -> str:
     return text.replace(old, new, 1)
 
 
-def instrument(source: str) -> str:
+def instrument(source: str, external_initramfs: bool = False) -> str:
     result = replace_once(
         source,
         'setenv load_addr "0x02000000"\n',
@@ -45,13 +45,30 @@ def instrument(source: str) -> str:
         "\tenv import -t ${load_addr} ${filesize}\nfi\n",
         "\tenv import -t ${load_addr} ${filesize}\nfi\n" + marker("S11"),
     )
+    if external_initramfs:
+        result = replace_once(
+            result,
+            "load ${devtype} ${devnum} ${ramdisk_addr_r} ${prefix}${initrdimg}\n",
+            "if load ${devtype} ${devnum} ${ramdisk_addr_r} ${prefix}${initrdimg}; then\n"
+            + marker("S12")
+            + "else\n"
+            + marker("E12")
+            + "\texit\nfi\n",
+        )
+        kernel_success, kernel_failure = "S13", "E13"
+        dtb_success, dtb_failure = "S14", "E14"
+        handoff_stage = "S15"
+    else:
+        kernel_success, kernel_failure = "S12", "E12"
+        dtb_success, dtb_failure = "S13", "E13"
+        handoff_stage = "S14"
     result = replace_once(
         result,
         "load ${devtype} ${devnum} ${kernel_addr_r} ${prefix}${kernelimg}\n",
         "if load ${devtype} ${devnum} ${kernel_addr_r} ${prefix}${kernelimg}; then\n"
-        + marker("S12")
+        + marker(kernel_success)
         + "else\n"
-        + marker("E12")
+        + marker(kernel_failure)
         + "\texit\nfi\n",
     )
     result = replace_once(
@@ -68,15 +85,15 @@ def instrument(source: str) -> str:
         "\tif load ${devtype} ${devnum} ${fdt_addr_r} ${prefix}dtbs/${kernelversion}/${fdtfile}; then setenv probe_dtb_loaded true; fi\n"
         "fi\n"
         "if test ${probe_dtb_loaded} = 'true'; then\n"
-        + marker("S13")
+        + marker(dtb_success)
         + "else\n"
-        + marker("E13")
+        + marker(dtb_failure)
         + "\texit\nfi\n",
     )
     result = replace_once(
         result,
         'echo "initrdsize = $initrdsize"\n',
-        marker("S14") + 'echo "initrdsize = $initrdsize"\n' + marker("S19"),
+        marker(handoff_stage) + 'echo "initrdsize = $initrdsize"\n' + marker("S19"),
     )
     result = replace_once(
         result,
@@ -89,6 +106,7 @@ def instrument(source: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--external-initramfs", action="store_true")
     parser.add_argument("input", type=Path)
     parser.add_argument("output_dir", type=Path)
     args = parser.parse_args()
@@ -97,7 +115,7 @@ def main() -> int:
     actual = hashlib.sha256(source_bytes).hexdigest()
     if actual != EXPECTED_BOOT_CMD_SHA256:
         raise SystemExit(f"refusing unknown boot.cmd: expected {EXPECTED_BOOT_CMD_SHA256}, got {actual}")
-    instrumented = instrument(source_bytes.decode("utf-8"))
+    instrumented = instrument(source_bytes.decode("utf-8"), args.external_initramfs)
     command = instrumented.encode("utf-8")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / "boot.cmd").write_bytes(command)

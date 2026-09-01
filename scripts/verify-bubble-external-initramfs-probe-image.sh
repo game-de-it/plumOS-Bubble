@@ -1,0 +1,101 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+tools_image=${PLUMOS_BUBBLE_TOOLS_IMAGE:-plumos-bubble-tools:dev}
+
+if [ "${1:-}" != "--inside" ]; then
+    image=${1:-$repo_root/output/image/bubble-external-probe/plumOS-Bubble-0.1.0-dev-external-initramfs-probe.img}
+    case "$image" in "$repo_root"/*) ;; *) echo 'image must be under repository' >&2; exit 2;; esac
+    relative=${image#"$repo_root"/}
+    exec docker run --rm --platform linux/arm64 \
+        -e PLUMOS_BUBBLE_VERIFY_IMAGE="/work/$relative" \
+        -v "$repo_root:/work" -w /work "$tools_image" \
+        ./scripts/verify-bubble-external-initramfs-probe-image.sh --inside
+fi
+
+repo_root=/work
+image=${PLUMOS_BUBBLE_VERIFY_IMAGE:?}
+prefix=$repo_root/artifacts/vendor/bubble-stock-source/rockchip-boot-prefix.bin
+boot_source=$repo_root/artifacts/vendor/bubble-stock-source/boot
+system=$repo_root/output/system-rootfs/bubble-minimal/payload/SYSTEM
+initramfs=$repo_root/output/initramfs/bubble-external-probe/payload/initramfs-plumos-bubble-external-probe.cpio.gz
+manifest=${image%/*}/image.manifest
+verify=$repo_root/work/bubble-external-initramfs-probe-verify
+find "$verify" -depth -delete 2>/dev/null || true
+mkdir -p "$verify/matching" "$verify/initramfs"
+
+expected_size=$(awk -F= '$1 == "image_size" {print $2}' "$manifest")
+expected_sha=$(awk -F= '$1 == "image_sha256" {print $2}' "$manifest")
+expected_p2_sha=$(awk -F= '$1 == "p2_raw_partition_sha256" {print $2}' "$manifest")
+test "$expected_size" -eq 2231369728
+test "$(stat -c '%s' "$image")" = "$expected_size"
+test "$(sha256sum "$image" | cut -d' ' -f1)" = "$expected_sha"
+
+parted -ms "$image" unit s print > "$verify/partitions.txt"
+grep -q '^1:32768s:1081343s:1048576s:fat32::boot, lba;$' "$verify/partitions.txt"
+grep -q '^2:1081344s:1212415s:131072s:::;$' "$verify/partitions.txt"
+grep -q '^3:1212416s:4358143s:3145728s:ext4::;$' "$verify/partitions.txt"
+! grep -q '^4:' "$verify/partitions.txt"
+cmp -i 512:512 -n 16776704 "$prefix" "$image"
+
+dd if="$image" of="$verify/flash.fat" bs=512 skip=32768 count=1048576 status=none
+dd if="$image" of="$verify/matching.raw" bs=512 skip=1081344 count=131072 status=none
+dd if="$image" of="$verify/runtime.ext4" bs=512 skip=1212416 count=3145728 status=none
+test "$(sha256sum "$verify/matching.raw" | cut -d' ' -f1)" = "$expected_p2_sha"
+test "$(dd if="$verify/matching.raw" bs=1 count=6 status=none)" = 070701
+test -z "$(blkid -p -s TYPE -o value "$verify/matching.raw" 2>/dev/null || true)"
+test "$(blkid -s LABEL -o value "$verify/flash.fat")" = PLUMBOOT
+test "$(blkid -s LABEL -o value "$verify/runtime.ext4")" = PLUMOS_SYS
+fsck.fat -vn "$verify/flash.fat" >/dev/null
+e2fsck -fn "$verify/runtime.ext4" >/dev/null
+
+(cd "$verify/matching" && /bin/busybox cpio -idm < "$verify/matching.raw" 2>/dev/null)
+(cd "$verify/matching" && sha256sum -c checksums.sha256)
+cmp "$boot_source/Image" "$verify/matching/Image"
+cmp "$initramfs" "$verify/matching/initramfs-plumos-bubble-external-probe.cpio.gz"
+cmp "$boot_source/dtbs/4.19.193-51-rockchip-gb2c01b3d79f2/rockchip/rk3566-gkd-geek-bbg.dtb" \
+    "$verify/matching/dtbs/4.19.193-51-rockchip-gb2c01b3d79f2/rockchip/rk3566-gkd-geek-bbg.dtb"
+grep -q '^p2_direct_boot=not-yet-proven$' "$verify/matching/matching-bundle.manifest"
+grep -q '^final_p2_format=no$' "$verify/matching/matching-bundle.manifest"
+
+MTOOLS_SKIP_CHECK=1 mcopy -i "$verify/flash.fat" \
+    ::/System/system-a.squashfs "$verify/system-a.squashfs"
+MTOOLS_SKIP_CHECK=1 mcopy -i "$verify/flash.fat" \
+    ::/System/system-b.squashfs "$verify/system-b.squashfs"
+cmp "$system" "$verify/system-a.squashfs"
+cmp "$system" "$verify/system-b.squashfs"
+MTOOLS_SKIP_CHECK=1 mtype -i "$verify/flash.fat" ::/System/active-slot | grep -qx a
+MTOOLS_SKIP_CHECK=1 mtype -i "$verify/flash.fat" ::/uEnv.txt > "$verify/uEnv.txt"
+grep -q '^rootuuid=42554242-4c45-5359-5300-000000000003$' "$verify/uEnv.txt"
+grep -q '^initrdimg=initramfs-plumos-bubble-external-probe.cpio.gz$' "$verify/uEnv.txt"
+grep -q "plumos_probe_p2_sha256=$expected_p2_sha" "$verify/uEnv.txt"
+MTOOLS_SKIP_CHECK=1 mcopy -i "$verify/flash.fat" ::/boot.cmd "$verify/boot.cmd"
+for stage in S10 S11 S12 E12 S13 E13 S14 E14 S15 S19 E20; do
+    grep -q "$stage" "$verify/boot.cmd"
+done
+! grep -q fatwrite "$verify/boot.cmd"
+
+gzip -dc "$initramfs" | (cd "$verify/initramfs" && /bin/busybox cpio -idm 2>/dev/null)
+for stage in S21 S22 S23 S24 S25 S26 S27 S28 S29 E23 E24 E25 E26 E27 E28 E29; do
+    grep -q "$stage" "$verify/initramfs/init"
+done
+! grep -Eq '(^|[[:space:]])(parted|sfdisk|fdisk|mkfs|resize2fs|growpart)([[:space:]]|$)' \
+    "$verify/initramfs/init"
+test "$(stat -c '%a' "$verify/initramfs/init")" = 755
+readelf -h "$verify/initramfs/bin/busybox" | grep -q 'Machine:.*AArch64'
+
+debugfs -R 'cat /plumos/external-initramfs-probe.manifest' \
+    "$verify/runtime.ext4" 2>/dev/null > "$verify/runtime.manifest"
+grep -q '^authorized=yes$' "$verify/runtime.manifest"
+grep -q '^partition_expansion=not-included$' "$verify/runtime.manifest"
+grep -q '^p4_creation=not-included$' "$verify/runtime.manifest"
+
+MTOOLS_SKIP_CHECK=1 mtype -i "$verify/flash.fat" \
+    ::/plumos-image.manifest > "$verify/plumos-image.manifest"
+grep -q '^layout=probe-v1,raw-prefix-16MiB,p1-fat32-512MiB,p2-raw-64MiB,p3-ext4-1536MiB,no-p4$' \
+    "$verify/plumos-image.manifest"
+grep -q '^final_partition_contract=no$' "$verify/plumos-image.manifest"
+grep -q '^publishable=no$' "$verify/plumos-image.manifest"
+
+echo "bubble_external_probe_verify=result-ok image=$image sha256=$expected_sha"
