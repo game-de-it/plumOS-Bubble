@@ -93,7 +93,7 @@
 - [ ] `BUB-P3-05` plumOS supervisor、boot log、visible error screen、recovery SSH を実装する。
 - [ ] `BUB-P3-06` Bubble root/app-layer manifest と `checksums.sha256` を生成・検証する。
   - frontend、RetroArch、QuickNESのcomponent manifest/checksumと全app-layer checksumを
-    host生成し、p3からの独立readback verifierへ合格。実機bootstrap合格を残す。
+    host生成し、p3からの独立readback verifierと実機bootstrapに合格した。
 - [ ] `BUB-P3-07` componentごとの loader/library path を固定し、global `LD_LIBRARY_PATH` fallback を禁止する。
   - frontendは`frontend/lib`、RetroArch/amixerは`emulator/lib`だけを各launcherで設定し、
     GPU library非依存をELF検証済み。実機mapped-library確認を残す。
@@ -106,7 +106,8 @@
 
 - [ ] `BUB-P4-D01` DRM connector/CRTC/plane/format/stride/modifier を read-only probe で採取する。
 - [ ] `BUB-P4-D02` CPU-rendered DRM dumb-buffer double buffering と page-flip completion を実装する。
-  - MFの共通rendererとRetroArch DRM修正をBubbleへ移植しhost build済み。実パネル確認を残す。
+  - MFの共通rendererとRetroArch DRM修正をBubbleへ移植し、FEとRetroArch RGUIの実パネル表示、
+    DRM handoff、FEへの再取得まで確認した。page-flip継続計測を残す。
 - [ ] `BUB-P4-D03` 640x480 panel の実 refresh、scroll pacing、input-to-visible response を測定する。
 - [ ] `BUB-P4-D04` fbdev/DRM handoff、FE/game/menu、終了後のscanout ownershipを物理確認する。
 - [ ] `BUB-P4-D05` vendor `libmali` のlicense、redistribution、DDK/kernel ABIを監査し、採用・隔離・不採用を決定する。
@@ -118,6 +119,7 @@
 - [ ] `BUB-P4-I03` `gpio-keys`、power key、G-sensor、rumble の物理対応と必要性を確定する。
 - [ ] `BUB-P4-I04` hotkey、volume、brightness、menu、exit の競合しない ownership policy を決める。
 - [ ] `BUB-P4-I05` normalized Bubble controller を公開し、FE/RetroArch/standaloneで1入力1反応を確認する。
+  - FEとRetroArch RGUIでD-pad/A/B、SELECT+START終了を物理確認した。standaloneと全buttonを残す。
 
 ### Audio/power
 
@@ -195,6 +197,9 @@
 - [ ] frontend/RetroArch/QuickNES private probeをRaspberry Pi Imagerでwriteし、1回のcold bootで
   FE表示、Bubble入力、RetroArch RGUI、利用者提供NESのQuickNES video/input/audio、FE復帰、
   Wi-Fi/SSH、`S39..S79`とerror-free kernel logを確認する。
-  - source `dc9cdb0`から再現buildしたprivate imageを独立readback verifierへ合格させ、
-    RetroArch `1.22.2`のARM64 runtime、UDEV、ALSA、dynamic core loadingをhost確認済み。
-    残りはこの1枚による実機acceptanceのみ。
+  - source `eee3d8c`のlive deploy後、共通logoからFE表示、共通START 7項目、Bubble入力、
+    RetroArch RGUI、DRM/udev controller/ALSA device取得、SELECT+START `rc=0`、FE 1 process復帰、
+    Wi-Fi/SSH、app-layer checksumを実機確認した。
+  - QuickNES ROM video/input/audio、speaker実聴、save/state、F/Mode menuを残す。
+- [x] 共通plumOS START項目を未実装を理由に削除しない方針を固定し、Bubbleへ
+  UI設定、システム設定、ネットワーク設定、アプリ、ヘルプ、再起動、シャットダウンを復元する。

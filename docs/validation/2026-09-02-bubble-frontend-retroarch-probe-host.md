@@ -5,7 +5,8 @@
 This gate advances the already booted external-initramfs three-partition probe
 to a common plumOS frontend and a software-only RetroArch/QuickNES baseline.
 It does not finalize partition expansion, p4, SD2, update/rollback, or physical
-display/input/audio acceptance.
+audio/game acceptance. Frontend display/input and the RetroArch menu lifecycle
+were subsequently accepted on the live probe as recorded below.
 
 ## Host-verified implementation
 
@@ -24,6 +25,14 @@ display/input/audio acceptance.
   `Resume Path=ON`, `Playback Path=SPK`, and conservative `SPK=40%`.
 - Frontend, RetroArch menu, and game launch are foreground-owned sessions.
   The FE releases DRM/input before a child and reacquires them after return.
+- The common START menu retains UI Settings, System Settings, Network Settings,
+  Apps, Help, Reboot, and Shutdown. Incomplete device support remains visible
+  and reports its state instead of being hidden from the menu.
+- Bubble input discovery uses `/sys/class/input/input*/name` and event symlinks.
+  BusyBox `ash` blocked before the first line when reading
+  `/proc/bus/input/devices` on this runtime, so that procfs parser is not used.
+- `/storage/plumos/logs/frontend-actions.log` records action, before/after
+  screen, cursor, menu, and status in addition to the raw input-event trace.
 - Mutable settings are seeded only when missing. ROM, BIOS, save, state, and
   user configuration paths are excluded from managed app-layer checksums.
 - No ROM or BIOS content exists in the image.
@@ -63,34 +72,51 @@ and DRM frame statistics are enabled for the first physical boot.
 
 ## Accepted host artifact
 
-- implementation source: `dc9cdb0`
+- implementation source: `eee3d8c`
 - private image:
   `plumOS-Bubble-0.1.0-dev-frontend-retroarch-probe-wifi-private.img`
 - bytes: `2231369728`
 - SHA-256:
-  `1d61811996aa11242fd9eeb810fd6b62fe1c841a8f0ce2fa4949bae4a3f236cd`
+  `3cf4f1dbd7eeaae3e68442d16a9f3784c23926341e6479f0cd8fe2cc8c5f9eb8`
 - base image SHA-256:
-  `51f6d37465025686caf7bf3b159222c473eaedb54c2aadf2c6f4f52ce137e966`
-- status: host accepted, private, diagnostic-only, not publishable
+  `75e25dc2aca3a18b693ed85974481cde06b041466a245c58f78d486529efa9b8`
+- status: host accepted and FE/RetroArch-menu physically accepted, private,
+  diagnostic-only, not publishable
 
 Both the base and Wi-Fi-personalized images passed the independent image
 verifier. Only the personalized image and its sidecars are retained under
 `output`; superseded images were moved to the macOS Trash after verification.
 
-## Required physical acceptance on the next boot
+## Physical acceptance state
 
-1. Common plumOS logo transitions to the graphical frontend, not a shell.
-2. D-pad moves once per press; physical A confirms and physical B returns.
-3. START -> Apps -> RetroArch opens RGUI; the F/Mode button opens/closes its
-   menu; Select+Start exits and FE returns once.
-4. Speaker output is audible at a safe level after launching user-provided NES
-   content; QuickNES video/input/audio and return-to-FE are checked.
-5. SSH remains reachable and logs show no `E39`, DRM failure, kernel Oops,
-   panic, I/O error, or repeated `E80`.
-6. Shutdown from the FE menu completes before power is removed. FAT/ext4 clean
-   state is checked at the next host readback only if another SD insertion is
-   still necessary.
+1. Passed: common plumOS logo transitions to the graphical frontend.
+2. Passed for FE and RGUI: D-pad, physical A, and physical B respond. A full
+   button-map and standalone-emulator pass remains.
+3. Partially passed: START -> Apps -> RetroArch opens RGUI; Select+Start exits
+   and exactly one FE instance returns. F/Mode menu toggle remains.
+4. Pending: user-provided NES content, QuickNES video/input/audio, audible
+   speaker/headphone output, save/state, and return-to-FE.
+5. Passed: SSH remains reachable; app-layer and fatal kernel-log checks pass.
+6. Pending: FE-menu shutdown and, only if another SD insertion is necessary,
+   FAT/ext4 clean-state readback.
 
-The first physical boot may prove or reject the inferred RetroArch button
-indices. The persistent FE input trace makes a correction possible over SSH,
-without another SD-card swap.
+## Physical results on the live probe
+
+- Common logo -> FE: passed.
+- START menu: the seven common entries are present; Apps is the fourth entry.
+- FE input and action routing: passed with persistent raw/action traces.
+- RetroArch RGUI: passed after correcting the exact
+  `rgui_show_start_screen = "false"` setting. The earlier unrecognized
+  `menu_show_start_screen` spelling left RetroArch in its first-boot fallback.
+- RetroArch runtime ownership: DRM card0, controller event2, and ALSA
+  `pcmC0D0p` are held by the RetroArch process. The Bubble udev fallback
+  configured `retrogame_joypad` in port 1.
+- RGUI D-pad/A/B and SELECT+START exit: physically passed. RetroArch exited
+  with `rc=0`; one FE process reacquired DRM, controller event2, and power
+  event0.
+- App-layer checksum, Wi-Fi/SSH, and fatal kernel-log scan: passed after the
+  final live deploy. Active frontend/system/RetroArch/WPA settings were
+  preserved across managed-file deployment.
+- Remaining: F/Mode menu toggle, QuickNES with user-provided content, audible
+  speaker/headphone output, save/state persistence, and first-boot
+  provisioning/update layout.

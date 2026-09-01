@@ -30,6 +30,8 @@ recovery-capable boot -> plumOS System -> frontend -> NES/QuickNES
 8. OS SD/ROM SD の device number を固定せず、partition identity と mount source で解決する。
 9. host build、SSH 上の起動、物理表示・入力・音声・終了は別の acceptance として記録する。
 10. artifact 生成と release 公開を分け、公開は利用者の明示確認後にだけ行う。
+11. 共通plumOSのメニュー項目は未実装でも削除せず表示を維持し、選択時に未実装状態と
+    対応TODOを追えるようにする。
 
 ## Reference matrix
 
@@ -175,6 +177,7 @@ Deliverables:
 - RK817 audio route
 - RetroArch + QuickNES + 利用者提供の1本のNES test content
 - save/state と frontend return lifecycle
+- V90S/MF/Pixel2と共通のSTART項目。未実装項目も非表示にせず状態を明示する
 
 Gate:
 
