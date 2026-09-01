@@ -51,6 +51,23 @@ fi
 
 printf 'picoarch=stage-P10 system=%s core=%s\n' "$SYSTEM_ID" "$CORE_ID" \
     >>"$PLUMOS_ROOT/logs/session.log"
+child=
+stop_rc=
+stop_child() {
+    signal_rc=$1
+    stop_rc=$signal_rc
+    [ -n "$child" ] || return 0
+    kill -TERM "$child" 2>/dev/null || return 0
+    count=0
+    while kill -0 "$child" 2>/dev/null && [ "$count" -lt 10 ]; do
+        $BB usleep 100000
+        count=$((count + 1))
+    done
+    kill -KILL "$child" 2>/dev/null || true
+}
+trap 'stop_child 129' HUP
+trap 'stop_child 130' INT
+trap 'stop_child 143' TERM
 set +e
 HOME="$PLUMOS_ROOT/state/picoarch/$SYSTEM_ID" \
 PLUMOS_PICOARCH_SYSTEM="$SYSTEM_ID" \
@@ -62,9 +79,13 @@ SDL_AUDIODRIVER=alsa \
 PLUMOS_DRM_DEVICE=/dev/dri/card0 \
 ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf" \
 LD_LIBRARY_PATH="$PLUMOS_ROOT/picoarch/lib:$PLUMOS_ROOT/emulator/lib:/usr/lib" \
-    "$PICOARCH" "$CORE" "$CONTENT" NONE >>"$LOG" 2>&1
+    "$PICOARCH" "$CORE" "$CONTENT" NONE >>"$LOG" 2>&1 &
+child=$!
+wait "$child"
 rc=$?
 set -e
+[ -z "$stop_rc" ] || rc=$stop_rc
+trap - HUP INT TERM
 printf 'picoarch=stage-P19 system=%s core=%s rc=%s\n' \
     "$SYSTEM_ID" "$CORE_ID" "$rc" >>"$PLUMOS_ROOT/logs/session.log"
 $BB sync
