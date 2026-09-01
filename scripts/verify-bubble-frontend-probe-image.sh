@@ -174,6 +174,7 @@ grep -q 'video_context_driver = ""' \
     "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
 grep -q 'video_driver = "gl"' "$app/bin/plumos-retroarch-launch"
 grep -q 'video_context_driver = "kms"' "$app/bin/plumos-retroarch-launch"
+grep -q 'config_save_on_exit = "false"' "$app/bin/plumos-retroarch-launch"
 grep -q 'menu_driver = "rgui"' "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
 grep -q 'rgui_show_start_screen = "false"' \
     "$app/factory-defaults/retroarch/retroarch-bubble.cfg"

@@ -62,6 +62,7 @@ run_launcher "$tmp/hardware" --system n64 \
     --rom "$rom_root/n64/test.z64"
 grep -qx 'video_driver = "gl"' "$tmp/hardware.append"
 grep -qx 'video_context_driver = "kms"' "$tmp/hardware.append"
+grep -qx 'config_save_on_exit = "false"' "$tmp/hardware.append"
 ! find "$runtime/retroarch" -type f -name 'launch.*.cfg' -print -quit | grep -q .
 
 TEST_TRACE=$tmp/signal TEST_HOLD=1 PLUMOS_ROOT=$root \

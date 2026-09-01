@@ -53,6 +53,9 @@ case "$core_id" in
         {
             printf '%s\n' 'video_driver = "gl"'
             printf '%s\n' 'video_context_driver = "kms"'
+            # Hardware routing is launch-scoped.  Do not let RetroArch merge
+            # these append-only overrides into the user's active config.
+            printf '%s\n' 'config_save_on_exit = "false"'
         } >"$append_config"
         ;;
 esac
