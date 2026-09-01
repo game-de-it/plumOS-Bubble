@@ -144,6 +144,12 @@ readelf -h "$app/cores/quicknes_libretro.so" | grep -q 'Machine:.*AArch64'
 ! readelf -d "$app/bin/retroarch" | grep -Eq 'lib(EGL|GLES|gbm|GL)'
 grep -q 'video_driver = "drm"' "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
 grep -q 'menu_driver = "rgui"' "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
+grep -q 'menu_show_start_screen = "false"' \
+    "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
+for entry in ui-settings system-settings network-settings apps help reboot shutdown; do
+    grep -q "\"id\": \"$entry\"" "$app/config/frontend/menus.json"
+done
+grep -q 'PLUMOS_ACTION_TRACE_PATH' "$app/bin/plumos-controller-ui-bubble"
 grep -q 'input_device = "retrogame_joypad"' \
     "$app/factory-defaults/retroarch/autoconfig/udev/gkd-bubble-retrogame-joypad.cfg"
 grep -q 'input_a_btn = "1"' \

@@ -14018,7 +14018,7 @@ static void move_gallery_cursor(struct ui_state *ui, long delta) {
   }
 }
 
-static void handle_action(struct ui_state *ui, enum ui_action action) {
+static void handle_action_impl(struct ui_state *ui, enum ui_action action) {
   if (action == ACTION_NONE) {
     return;
   }
@@ -14765,6 +14765,117 @@ static void handle_action(struct ui_state *ui, enum ui_action action) {
                             entry->relative_path);
     return;
   }
+}
+
+static const char *ui_action_trace_name(enum ui_action action) {
+  switch (action) {
+  case ACTION_UP:
+    return "up";
+  case ACTION_DOWN:
+    return "down";
+  case ACTION_LEFT:
+    return "left";
+  case ACTION_RIGHT:
+    return "right";
+  case ACTION_A:
+    return "a";
+  case ACTION_B:
+    return "b";
+  case ACTION_X:
+    return "x";
+  case ACTION_Y:
+    return "y";
+  case ACTION_START:
+    return "start";
+  case ACTION_SELECT:
+    return "select";
+  case ACTION_FUNCTION:
+    return "function";
+  case ACTION_POWER:
+    return "power";
+  case ACTION_VOLUME_DOWN:
+    return "volume-down";
+  case ACTION_VOLUME_UP:
+    return "volume-up";
+  case ACTION_QUIT:
+    return "quit";
+  case ACTION_NONE:
+  default:
+    return "none";
+  }
+}
+
+static const char *ui_screen_trace_name(enum ui_screen screen) {
+  switch (screen) {
+  case SCREEN_TOP:
+    return "top";
+  case SCREEN_ROMS:
+    return "roms";
+  case SCREEN_START_MENU:
+    return "start-menu";
+  case SCREEN_FAVORITES:
+    return "favorites";
+  case SCREEN_RECENT:
+    return "recent";
+  case SCREEN_SETTINGS:
+    return "settings";
+  case SCREEN_POWER_MENU:
+    return "power-menu";
+  case SCREEN_HELP:
+    return "help";
+  case SCREEN_CORE_SELECT:
+    return "core-select";
+  case SCREEN_NETWORK_RESCUE:
+    return "network-rescue";
+  case SCREEN_WIFI_CONNECT:
+    return "wifi-connect";
+  case SCREEN_THUMBNAIL_RESULTS:
+    return "thumbnail-results";
+  case SCREEN_THUMBNAIL_RUNNING:
+    return "thumbnail-running";
+  case SCREEN_SCRAPING:
+    return "scraping";
+  case SCREEN_GALLERY:
+    return "gallery";
+  case SCREEN_TOP_REFRESH_RUNNING:
+    return "top-refresh-running";
+  case SCREEN_POWER_ACTION_RUNNING:
+    return "power-action-running";
+  default:
+    return "unknown";
+  }
+}
+
+static void handle_action(struct ui_state *ui, enum ui_action action) {
+  const char *trace_path;
+  enum ui_screen before_screen;
+  size_t before_cursor;
+  FILE *trace;
+
+  if (!ui) {
+    return;
+  }
+  before_screen = ui->screen;
+  before_cursor = ui->screen == SCREEN_START_MENU ? ui->menu_cursor : 0;
+  handle_action_impl(ui, action);
+
+  trace_path = getenv("PLUMOS_ACTION_TRACE_PATH");
+  if (!trace_path || !trace_path[0]) {
+    return;
+  }
+  trace = fopen(trace_path, "a");
+  if (!trace) {
+    return;
+  }
+  fprintf(trace,
+          "ms=%lld action=%s before=%s before_cursor=%zu after=%s "
+          "after_cursor=%zu menu=%s status=%s\n",
+          current_time_ms(), ui_action_trace_name(action),
+          ui_screen_trace_name(before_screen), before_cursor,
+          ui_screen_trace_name(ui->screen),
+          ui->screen == SCREEN_START_MENU ? ui->menu_cursor : 0,
+          ui->menu_id[0] ? ui->menu_id : "-", ui->status[0] ? ui->status : "-");
+  fclose(trace);
 }
 
 static enum ui_action action_from_key_code(unsigned int code) {
