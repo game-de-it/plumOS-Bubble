@@ -79,3 +79,31 @@ private派生イメージを新SDへfull write/readbackしてcold bootする。�
 SD readbackではp3の`external-initramfs.log`とminimal init log、p1/p2不変、p1 FAT/p3 ext4 cleanを
 確認する。実機合格前にfirst-boot resizeやp4作成を有効化しない。
 
+## First physical boot result
+
+利用者がRaspberry Pi Imagerでprivate派生イメージを書き、Bubbleをcold bootした。
+Macから既知のWi-Fi MAC `6c:21:a2:59:45:d6`を`192.168.10.101`で確認し、ping 3/3、
+TCP 22、SSH `root/plumos`へ到達した。
+
+実機のexternal initramfs persistent logは`S21`から`S29`まで、minimal System logは
+`S30`から`S39`まで欠落なく記録し、`stage=E`は0件だった。主要readbackは次のとおり。
+
+```text
+root=/dev/loop0 squashfs ro
+flash=/dev/mmcblk1p1 vfat ro
+storage=/dev/mmcblk1p3 ext4 ro
+p1=32768+1048576 sectors
+p2=1081344+131072 sectors
+p3=1212416+3145728 sectors
+p4=absent
+p2_sha256=042f5950539ce56fb8ba834fefd186582c19c9ea202f6aa7ea2cd84225e61acd
+active_slot=a
+system_a_sha256=4f9e3408b8cce9a5a21c5be802b2df47c20a2bf4feeb9dbec939f22977055afe
+system_b_sha256=4f9e3408b8cce9a5a21c5be802b2df47c20a2bf4feeb9dbec939f22977055afe
+wpa_state=COMPLETED
+ip_address=192.168.10.101
+```
+
+kernel logにはpanic、Oops、call trace、filesystem I/O errorを検出しなかった。SSHから
+`sync; poweroff`を実行し、2回目のpollでping unreachable、TCP 22 closedを確認した。
+poweroff後のoffline p1/p2 hashとFAT/ext4 fsckは、SDをMacへ接続してから実施する。

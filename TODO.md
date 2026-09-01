@@ -48,6 +48,8 @@
     p3 ext4=1536 MiBをhost build/verifyした。これは容量・p2形式の最終決定ではない。
 - [ ] `BUB-P1-08` sector image から複製 OS SD を作り、write後block readbackを実施する。
 - [ ] `BUB-P1-09` 複製 SD で cold boot、LCD、controller、audio、AP6330 Wi-Fi、SSH、ROM SD mount を物理確認する。
+  - external initramfs 3 partition probeでcold boot、共通logo、AP6330 association、DHCP、
+    SSHは合格。controller、audio、ROM SDはこのminimal recovery gateでは未確認。
 - [ ] `BUB-P1-10` known-good SD 交換、boot log、SSH、可能なら UART を含む recovery procedure を実証する。
 
 ## P2: boot chain and ownership probe
@@ -174,6 +176,8 @@
   p3 runtimeの3 partition probeを再現buildし、独立readback verifierへ合格させる。
 - [ ] private 3 partition probeを新SDへfull write/readbackし、実機で`S21..S39`、Wi-Fi、SSH、
   normal shutdown、p1/p2不変、FAT/ext4 cleanを確認する。
+  - `S21..S39`、Wi-Fi、SSH、exact geometry、System A/B、p2 runtime hash、normal shutdownは合格。
+    poweroff後のoffline p1/p2 hashとFAT/ext4 fsckを残す。
 - [ ] cold bootし、Wi-Fi association、DHCP、SSH、log、normal shutdown後のext4 cleanを確認する。
   - association、DHCP、SSH、persistent log、normal shutdown、SD readbackのext4 cleanは合格。
   - p1 FATはmacOS自動check前のclean状態が未証明。U-Boot `fatwrite`廃止後の次回SDで再確認する。
