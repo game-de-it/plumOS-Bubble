@@ -51,10 +51,16 @@ trap cleanup EXIT HUP INT TERM
 find "$work" -depth -delete 2>/dev/null || true
 mkdir -p "$work" "${output%/*}"
 
-test "$(stat -c '%s' "$base")" -eq 2231369728
+parted -ms "$base" unit s print >"$work/partitions.txt"
+runtime_start=$(awk -F: '$1 == 3 {gsub(/s/, "", $2); print $2}' "$work/partitions.txt")
+runtime_sectors=$(awk -F: '$1 == 3 {gsub(/s/, "", $4); print $4}' "$work/partitions.txt")
+case "$runtime_start:$runtime_sectors" in
+    1212416:3145728|1212416:4718592) ;;
+    *) echo 'unsupported p3 geometry' >&2; exit 2 ;;
+esac
 cp --sparse=always "$base" "$incoming"
-dd if="$incoming" of="$work/runtime.ext4" bs=512 skip=1212416 \
-    count=3145728 status=none
+dd if="$incoming" of="$work/runtime.ext4" bs=512 skip="$runtime_start" \
+    count="$runtime_sectors" status=none
 debugfs -R 'cat /plumos/external-initramfs-probe.manifest' \
     "$work/runtime.ext4" 2>/dev/null | grep -q '^authorized=yes$'
 if debugfs -R 'ls -p /plumos/config' "$work/runtime.ext4" 2>/dev/null | \
@@ -80,21 +86,21 @@ debugfs -R 'stat /plumos/config/wpa_supplicant.conf' \
 debugfs -R 'dump /plumos/config/wpa_supplicant.conf /work/work/bubble-frontend-probe-wifi-personalize/readback.conf' \
     "$work/runtime.ext4" >/dev/null 2>&1
 cmp /input/wpa_supplicant.conf "$work/readback.conf"
-dd if="$work/runtime.ext4" of="$incoming" bs=512 seek=1212416 \
+dd if="$work/runtime.ext4" of="$incoming" bs=512 seek="$runtime_start" \
     conv=notrunc status=none
 mv "$incoming" "$output"
 
 base_sha=$(sha256sum "$base" | cut -d' ' -f1)
 output_sha=$(sha256sum "$output" | cut -d' ' -f1)
 cat > "$output.manifest" <<EOF
-format=plumos-bubble-personalized-frontend-probe-v1
+format=plumos-bubble-personalized-full-stack-validation-v2
 file=$(basename "$output")
 image_size=$(stat -c '%s' "$output")
 image_sha256=$output_sha
 base_image_sha256=$base_sha
 personalization=external-wpa-supplicant-config-in-p3
 credential_hash_recorded=no
-final_partition_contract=no
+final_partition_contract=host-candidate
 publishable=no
 EOF
 printf '%s  %s\n' "$output_sha" "$(basename "$output")" > "$output.sha256"

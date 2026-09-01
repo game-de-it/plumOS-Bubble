@@ -7,10 +7,7 @@ tools_image=${PLUMOS_BUBBLE_TOOLS_IMAGE:-plumos-bubble-tools:dev}
 if [ "${1:-}" != "--inside" ]; then
     "$repo_root/scripts/build-bubble-frontend-system.sh"
     "$repo_root/scripts/build-bubble-external-initramfs.sh"
-    "$repo_root/scripts/build-bubble-frontend.sh"
-    "$repo_root/scripts/build-bubble-retroarch.sh"
-    "$repo_root/scripts/build-bubble-quicknes.sh"
-    "$repo_root/scripts/build-bubble-app-layer.sh" --assemble-only
+    "$repo_root/scripts/build-bubble-app-layer.sh"
     exec docker run --rm --platform linux/arm64 \
         -e SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-}" \
         -e PLUMOS_BUBBLE_VERSION="${PLUMOS_BUBBLE_VERSION:-0.1.0-dev}" \
@@ -28,9 +25,9 @@ app_dir=$repo_root/output/app-layer/bubble/plumos
 out_dir=$repo_root/output/image/bubble-frontend-probe
 work=$repo_root/work/bubble-frontend-probe-image
 version=${PLUMOS_BUBBLE_VERSION:-0.1.0-dev}
-source_ref=$(git -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
+source_ref=$(git -c safe.directory="$repo_root" -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
 source_epoch=${SOURCE_DATE_EPOCH:-}
-[ -n "$source_epoch" ] || source_epoch=$(git -C "$repo_root" show -s --format=%ct HEAD)
+[ -n "$source_epoch" ] || source_epoch=$(git -c safe.directory="$repo_root" -C "$repo_root" show -s --format=%ct HEAD)
 case "$source_epoch" in ''|*[!0-9]*) echo 'invalid SOURCE_DATE_EPOCH' >&2; exit 2;; esac
 
 kernel_version=4.19.193-51-rockchip-gb2c01b3d79f2
@@ -115,14 +112,20 @@ find "$work/matching" -exec touch -h -d "@$source_epoch" {} +
 python3 "$repo_root/scripts/pack-bubble-initramfs.py" --uncompressed \
     --mtime "$source_epoch" "$work/matching" "$work/matching-bundle.cpio"
 
-total_sectors=4358144
+total_sectors=5931008
 boot_start=32768
 boot_sectors=1048576
 matching_start=1081344
 matching_sectors=131072
 runtime_start=1212416
-runtime_sectors=3145728
+runtime_sectors=4718592
 matching_bytes=$((matching_sectors * 512))
+runtime_bytes=$((runtime_sectors * 512))
+app_bytes=$(du -sb "$app_dir" | awk '{print $1}')
+test "$app_bytes" -lt $((runtime_bytes - 268435456)) || {
+    echo "app-layer leaves less than 256 MiB free in p3 seed: $app_bytes bytes" >&2
+    exit 1
+}
 test "$(stat -c '%s' "$work/matching-bundle.cpio")" -lt "$matching_bytes"
 truncate -s "$matching_bytes" "$work/matching.raw"
 dd if="$work/matching-bundle.cpio" of="$work/matching.raw" \
@@ -145,22 +148,22 @@ extraboardargs=plumos_external_initramfs_probe=1 plumos_probe_p2_sha256=$matchin
 EOF
 
 cat > "$work/runtime/plumos/external-initramfs-probe.manifest" <<EOF
-format=plumos-bubble-frontend-runtime-probe-v1
+format=plumos-bubble-full-stack-runtime-validation-v2
 authorized=yes
 device=bubble
 version=$version
 source_ref=$source_ref
 source_date_epoch=$source_epoch
-runtime_policy=managed-probe-log-and-device-config
-app_layer=frontend,retroarch,quicknes
+runtime_policy=managed-runtime-log-device-config-and-separate-userdata
+app_layer=frontend,retroarch,libretro-cores,picoarch,standalone,pyxel,portmaster
 frontend_boot=automatic
-partition_expansion=not-included
-p4_creation=not-included
+partition_expansion=p3-seed-2304MiB-to-8192MiB
+p4_creation=first-boot-fat32-PLUMOS
 publishable=no
 EOF
 
 cat > "$work/flash/plumos-image.manifest" <<EOF
-format=plumos-bubble-frontend-probe-image-v1
+format=plumos-bubble-full-stack-validation-image-v2
 device=bubble
 architecture=aarch64
 version=$version
@@ -172,20 +175,25 @@ external_initramfs_sha256=$(sha256sum "$initramfs" | cut -d' ' -f1)
 system_a_sha256=$system_sha
 system_b_sha256=$system_sha
 p2_raw_partition_sha256=$matching_sha
-layout=probe-v1,raw-prefix-16MiB,p1-fat32-512MiB,p2-raw-64MiB,p3-ext4-1536MiB,no-p4
+layout=validation-seed-v2,raw-prefix-16MiB,p1-fat32-512MiB,p2-raw-64MiB,p3-ext4-2304MiB,no-p4
 boot_source=p1-file
 app_layer_sha256=$(sha256sum "$app_dir/checksums.sha256" | cut -d' ' -f1)
 frontend=cpu-drm-dumb-buffer
 retroarch=software-plain-drm-rgui
-libretro_core=quicknes
-roms_bios_included=no
+core_baseline=all-114-source-records
+catalog_systems=98
+catalog_launch_profile_occurrences=196
+user_media_included=no
+managed_firmware_assets=blueMSX-C-BIOS,DraStic-packaged-BIOS-non-release-eligible
 p2_direct_boot=not-yet-proven
-partition_expansion=not-included
-final_partition_contract=no
+partition_expansion=first-boot-p3-to-8192MiB
+p4_creation=first-boot-fat32-PLUMOS-to-card-end
+minimum_card_size_mib=14336
+final_partition_contract=host-candidate
 publishable=no
 EOF
 
-image_path=$out_dir/plumOS-Bubble-$version-frontend-retroarch-probe.img
+image_path=$out_dir/plumOS-Bubble-$version-full-stack-validation.img
 boot_fat=$work/flash.fat
 runtime_ext4=$work/runtime.ext4
 truncate -s "$((total_sectors * 512))" "$image_path"
@@ -224,7 +232,7 @@ e2fsck -fn "$runtime_ext4" >/dev/null
 image_size=$(stat -c '%s' "$image_path")
 image_sha=$(sha256sum "$image_path" | cut -d' ' -f1)
 cat > "$out_dir/image.manifest" <<EOF
-format=plumos-bubble-frontend-probe-image-v1
+format=plumos-bubble-full-stack-validation-image-v2
 file=$(basename "$image_path")
 image_size=$image_size
 image_sha256=$image_sha
@@ -234,7 +242,10 @@ boot_prefix_sha256=$expected_prefix
 p1_filesystem_sha256=$(sha256sum "$boot_fat" | cut -d' ' -f1)
 p2_raw_partition_sha256=$matching_sha
 p3_filesystem_sha256=$(sha256sum "$runtime_ext4" | cut -d' ' -f1)
-final_partition_contract=no
+first_boot_p3_target_mib=8192
+first_boot_p4_label=PLUMOS
+minimum_card_size_mib=14336
+final_partition_contract=host-candidate
 publishable=no
 EOF
 (cd "$out_dir" && sha256sum "$(basename "$image_path")" image.manifest > checksums.sha256)

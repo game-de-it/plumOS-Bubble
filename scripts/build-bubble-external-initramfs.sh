@@ -19,9 +19,9 @@ out_dir=$repo_root/output/initramfs/bubble-external-probe
 rootfs=$out_dir/rootfs
 payload=$out_dir/payload
 version=${PLUMOS_BUBBLE_VERSION:-0.1.0-dev}
-source_ref=$(git -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
+source_ref=$(git -c safe.directory="$repo_root" -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
 source_epoch=${SOURCE_DATE_EPOCH:-}
-[ -n "$source_epoch" ] || source_epoch=$(git -C "$repo_root" show -s --format=%ct HEAD)
+[ -n "$source_epoch" ] || source_epoch=$(git -c safe.directory="$repo_root" -C "$repo_root" show -s --format=%ct HEAD)
 case "$source_epoch" in ''|*[!0-9]*) echo 'invalid SOURCE_DATE_EPOCH' >&2; exit 2;; esac
 
 case "$out_dir" in /work/output/initramfs/bubble-external-probe) ;; *) exit 2;; esac
@@ -30,6 +30,9 @@ mkdir -p "$rootfs/bin" "$rootfs/dev/pts" "$rootfs/proc" "$rootfs/sys" \
     "$rootfs/run" "$rootfs/tmp" "$rootfs/root" "$rootfs/mnt" \
     "$rootfs/usr/sbin" "$rootfs/usr/share/plumos" "$payload"
 install -m 0755 "$repo_root/rootfs/bubble-external-initramfs/init" "$rootfs/init"
+install -m 0755 \
+    "$repo_root/rootfs/bubble-external-initramfs/usr/sbin/plumos-bubble-provision-storage" \
+    "$rootfs/usr/sbin/plumos-bubble-provision-storage"
 install -m 0755 /bin/busybox "$rootfs/bin/busybox"
 for applet in awk cat cp dd grep hostname losetup mkdir mknod mount \
     sha256sum sh sleep sync switch_root umount; do
@@ -51,8 +54,14 @@ copy_elf() {
         install -m 0755 "$library" "$rootfs$library"
     done
 }
-copy_elf blkid
+for binary in blkid parted partprobe e2fsck resize2fs mkfs.fat fsck.fat; do
+    copy_elf "$binary"
+done
 chroot "$rootfs" /usr/sbin/blkid -V >/dev/null
+chroot "$rootfs" /usr/sbin/parted --version >/dev/null
+chroot "$rootfs" /usr/sbin/resize2fs -V >/dev/null 2>&1 ||
+    chroot "$rootfs" /usr/sbin/resize2fs 2>&1 | grep -q 'Usage:'
+chroot "$rootfs" /usr/sbin/mkfs.fat --help >/dev/null 2>&1
 
 shared_boot_logo=$repo_root/package/boot-assets-common/plumos-640x480.bmp
 test "$(sha256sum "$shared_boot_logo" | cut -d' ' -f1)" = \
@@ -67,20 +76,20 @@ python3 "$repo_root/scripts/pack-bubble-initramfs.py" \
 archive_size=$(stat -c '%s' "$archive")
 archive_sha=$(sha256sum "$archive" | awk '{print $1}')
 cat > "$payload/initramfs.manifest" <<EOF
-format=plumos-bubble-external-initramfs-probe-v1
+format=plumos-bubble-external-initramfs-provisioning-v2
 device=bubble
 architecture=aarch64
 version=$version
 source_ref=$source_ref
 source_date_epoch=$source_epoch
 kernel_release=4.19.193-g5a07852a55cf-dirty
-purpose=read-only-partition-and-system-ab-boundary
-partition_mutation=none
-runtime_writes=p3-log-only
-stages=S21-S29,E23-E29
+purpose=authorized-first-boot-storage-provisioning-and-system-ab-boundary
+partition_mutation=authorized-p3-expand-to-8192MiB-and-p4-create
+runtime_writes=p3-managed-state-and-p4-user-contract
+stages=S21-S29,S24A-S24D,E23-E29,E24A-E24D
 boot_source=p1-file
 p2_boot_source=not-yet-proven
-final_partition_contract=no
+final_partition_contract=host-candidate
 publishable=no
 image_size=$archive_size
 image_sha256=$archive_sha

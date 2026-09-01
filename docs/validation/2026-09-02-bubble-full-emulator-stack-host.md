@@ -86,7 +86,8 @@ redistributable blueMSX C-BIOS and the non-release-eligible DraStic packaged
 BIOS, which are identified separately in the aggregate manifest.
 
 The current device p3 is the 1.5 GiB diagnostic partition, so this payload must
-not be live-deployed there. The next device cycle must first integrate and
-host-test V90S-derived first-boot expansion and p4 creation, then perform one
-batched physical pass covering FE enumeration, representative content,
+not be live-deployed there. V90S-derived first-boot expansion and p4 creation
+now pass the separate real block-device host fixture. The next device cycle
+must use the full-stack validation seed and perform one batched physical pass
+covering first-boot provisioning, FE enumeration, representative content,
 video/input/audio, menu/exit, save/state, FE return, and device-owner cleanup.

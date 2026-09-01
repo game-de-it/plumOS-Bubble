@@ -10,13 +10,15 @@ boot_sectors=1048576
 matching_start=1081344
 matching_sectors=131072
 runtime_start=1212416
-runtime_sectors=3145728
+runtime_seed_sectors=4718592
+runtime_target_sectors=16777216
 
 console_log=/run/plumos-external-initramfs.log
 runtime_mount=/mnt/plumos-runtime
 flash_mount=/mnt/plumos-flash
 matching_device=
 runtime_device=
+user_device=
 flash_device=
 os_disk=
 persistent_log=
@@ -55,6 +57,7 @@ fail() {
     persist_console_log
     $bb sync
     mounted "$flash_mount" && $bb umount "$flash_mount" 2>/dev/null || true
+    mounted "$runtime_mount/user" && $bb umount "$runtime_mount/user" 2>/dev/null || true
     mounted /mnt/plumos-system/flash && \
         $bb umount /mnt/plumos-system/flash 2>/dev/null || true
     if mounted "$runtime_mount"; then
@@ -131,6 +134,7 @@ while [ "$count" -lt 50 ]; do
             os_disk=${candidate%p1}
             matching_device=${os_disk}p2
             runtime_device=${os_disk}p3
+            user_device=${os_disk}p4
             break 2
         fi
     done
@@ -140,7 +144,6 @@ done
 [ -n "$os_disk" ] || fail E23 OS_DISK_NOT_FOUND
 [ -b "$matching_device" ] || fail E23 MATCHING_PARTITION_MISSING
 [ -b "$runtime_device" ] || fail E23 RUNTIME_PARTITION_MISSING
-[ ! -b "${os_disk}p4" ] || fail E23 UNEXPECTED_P4_PRESENT
 [ "$(label_of "$runtime_device")" = PLUMOS_SYS ] || fail E23 RUNTIME_LABEL_MISMATCH
 log "stage=S23_OS_DISK_RESOLVED disk=$os_disk flash=$flash_device matching=$matching_device runtime=$runtime_device"
 
@@ -148,16 +151,18 @@ check_geometry "$flash_device" "$boot_start" "$boot_sectors" || \
     fail E24 P1_GEOMETRY_MISMATCH
 check_geometry "$matching_device" "$matching_start" "$matching_sectors" || \
     fail E24 P2_GEOMETRY_MISMATCH
-check_geometry "$runtime_device" "$runtime_start" "$runtime_sectors" || \
-    fail E24 P3_GEOMETRY_MISMATCH
-log "stage=S24_PROVISIONAL_GEOMETRY_VALIDATED p1=${boot_start}+${boot_sectors} p2=${matching_start}+${matching_sectors} p3=${runtime_start}+${runtime_sectors}"
+runtime_actual_start=$(geometry_value start "$runtime_device")
+runtime_actual_sectors=$(geometry_value size "$runtime_device")
+[ "$runtime_actual_start" = "$runtime_start" ] || fail E24 P3_START_MISMATCH
+case "$runtime_actual_sectors" in
+    "$runtime_seed_sectors"|"$runtime_target_sectors") ;;
+    *) fail E24 P3_SIZE_MISMATCH ;;
+esac
+log "stage=S24_PROVISIONABLE_GEOMETRY_VALIDATED p1=${boot_start}+${boot_sectors} p2=${matching_start}+${matching_sectors} p3=${runtime_start}+${runtime_actual_sectors}"
 
 $bb mount -t vfat -o ro "$flash_device" "$flash_mount" || fail E25 P1_MOUNT_FAILED
-$bb mount -t ext4 -o rw,noatime "$runtime_device" "$runtime_mount" || \
+$bb mount -t ext4 -o ro,noload,noatime "$runtime_device" "$runtime_mount" || \
     fail E25 P3_MOUNT_FAILED
-$bb mkdir -p "$runtime_mount/plumos/logs"
-persistent_log=$runtime_mount/plumos/logs/external-initramfs.log
-persist_console_log
 [ -f "$flash_mount/plumos-probe/external-initramfs-authorized.txt" ] || \
     fail E25 P1_AUTHORIZATION_MARKER_MISSING
 [ -f "$runtime_mount/plumos/external-initramfs-probe.manifest" ] || \
@@ -165,7 +170,58 @@ persist_console_log
 $bb grep -qx 'authorized=yes' \
     "$runtime_mount/plumos/external-initramfs-probe.manifest" || \
     fail E25 P3_AUTHORIZATION_MISSING
-log 'stage=S25_PROBE_MEDIA_MOUNTED'
+if [ -f "$runtime_mount/plumos/provision/complete" ]; then
+    provisioning_was_complete=yes
+else
+    provisioning_was_complete=no
+fi
+$bb umount "$runtime_mount" || fail E25 P3_PREAUTH_UNMOUNT_FAILED
+$bb umount "$flash_mount" || fail E25 P1_PREAUTH_UNMOUNT_FAILED
+log 'stage=S25_STORAGE_MUTATION_AUTHORIZED'
+
+provision_log=/run/plumos-storage-provision.log
+PLUMOS_BUBBLE_STORAGE_AUTHORIZED=yes \
+PLUMOS_PROVISION_DISK="$os_disk" \
+PLUMOS_PROVISION_P1="$flash_device" \
+PLUMOS_PROVISION_P2="$matching_device" \
+PLUMOS_PROVISION_P3="$runtime_device" \
+PLUMOS_PROVISION_P4="$user_device" \
+    /usr/sbin/plumos-bubble-provision-storage >"$provision_log" 2>&1
+provision_rc=$?
+$bb cat "$provision_log" >/dev/console 2>/dev/null || true
+$bb cat "$provision_log" >>"$console_log" 2>/dev/null || true
+[ "$provision_rc" -eq 0 ] || fail E25 STORAGE_PROVISION_FAILED
+log 'stage=S25_STORAGE_PROVISIONED'
+
+$bb mount -t vfat -o ro "$flash_device" "$flash_mount" || fail E25 P1_REMOUNT_FAILED
+$bb mount -t ext4 -o rw,noatime "$runtime_device" "$runtime_mount" || \
+    fail E25 P3_REMOUNT_FAILED
+$bb mkdir -p "$runtime_mount/user"
+$bb mount -t vfat -o rw,noatime "$user_device" "$runtime_mount/user" || \
+    fail E25 P4_MOUNT_FAILED
+$bb mkdir -p "$runtime_mount/plumos/logs" "$runtime_mount/plumos/provision"
+if [ "$provisioning_was_complete" = yes ]; then
+    persistent_log=$runtime_mount/plumos/logs/last-boot.log
+else
+    persistent_log=$runtime_mount/plumos/logs/first-boot.log
+fi
+persist_console_log
+
+for directory in Roms BIOS Images Themes Screenshots Music Manuals Cheats \
+    Patches Shaders updates imports exports; do
+    $bb mkdir -p "$runtime_mount/user/$directory"
+    if [ ! -e "$runtime_mount/$directory" ] && [ ! -L "$runtime_mount/$directory" ]; then
+        $bb ln -s "user/$directory" "$runtime_mount/$directory"
+    fi
+done
+$bb touch "$runtime_mount/user/.plumos-ready"
+for marker in partition-expanded ext4-resized p4-ready userdata-seeded; do
+    $bb touch "$runtime_mount/plumos/provision/$marker"
+done
+$bb sync
+$bb touch "$runtime_mount/plumos/provision/complete"
+$bb sync
+log 'stage=S25_USERDATA_CONTRACT_READY'
 
 expected_matching_sha=$(cmdline_value plumos_probe_p2_sha256 || true)
 [ -n "$expected_matching_sha" ] || fail E26 P2_EXPECTED_SHA_MISSING

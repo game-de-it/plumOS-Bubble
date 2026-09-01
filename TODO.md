@@ -42,6 +42,8 @@
   - 2 partition/2 GiB bring-up seedは拡張なしのdiagnostic-onlyで、正式layoutへ流用しない。
   - 正式seedはV90S同様にp1〜p3だけを収録し、初回bootでp3を8 GiB候補へ拡張して
     残領域にp4を作る。中断再開と未知p4/SD2非破壊をhost fixtureで先に検証する。
+  - 2304 MiB seed p3から8192 MiBへの拡張、p4作成、再実行UUID不変、p3拡張後の再開、
+    durable intentなしの空p4拒否とintentありの再開をreal loop fixtureでhost検証済み。
   - stock embedded initramfsは`SYSTEM_IMAGE=`に対応するがstorageをp2固定するため、
     p3 runtimeにはexternal provisioning initramfsが必要とhash固定解析で確定した。
   - external initramfsのread-only one-shotとしてp1=512 MiB、p2 raw=64 MiB、
@@ -234,5 +236,5 @@
   その後、97-system catalog、全core、PicoArch/standalone/Pyxel/PortsとFE導線を一括packageし、
   host coverage gateに合格してからROM総合試験へ進む。
   - 全runtimeのhost build、98 system / 196 profileの導線検証、114/114 core load smoke、
-    1.8 GiB app-layer checksumまで合格。次は現1.5 GiB診断用p3へlive deployせず、
-    first-boot拡張とp4生成をhost fixtureで通した正式seedへ統合する。
+    1.8 GiB app-layer checksumまで合格。first-boot p3拡張とp4生成もhost fixture合格。
+    次は現1.5 GiB診断用p3へlive deployせず、full-stack validation seedを一度だけwriteする。

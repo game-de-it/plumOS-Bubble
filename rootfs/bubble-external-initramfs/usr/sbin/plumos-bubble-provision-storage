@@ -1,0 +1,227 @@
+#!/bin/sh
+set -u
+
+# This helper runs only after /init has verified the p1 authorization marker,
+# the p3 image manifest, and the fixed p1/p2/p3 starts.  It never formats an
+# existing unknown p4.  A blank p4 is resumable only when p3 contains the
+# durable intent marker written immediately before p4 creation.
+
+BB=${PLUMOS_PROVISION_BUSYBOX:-/bin/busybox}
+PARTED=${PLUMOS_PROVISION_PARTED:-/usr/sbin/parted}
+PARTPROBE=${PLUMOS_PROVISION_PARTPROBE:-/usr/sbin/partprobe}
+BLKID=${PLUMOS_PROVISION_BLKID:-/usr/sbin/blkid}
+E2FSCK=${PLUMOS_PROVISION_E2FSCK:-/usr/sbin/e2fsck}
+RESIZE2FS=${PLUMOS_PROVISION_RESIZE2FS:-/usr/sbin/resize2fs}
+MKFS_FAT=${PLUMOS_PROVISION_MKFS_FAT:-/usr/sbin/mkfs.fat}
+FSCK_FAT=${PLUMOS_PROVISION_FSCK_FAT:-/usr/sbin/fsck.fat}
+SYS_BLOCK_ROOT=${PLUMOS_PROVISION_SYS_BLOCK_ROOT:-/sys/class/block}
+STATE_MOUNT=${PLUMOS_PROVISION_STATE_MOUNT:-/run/plumos-provision-state}
+
+DISK=${PLUMOS_PROVISION_DISK:?missing physical disk}
+P1=${PLUMOS_PROVISION_P1:?missing p1}
+P2=${PLUMOS_PROVISION_P2:?missing p2}
+P3=${PLUMOS_PROVISION_P3:?missing p3}
+P4=${PLUMOS_PROVISION_P4:-${DISK}p4}
+AUTHORIZED=${PLUMOS_BUBBLE_STORAGE_AUTHORIZED:-no}
+
+boot_start=32768
+boot_sectors=1048576
+matching_start=1081344
+matching_sectors=131072
+runtime_start=1212416
+runtime_seed_sectors=4718592
+runtime_target_sectors=16777216
+runtime_target_end=$((runtime_start + runtime_target_sectors - 1))
+userdata_start=$((runtime_target_end + 1))
+minimum_disk_sectors=29360128
+p4_minimum_sectors=1048576
+intent_path=plumos/provision/p4-create-authorized
+
+log() {
+    printf 'plumos-bubble-provision=%s\n' "$*"
+}
+
+fail() {
+    log "result=error stage=$1 detail=$2"
+    exit 1
+}
+
+block_value() {
+    field=$1
+    name=${2##*/}
+    "$BB" cat "$SYS_BLOCK_ROOT/$name/$field" 2>/dev/null || true
+}
+
+ensure_block_node() {
+    device=$1
+    name=${device##*/}
+    dev_numbers=$("$BB" cat "$SYS_BLOCK_ROOT/$name/dev" 2>/dev/null || true)
+    case "$dev_numbers" in *:*) ;; *) return 1 ;; esac
+    major=${dev_numbers%:*}
+    minor=${dev_numbers#*:}
+    # A partition-table reread can assign a new dynamic minor (notably for
+    # loop-backed host fixtures).  Early userspace has no udev, so refresh the
+    # unmounted node from sysfs before using it.
+    "$BB" rm -f "$device"
+    "$BB" mknod "$device" b "$major" "$minor" 2>/dev/null || true
+    [ -b "$device" ]
+}
+
+check_geometry() {
+    device=$1
+    expected_start=$2
+    expected_size=$3
+    [ "$(block_value start "$device")" = "$expected_start" ] &&
+        [ "$(block_value size "$device")" = "$expected_size" ]
+}
+
+wait_for_size() {
+    device=$1
+    expected=$2
+    count=0
+    while [ "$count" -lt 100 ]; do
+        ensure_block_node "$device" &&
+            [ "$(block_value size "$device")" = "$expected" ] &&
+            return 0
+        "$BB" sleep 0.1
+        count=$((count + 1))
+    done
+    return 1
+}
+
+blkid_value() {
+    "$BLKID" -s "$1" -o value "$2" 2>/dev/null || true
+}
+
+fsck_ext4() {
+    "$E2FSCK" -pf "$P3"
+    rc=$?
+    case "$rc" in 0|1) ;; *) fail E24B "e2fsck rc=$rc" ;; esac
+}
+
+fsck_fat() {
+    "$FSCK_FAT" -a "$P4"
+    rc=$?
+    case "$rc" in 0|1) ;; *) fail E24D "fsck.fat rc=$rc" ;; esac
+}
+
+mount_state() {
+    "$BB" mkdir -p "$STATE_MOUNT"
+    "$BB" mount -t ext4 -o rw,noatime "$P3" "$STATE_MOUNT" ||
+        fail E24C P3_STATE_MOUNT_FAILED
+}
+
+unmount_state() {
+    "$BB" sync
+    "$BB" umount "$STATE_MOUNT" || fail E24C P3_STATE_UNMOUNT_FAILED
+}
+
+write_p4_intent() {
+    mount_state
+    "$BB" mkdir -p "$STATE_MOUNT/plumos/provision"
+    printf '%s\n' 'format=plumos-bubble-p4-create-intent-v1' \
+        >"$STATE_MOUNT/$intent_path"
+    "$BB" sync
+    unmount_state
+    log 'stage=S24C_P4_CREATE_INTENT_PERSISTED'
+}
+
+has_p4_intent() {
+    mount_state
+    if [ -f "$STATE_MOUNT/$intent_path" ] &&
+        "$BB" grep -qx 'format=plumos-bubble-p4-create-intent-v1' \
+            "$STATE_MOUNT/$intent_path"; then
+        result=0
+    else
+        result=1
+    fi
+    unmount_state
+    return "$result"
+}
+
+[ "$AUTHORIZED" = yes ] || fail E24 AUTHORIZATION_NOT_GRANTED
+for tool in "$PARTED" "$PARTPROBE" "$BLKID" "$E2FSCK" "$RESIZE2FS" \
+    "$MKFS_FAT" "$FSCK_FAT"; do
+    [ -x "$tool" ] || fail E24 "TOOL_MISSING:${tool##*/}"
+done
+for device in "$DISK" "$P1" "$P2" "$P3"; do
+    [ -b "$device" ] || fail E24 "BLOCK_DEVICE_MISSING:${device##*/}"
+done
+
+[ "$(block_value size "$DISK")" -ge "$minimum_disk_sectors" ] ||
+    fail E24 DISK_SMALLER_THAN_14_GIB
+check_geometry "$P1" "$boot_start" "$boot_sectors" ||
+    fail E24 P1_GEOMETRY_MISMATCH
+check_geometry "$P2" "$matching_start" "$matching_sectors" ||
+    fail E24 P2_GEOMETRY_MISMATCH
+[ "$(block_value start "$P3")" = "$runtime_start" ] ||
+    fail E24 P3_START_MISMATCH
+[ "$(blkid_value LABEL "$P3")" = PLUMOS_SYS ] ||
+    fail E24 P3_LABEL_MISMATCH
+
+p3_sectors=$(block_value size "$P3")
+case "$p3_sectors" in
+    "$runtime_seed_sectors"|"$runtime_target_sectors") ;;
+    *) fail E24 "P3_SIZE_UNEXPECTED:$p3_sectors" ;;
+esac
+if [ "$p3_sectors" = "$runtime_seed_sectors" ] && [ -b "$P4" ]; then
+    fail E24 P4_PRESENT_BEFORE_P3_EXPANSION
+fi
+log "stage=S24_LAYOUT_AUTHORIZED disk_sectors=$(block_value size "$DISK") p3_sectors=$p3_sectors"
+
+if [ "$p3_sectors" = "$runtime_seed_sectors" ]; then
+    "$PARTED" -s "$DISK" unit s resizepart 3 "${runtime_target_end}s" ||
+        fail E24A P3_PARTITION_EXPANSION_FAILED
+    "$PARTPROBE" "$DISK" >/dev/null 2>&1 || true
+    "$BB" blockdev --rereadpt "$DISK" >/dev/null 2>&1 || true
+    wait_for_size "$P3" "$runtime_target_sectors" ||
+        fail E24A P3_GEOMETRY_NOT_VISIBLE
+    log "stage=S24A_P3_PARTITION_EXPANDED sectors=$runtime_target_sectors"
+else
+    log 'stage=S24A_P3_PARTITION_ALREADY_EXPANDED'
+fi
+
+fsck_ext4
+"$RESIZE2FS" "$P3" || fail E24B P3_FILESYSTEM_RESIZE_FAILED
+fsck_ext4
+log 'stage=S24B_P3_FILESYSTEM_READY'
+
+format_p4=0
+if [ ! -b "$P4" ]; then
+    write_p4_intent
+    "$PARTED" -s -a optimal "$DISK" unit s \
+        mkpart primary fat32 "${userdata_start}s" 100% ||
+        fail E24C P4_CREATE_FAILED
+    "$PARTPROBE" "$DISK" >/dev/null 2>&1 || true
+    "$BB" blockdev --rereadpt "$DISK" >/dev/null 2>&1 || true
+    count=0
+    while [ "$count" -lt 100 ] && ! ensure_block_node "$P4"; do
+        "$BB" sleep 0.1
+        count=$((count + 1))
+    done
+    ensure_block_node "$P4" || fail E24C P4_NOT_VISIBLE
+    format_p4=1
+    log 'stage=S24C_P4_PARTITION_CREATED'
+fi
+
+p4_actual_start=$(block_value start "$P4")
+[ "$p4_actual_start" = "$userdata_start" ] ||
+    fail E24C "P4_START_MISMATCH:$p4_actual_start"
+[ "$(block_value size "$P4")" -ge "$p4_minimum_sectors" ] ||
+    fail E24C P4_TOO_SMALL
+p4_type=$(blkid_value TYPE "$P4")
+p4_label=$(blkid_value LABEL "$P4")
+if [ -z "$p4_type" ]; then
+    if [ "$format_p4" -ne 1 ]; then
+        has_p4_intent || fail E24C BLANK_P4_WITHOUT_DURABLE_INTENT
+    fi
+    "$MKFS_FAT" -F 32 -n PLUMOS "$P4" || fail E24C P4_FORMAT_FAILED
+    p4_type=$(blkid_value TYPE "$P4")
+    p4_label=$(blkid_value LABEL "$P4")
+    log 'stage=S24C_P4_FORMATTED'
+fi
+[ "$p4_type" = vfat ] || fail E24D "P4_TYPE_UNEXPECTED:$p4_type"
+[ "$p4_label" = PLUMOS ] || fail E24D "P4_LABEL_UNEXPECTED:$p4_label"
+fsck_fat
+log "stage=S24D_P4_READY sectors=$(block_value size "$P4")"
+log 'result=ok'

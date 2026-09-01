@@ -35,8 +35,9 @@ macOSのFAT checkが`FSCK0000.000`として回収した。そのためU-Boot sta
 | `S21` | external initramfs entryへ到達 |
 | `S22` | proc/sys/dev/run/tmpを準備し、共通plumOS logoを描画 |
 | `S23` / `E23` | `PLUMBOOT`からOS SDとp1/p2/p3を解決 / identity不一致 |
-| `S24` / `E24` | one-shot用exact geometryとp4不在を確認 / geometry不一致 |
-| `S25` / `E25` | p1 read-only、p3 read-writeでauthorization確認 / mountまたはmarker不一致 |
+| `S24` / `E24` | p1/p2 exact geometry、p3 seed/target geometryを確認 / identity、容量、geometry不一致 |
+| `S24A..S24D` / `E24A..E24D` | p3 partition拡張、ext4拡張、durable intent付きp4作成、FAT検査 / 各provisioning段階の失敗 |
+| `S25` / `E25` | p1/p3 read-only authorization後にprovisionし、p3/p4とuser-data contractをmount / authorization、provision、mount失敗 |
 | `S26` / `E26` | p2 raw partition全体のSHAとnewc magic確認 / matching bundle不一致 |
 | `S27` / `E27` | System A/Bとactive slotのSHA確認 / slot metadata不一致 |
 | `S28` / `E28` | selected Systemをread-only loop mount / System contract不一致 |
