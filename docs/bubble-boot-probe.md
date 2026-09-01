@@ -8,14 +8,17 @@ original OS SDでは実行しない。
 | Channel | 到達前提 | 保存先 | 回収方法 |
 | --- | --- | --- | --- |
 | U-Boot console | boot script実行 | serial `ttyFIQ0` | UART capture |
-| U-Boot FAT marker | p1 FAT read/write | `plumos-probe/uboot-stage.txt` | SDをMacへ戻す |
 | system persistent log | built-in initramfsがp2をmountしsystemd開始 | `/storage/plumos/boot-probe/logs/<boot-id>.log` | SSHまたはLinuxでext4 mount |
 | system FAT mirror | systemd probe実行 | `plumos-probe/system-stage.txt` | SDをMacへ戻す |
 | runtime snapshot | systemd + `/storage` writable | `<boot-id>.snapshot.txt` | SSH |
 
-U-BootとsystemdのFAT書込みはprobe cloneだけで行う。systemd側はmarkerをatomic renameし、
+systemd側のFAT書込みはprobe cloneだけで行う。markerをatomic renameし、
 `sync`後すぐ`/flash`をread-onlyへ戻す。original SDにはclone authorization markerがないため、
 prepare/install scriptは拒否する。
+
+stock U-Bootの`fatwrite`はactive directory entryを更新せず`S19\n`の孤立clusterを残し、
+macOSのFAT checkが`FSCK0000.000`として回収した。そのためU-Boot stageはconsole/UARTへの
+`echo`だけとし、FATをU-Bootから書き換えない。
 
 ## Stage map
 
@@ -45,13 +48,11 @@ prepare/install scriptは拒否する。
 | `S80` / `E80` | frontend process開始 / unit失敗 |
 | `S90` | frontend開始を含む`miniplus.target` boot完了 |
 
-初回physical seed bootではsystem側`S30..S39`とBusyBox promptまで到達したが、U-Boot
-`fatwrite` markerは初期値`----`のままだった。したがってstock U-BootのFAT書込みは
-診断の必須条件にしない。次seed以降はkernel cmdline、early-init snapshot、必要ならUARTを
-U-Bootからkernelへの境界証拠として併用する。
+初回physical seed bootではsystem側`S30..S39`とBusyBox promptまで到達した。U-Bootから
+kernelへの境界証拠はkernel cmdline、early-init snapshot、必要ならUARTを併用する。
 
-`uboot-stage.txt=S19`でsystem logが無い場合、kernel entryからbuilt-in initramfs、p2 mount、
-`SYSTEM` loop handoffの間に失敗している。`S40`以降はboot ID単位のsnapshotでさらに切り分ける。
+system logが無い場合、kernel entryからbuilt-in initramfs、p2 mount、`SYSTEM` loop handoffの
+間はUARTで切り分ける。`S40`以降はboot ID単位のsnapshotでさらに切り分ける。
 
 ## Build verification
 
@@ -72,7 +73,7 @@ python3 scripts/instrument-bubble-boot-script.py \
 3. original OS SDを実機から抜いて保管する。
 4. 新SDだけをMacへ挿し、seed imageを書いて全image-size blockをreadbackする。
 5. 新SDを実機でcold bootし、既存plumOS共通logoとFATの`S33` markerを確認する。
-6. 失敗時はSDをMacへ戻し、FATの`uboot-stage.txt`と`system-stage.txt`を読む。
+6. 失敗時はSDをMacへ戻し、FATの`system-stage.txt`とp2 persistent logを読む。
 7. `S33`合格後にWi-Fi/SSHとfrontendをminimal Systemへ一層ずつ追加する。
 
 build/verify:

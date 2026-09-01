@@ -139,4 +139,29 @@ SSHから次を読み戻した。
 
 kernel logはhash固定firmware/NVRAMのopen、`Link UP`、`connection succeeded`を再度記録した。
 SSHから`sync; poweroff`を実行し、Macから2回目のpollでping unreachableを確認した。
-SDをhostへ戻した後のFAT/ext4 clean checkは未実施である。
+SDをhostへ戻した後のFAT/ext4 clean checkは次節に記録する。
+
+## Post-poweroff partition readback
+
+normal poweroff後のSDを`/dev/disk4`と容量・partition geometryで再同定し、p1/p2全領域を
+raw deviceからread-only captureした。
+
+```text
+p1_size=536870912
+p1_sha256=489db77d36dae73cf8fc0b41074c2ad3ac20eae3410098d0815e08105509a88b
+p2_size=1593835520
+p2_sha256=674cb41d8e0d7563a3105f3b569b54884d382b7c9ad61b4277f6d5a1b96dfb47
+```
+
+`fsck.fat -vn`はerrorなし、`e2fsck -fn`は5 passに合格した。ext4 superblockは
+`Filesystem state: clean`、mount count 1である。p2の追加物はmode 0600のWPA config、
+mode 0600のDropbear host key、期待した4 logだけで、seed manifestと`update-state`は不変だった。
+
+p1のmanaged boot fileは`network-address.txt`と`system-stage.txt`以外baseとhash一致した。
+ただしmacOSは挿入後にp1をread-writeで自動mountし、`.Spotlight-V100`と
+`FSCK0000.000`を追加した。後者は4 bytesの`S19\n`で、stock U-Bootの`fatwrite`が
+active `uboot-stage.txt`を更新せず孤立clusterを残したことを示す。
+
+U-Boot stageのFAT書込みは信頼性がなくfilesystem汚染を起こすため廃止し、console/UART
+`echo`だけを残す。system側のatomic FAT final markerとp2 persistent logは維持する。
+Mac host metadataはmanaged boot file checksumとupdate payloadから除外する。

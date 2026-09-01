@@ -80,7 +80,6 @@ sed \
     -e 's/^rootuuid=.*/rootuuid=42554242-4c45-5359-5300-000000000002/' \
     -e '$a extraboardargs=plumos_seed=1' \
     "$boot/uEnv.txt" > "$work/boot/uEnv.txt"
-printf '%s\n' '----' > "$work/boot/plumos-probe/uboot-stage.txt"
 printf '%s\n' 'NOT_REACHED' > "$work/boot/plumos-probe/system-stage.txt"
 printf '%s\n' 'NOT_ASSIGNED' > "$work/boot/plumos-probe/network-address.txt"
 printf '%s\n' 'PLUMOS_BUBBLE_SEED_V1' > "$work/boot/plumos-probe/seed-authorized.txt"

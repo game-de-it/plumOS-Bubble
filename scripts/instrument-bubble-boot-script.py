@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Instrument the captured Bubble boot.cmd with persistent U-Boot stages."""
+"""Instrument the captured Bubble boot.cmd with console-only U-Boot stages."""
 
 from __future__ import annotations
 
@@ -24,16 +24,7 @@ def load_image_builder():
 def marker(stage: str) -> str:
     if len(stage) != 3 or stage[0] not in "SE" or not stage[1:].isdigit():
         raise ValueError(f"invalid U-Boot stage {stage!r}")
-    writes = "; ".join(
-        f"mw.b 0x0200000{index:x} 0x{byte:02x}"
-        for index, byte in enumerate((stage + "\n").encode("ascii"))
-    )
-    return (
-        f'echo "[plumOS Bubble probe] {stage}"\n'
-        f"{writes}\n"
-        "fatwrite ${devtype} ${devnum}:1 0x02000000 "
-        "${prefix}plumos-probe/uboot-stage.txt 4\n"
-    )
+    return f'echo "[plumOS Bubble probe] {stage}"\n'
 
 
 def replace_once(text: str, old: str, new: str) -> str:

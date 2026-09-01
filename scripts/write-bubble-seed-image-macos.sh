@@ -48,6 +48,17 @@ diskutil unmountDisk "$target"
 echo "writing $image ($image_size bytes) to $target ($target_size bytes)"
 sudo dd if="$image" of="$raw_target" bs=4m
 sync
+diskutil unmountDisk "$target"
 sudo cmp -n "$image_size" "$image" "$raw_target"
 echo 'full image-size block readback matched'
-diskutil eject "$target"
+diskutil unmountDisk "$target"
+if ! diskutil eject "$target"; then
+    echo 'initial eject failed; retrying after a fresh whole-disk unmount' >&2
+    diskutil unmountDisk "$target"
+    diskutil eject "$target"
+fi
+if diskutil info "$target" >/dev/null 2>&1; then
+    echo "eject verification failed: $target is still present" >&2
+    exit 1
+fi
+echo "safe removal verified: $target is no longer present"

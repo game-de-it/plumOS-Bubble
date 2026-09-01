@@ -60,6 +60,12 @@ PY
 for stage in S10 S11 S12 E12 S13 E13 S14 S19 E20; do
     grep -q "$stage" "$test_dir/instrumented/boot.cmd"
 done
+! grep -q 'fatwrite' "$test_dir/instrumented/boot.cmd"
+! grep -q 'uboot-stage.txt' "$test_dir/instrumented/boot.cmd"
+test "$(grep -c 'diskutil unmountDisk "\$target"' \
+    "$repo_root/scripts/write-bubble-seed-image-macos.sh")" -ge 3
+grep -q 'safe removal verified' \
+    "$repo_root/scripts/write-bubble-seed-image-macos.sh"
 
 test "$(shasum -a 256 "$repo_root/package/boot-assets-common/plumos-640x480.bmp" | awk '{print $1}')" = \
     6b4be39f18289bffe0a9ea65c11f0d479fd12946bd67154ae7332350df795fa8

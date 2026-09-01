@@ -47,7 +47,6 @@ python3 "$repo_root/scripts/instrument-bubble-boot-script.py" \
 mkdir -p "$volume/plumos-probe/original"
 cp -p "$volume/boot.cmd" "$volume/plumos-probe/original/boot.cmd"
 cp -p "$volume/boot.scr" "$volume/plumos-probe/original/boot.scr"
-printf '----\n' > "$volume/plumos-probe/uboot-stage.txt"
 cp "$build_dir/boot.cmd" "$volume/boot.cmd.incoming"
 cp "$build_dir/boot.scr" "$volume/boot.scr.incoming"
 sync

@@ -51,9 +51,10 @@
 - [ ] `BUB-P2-01` Boot ROM -> loader -> U-Boot -> kernel -> initrd/early init -> `SYSTEM` -> systemd -> FE の実行経路を証明する。
 - [ ] `BUB-P2-02` U-Boot の boot source selection、environment、root UUID、initrd variables、fallback を記録する。
 - [ ] `BUB-P2-03` boot milestone を serial/FAT/persistent log に記録し、cold/warm boot baseline を測る。
-  - U-Boot `S10..E20`、systemd/frontend `S40..S90/E80`の二系統probeとclone-only guardを実装済み。
+  - U-Boot console `S10..E20`、systemd/frontend `S40..S90/E80`の二系統probeとclone-only guardを実装済み。
   - 初回cold bootでminimal Systemのpersistent/FAT `S30..S39`を実証済み。
-  - stock U-Bootの`fatwrite` markerは`----`のままで、UARTまたはearly-init由来の代替記録が必要。
+  - stock U-Bootの`fatwrite`は`S19\n`の孤立clusterを作ったため廃止し、UART/consoleと
+    early-init由来の記録に限定する。
   - warm bootと時間baselineは未実施。
 - [ ] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
 - [x] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
@@ -63,7 +64,7 @@
 - [x] `BUB-P2-06` stock FE を開始せず、plumOS marker、log、recovery SSH を保持できることを実機確認する。
   - stock FEを開始せず、framebuffer marker、persistent log、BusyBox promptまでは実証済み。
   - AP6330、bounded WPA/DHCP、Dropbear recovery SSHを次seedへ実装しhost検証済み。
-  - device-owned credential入りpersonalized imageを生成済み。実機Wi-Fi/SSH確認は未実施。
+  - device-owned credential入りpersonalized imageで実機Wi-Fi/DHCP/SSHを確認済み。
   - 初回network seedはmodule loadと`wlan0`生成後、driver自動選択firmware path不在で
     `E36_WPA_START_FAILED`。p2 readbackはcleanで、固定名aliasと正確なE35判定を追加中。
   - 2回目はfirmware/NVRAM download、WPA開始、APへのlink upまで成功したが、SYSTEM内の
@@ -164,4 +165,5 @@
 - [x] diagnostic seedを正式layoutからmanifest/verifierで機械的に区別し、release対象にしない。
 - [ ] V90S型first-boot provisioningとSystem A/B/update metadataをBubble geometryへ移植する。
 - [ ] cold bootし、Wi-Fi association、DHCP、SSH、log、normal shutdown後のext4 cleanを確認する。
-  - association、DHCP、SSH、persistent log、normal shutdownは合格。SD readbackのext4 cleanのみ未確認。
+  - association、DHCP、SSH、persistent log、normal shutdown、SD readbackのext4 cleanは合格。
+  - p1 FATはmacOS自動check前のclean状態が未証明。U-Boot `fatwrite`廃止後の次回SDで再確認する。
