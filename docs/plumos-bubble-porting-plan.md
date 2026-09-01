@@ -21,7 +21,7 @@ recovery-capable boot -> plumOS System -> frontend -> NES/QuickNES
 
 1. 現在動作中の OS SD、ROM SD、ROM、BIOS、save、credential、active setting を変更しない。
 2. block device の調査、image 化、filesystem 検査は最初に read-only で行う。
-3. 実験は sector image から作った複製 OS SD だけで行う。
+3. 実験はhostで検証したseed imageを書いた新SDだけで行い、original OS SDへ書かない。
 4. raw boot prefix、U-Boot、kernel、DTB、initrd は一致する一組として扱い、単独更新しない。
 5. `/storage` の device-owned data を host metadata に合わせて上書きしない。
 6. live app-layer deploy は binary/library、`checksums.sha256`、`manifest.json`、component
@@ -79,7 +79,8 @@ Gate:
 
 ## Phase 1: exact boot artifact capture and rollback
 
-macOS に OS SD を接続し、最初は device を unmount して read-only capture する。
+1 SD reader環境では、稼働中stock OSからSSHでbounded boot substrateをread-only captureする。
+必要に応じてoriginal OS SDをmacOSへ接続し、offline full recovery imageを別工程で採取する。
 
 Deliverables:
 
@@ -88,7 +89,7 @@ Deliverables:
 - raw prefix、U-Boot、environment、`Image`、`SYSTEM`、全 DTB/DTBO、boot scripts の hash manifest
 - `/proc/device-tree` から採取した runtime DTB と selected file DTB の比較
 - kernel config、module/firmware、vendor Mali userspace の ABI/provenance inventory
-- original SD と複製 SD の byte/readback verification
+- host seed imageと新SDのimage-size全block readback verification
 - known-good SD への戻し方と serial/SSH/log recovery route
 - V90S由来4 partition candidateのp1 A/B capacity計算、p2 boot形式、p3 seed/target、
   p4/SD2 ownershipの確定

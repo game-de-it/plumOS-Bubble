@@ -20,6 +20,9 @@
 
 - [x] `BUB-P1-01` OS SD を macOS へ接続し、disk identifier、physical/sector size、MBR、partition LBA、unpartitioned region を read-only で採取する。
 - [ ] `BUB-P1-02` original OS SD の sector image または復元に必要な全領域を採取し、SHA-256 と readback を記録する。
+  - Macが1 SD slotのためdevice-to-device clone必須とはせず、起動中stock SDからbounded boot
+    substrateをSSH captureし、hostへ固定してから新SDへseed imageを書く方式を採用する。
+  - raw 16 MiBとactive boot matching setは取得済み。offline full recovery imageは未取得。
 - [ ] `BUB-P1-03` ROM SD は filesystem metadata と dirty state だけを read-only で確認し、ROM/BIOS/save 内容を repository や build artifact に取り込まない。
 - [ ] `BUB-P1-04` raw Rockchip prefix、IDBLoader/SPL、U-Boot、environment の offset/size/hash を特定する。
   - 先頭16 MiBをread-only取得し、exact size、SHA-256、RKNS/FIT/BL3X主要headerを確認済み。
@@ -49,6 +52,9 @@
   - 複製SDでのreadback、cold/warm boot実測は未実施。
 - [ ] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
 - [ ] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
+  - AArch64 static BusyBox、stock handoff互換entrypoint、FAT/ext4/console/kmsg stage、
+    framebuffer `S33` markerを持つ最小Systemと2 GiB seed imageをhost build/verify済み。
+  - 新SDへのwrite/readbackとphysical bootは未実施。
 - [ ] `BUB-P2-06` stock FE を開始せず、plumOS marker、log、recovery SSH を保持できることを実機確認する。
 - [ ] `BUB-P2-07` probe failure を意図的に起こし、original/known-good SDへ確実にrollbackできることを確認する。
 - [ ] `BUB-P2-08` preserved vendor substrate と plumOS-owned boundary の architecture decision record を確定する。
@@ -56,6 +62,7 @@
 ## P3: reproducible plumOS System
 
 - [ ] `BUB-P3-01` clean container から AArch64 Bubble System を再現 build する。
+  - full Systemに先立つminimal diagnostic Systemは専用arm64 containerから再現build済み。
 - [ ] `BUB-P3-02` vendor artifact を hash、source identity、license、capture procedure 付きの外部入力として固定する。
 - [ ] `BUB-P3-03` read-only System A/B、atomic slot metadata、checksum verification を実装する。
 - [ ] `BUB-P3-04` `/run`、`/tmp`、managed persistent、mutable config、user media の mount contract を実装する。
@@ -133,6 +140,6 @@
 
 ## Next action
 
-- [ ] original OS SDと別の複製用SDをmacOSへ接続し、whole-disk identifierを確定する。
-- [ ] clone scriptでdevice-to-device clone、source-size全block readback、clone marker作成を行う。
-- [ ] cloneにU-Boot probeを適用し、cold boot後にFAT stageとstock hardware/SSHを確認する。
+- [ ] 新しい書込み先SDだけをmacOSへ接続し、whole-disk identifierを確定する。
+- [ ] verified 2 GiB seed imageを書き、image-size全block readback後にejectする。
+- [ ] 実機cold bootし、画面の`S33` markerまたはFATの最終stageからhandoff結果を判定する。

@@ -95,3 +95,7 @@ V90Sの更新実績をBubbleへ持ち込める一方、初期bring-upでpartitio
 しない。最初は現CFWと同じp1 file bootを維持し、one-shot probeでboot ownershipを証明する。
 p2 raw bootを成立させてから最終4 partition seedへ進む。
 
+Mac側にSD slotが1つしかないため、初回one-shot probeはdevice-to-device cloneを必須にしない。
+稼働中stock SDからbounded boot substrateをhostへ固定し、2 GiBのstock-compatible p1 FAT +
+p2 ext4 seedへ最小plumOS `SYSTEM`を配置する。これは最終partition decisionの変更ではなく、
+stock built-in initramfsからplumOS userlandへのhandoffだけを検証する診断例外である。

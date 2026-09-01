@@ -1,7 +1,7 @@
-# Bubble clone boot probe
+# Bubble boot probe
 
-このprobeは「boot失敗」を一つの状態として扱わず、最後に完了したstageをclone SDへ残す。
-original OS SDでは実行せず、全block readback済みcloneだけで使う。
+このprobeは「boot失敗」を一つの状態として扱わず、最後に完了したstageを新しい検証用SDへ残す。
+original OS SDでは実行しない。
 
 ## Log channels
 
@@ -28,6 +28,11 @@ prepare/install scriptは拒否する。
 | `S14` | overlay/fixup処理を完了した |
 | `S19` | `booti`呼出し直前 |
 | `E20` | `booti`が戻った。kernel handoff失敗 |
+| `S30` | stock built-in initramfsがplumOS `SYSTEM` entrypointを実行した |
+| `S31` / `E31` | p2 ext4 `/storage` mount成功 / 失敗 |
+| `S32` / `E32` | p1 FAT `/flash` mount成功 / 失敗 |
+| `S33` / `E33` | framebuffer marker描画成功 / fbdev利用不可 |
+| `S39` / `E39` | 最小recovery待機へ到達しp2をread-only化 / read-only化失敗 |
 | `S40` | built-in initramfsと`SYSTEM` handoff後、systemd probeへ到達 |
 | `S45` | `/storage` persistent logへ書込み成功 |
 | `S60` | mount、hash、systemd、network、dmesg snapshot保存完了 |
@@ -50,15 +55,35 @@ python3 scripts/instrument-bubble-boot-script.py \
   work/bubble-boot-probe
 ```
 
-## Deployment order
+## Preferred one-slot deployment order
 
-1. original OS SDをoffline sourceとして別SDへdevice-to-device cloneする。
-2. source size分をtargetから全block readbackし、sourceと一致させる。
-3. clone scriptがtarget p1へ`PLUMOS_BUBBLE_CLONE_PROBE_V1 <disk id>` markerを作る。
-4. `prepare-bubble-clone-boot-probe-macos.sh /Volumes/<clone p1>`を実行する。
-5. cloneを実機でcold bootし、FAT `uboot-stage.txt`とstock hardware/SSHを確認する。
-6. clone起動中にsystem-stage probeをSSH installする。
-7. reboot後、`latest-stage`、boot ID log、snapshot、FAT mirrorをreadbackする。
+1. stock OS稼働中にraw 16 MiBとactive boot matching setをSSHからread-only captureする。
+2. clean arm64 containerで最小plumOS `SYSTEM`と2 GiB seed imageを生成・検証する。
+3. original OS SDを実機から抜いて保管する。
+4. 新SDだけをMacへ挿し、seed imageを書いて全image-size blockをreadbackする。
+5. 新SDを実機でcold bootし、画面の`S33` markerを確認する。
+6. 失敗時はSDをMacへ戻し、FATの`uboot-stage.txt`と`system-stage.txt`を読む。
+7. `S33`合格後にWi-Fi/SSHとfrontendをminimal Systemへ一層ずつ追加する。
+
+build/verify:
+
+```sh
+scripts/build-bubble-seed-image.sh
+scripts/verify-bubble-seed-image.sh
+```
+
+新SDへのwriteはwhole-disk identifier確定後にだけ行う。
+
+```sh
+PLUMOS_BUBBLE_WRITE_TARGET=/dev/diskN \
+  scripts/write-bubble-seed-image-macos.sh \
+  output/image/bubble/plumOS-Bubble-0.1.0-dev-seed.img /dev/diskN
+```
+
+## Optional exact-clone route
+
+2つのSD readerを使用できる場合は、既存のdevice-to-device clone probeも引き続き利用できる。
+これはstock CFW equivalence確認用であり、one-slot最小plumOS bring-upの必須工程ではない。
 
 system probe installは再起動しない。clone確認後に実行する例:
 
