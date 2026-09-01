@@ -98,6 +98,9 @@ recovery SSHはTCP 22、user/passwordはdevelopment既定の`root` / `plumos`で
 host keyはp2 `/plumos/ssh`へ初回生成し、System rebuildでは上書きしない。
 
 新SDへのwriteはwhole-disk identifier確定後にだけ行う。
+Mac内蔵SDXC readerは`Internal=true`と報告されるため、writerは`disk0`を常に拒否し、
+internal targetの場合はSecure Digital、removable、ejectable、physical、writableの全条件を要求する。
+`PLUMOS_BUBBLE_VALIDATE_ONLY=1`でunmount/writeなしのtarget gateだけを先に実行できる。
 
 ```sh
 PLUMOS_BUBBLE_WRITE_TARGET=/dev/diskN \
