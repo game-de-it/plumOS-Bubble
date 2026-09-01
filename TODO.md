@@ -13,7 +13,7 @@
 - [x] `BUB-P0-04` Git repository を初期化し、local artifact/output を除外する。
 - [x] `BUB-P0-05A` V90S由来のp1 boot/System A/B、p2 matching boot、p3 ext4 runtime、
   p4 FAT32 user/update、optional SD2というownership方向を採用する。
-- [ ] `BUB-P0-05` preserved / replaceable / unknown の path・partition ownership 表を、SD capture 後のhash付きで確定する。
+- [x] `BUB-P0-05` preserved / replaceable / unknown の path・partition ownership 表を、SD capture 後のhash付きで確定する。
 - [ ] `BUB-P0-06` original OS SD、ROM SD、ROM、BIOS、save、credential、active config の書き込み禁止境界を利用者と確認する。
 
 ## P1: stock media capture and recovery

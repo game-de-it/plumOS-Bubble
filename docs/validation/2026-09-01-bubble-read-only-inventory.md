@@ -156,6 +156,23 @@ glibc 2.38である。これらのcaptureは解析専用で、source identity、
 確認するまでplumOS image/releaseへ含めない。expected hashは
 `configs/bubble-stock-runtime.expected.sha256`に記録した。
 
+### Capture後のownership境界
+
+| 領域 | 現在の内容 | Bubble portでの扱い |
+| --- | --- | --- |
+| sectors 0..32767 | Rockchip prefix、SHA-256 `648078e91860adf21bd4ec8f1fd8a64ce52de0ce24511393b156b920327b4ec2` | preserved vendor substrate。clone boot/recovery実証前はreplace不可 |
+| p1 `/flash` | active kernel/DTB/script/SYSTEMと混在user files | active matching setはpreserved。明示boot filesだけcaptureし、user filesは常にpreserved |
+| p2 `/storage` | mutable config、credential、save、frontend/core等 | device/user-owned。調査・build metadata都合で上書きしない |
+| SD2 `/storage/roms` | ROM/BIOS/media、dirty FAT | user-owned。capture/hash対象外、自動修復しない |
+| runtime DTB/config/module/firmware/Mali capture | ignored analysis artifacts | source identity/license確定前はreleaseへ再配布しない |
+| 将来のp1 inactive System slot | plumOS signed immutable System | plumOS-owned。inactive slotだけtransactional更新 |
+| 将来のp3 managed runtime metadata | component/app-layer state | plumOS-owned entryだけatomic更新。device/user-owned dataを吸収しない |
+| 将来のp4/SD2 user tree | ROM/BIOS/save/config/update inbox | user-owned。factory reset/updateから独立 |
+
+ここで`preserved`は「永遠に変更不能」ではなく、複製SD、matching-set、readback、rollbackを
+満たす別工程までは変更禁止という意味である。`replaceable`は現時点では将来のplumOS-owned
+領域だけであり、original SD上には存在しない。
+
 ### Display と GPU
 
 | 項目 | 観測値 |
