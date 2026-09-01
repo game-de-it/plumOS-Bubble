@@ -1,0 +1,7 @@
+[Unit]
+Description=plumOS Bubble boot failure milestone for %i
+ConditionPathExists=/storage/plumos/boot-probe/enabled
+
+[Service]
+Type=oneshot
+ExecStart=/storage/plumos/boot-probe/bin/plumos-boot-probe-log --fat E80_UNIT_FAILED %i

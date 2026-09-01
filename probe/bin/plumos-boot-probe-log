@@ -1,0 +1,67 @@
+#!/bin/sh
+set -u
+
+usage() {
+    echo "usage: $0 [--fat] STAGE [DETAIL]" >&2
+    exit 2
+}
+
+mirror_fat=0
+if [ "${1:-}" = "--fat" ]; then
+    mirror_fat=1
+    shift
+fi
+
+[ "$#" -ge 1 ] || usage
+stage=$1
+detail=${2:-}
+
+case "$stage" in
+    S[0-9][0-9]_*|E[0-9][0-9]_*) ;;
+    *)
+        echo "invalid stage: $stage" >&2
+        exit 2
+        ;;
+esac
+
+probe_root=/storage/plumos/boot-probe
+boot_id=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown-boot)
+uptime=$(cut -d' ' -f1 /proc/uptime 2>/dev/null || echo unknown)
+timestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo unknown-time)
+log_dir=$probe_root/logs
+log_file=$log_dir/$boot_id.log
+line="$timestamp uptime=$uptime boot_id=$boot_id stage=$stage"
+[ -z "$detail" ] || line="$line detail=$detail"
+
+mkdir -p "$log_dir" || exit 1
+printf '%s\n' "$line" >> "$log_file" || exit 1
+printf '%s\n' "$line" > "$probe_root/latest-stage.tmp" || exit 1
+mv -f "$probe_root/latest-stage.tmp" "$probe_root/latest-stage" || exit 1
+ln -sf "$log_file" "$probe_root/latest.log" 2>/dev/null || true
+sync
+
+[ "$mirror_fat" -eq 1 ] || exit 0
+
+flash_writable=0
+restore_flash_ro() {
+    if [ "$flash_writable" -eq 1 ]; then
+        sync
+        mount -o remount,ro /flash >/dev/null 2>&1 || true
+    fi
+}
+trap restore_flash_ro EXIT HUP INT TERM
+
+if ! grep -q ' /flash ' /proc/self/mountinfo 2>/dev/null; then
+    printf '%s\n' "$timestamp stage=E41_FLASH_NOT_MOUNTED" >> "$log_file"
+    exit 0
+fi
+if ! mount -o remount,rw /flash >/dev/null 2>&1; then
+    printf '%s\n' "$timestamp stage=E42_FLASH_REMOUNT_RW_FAILED" >> "$log_file"
+    exit 0
+fi
+flash_writable=1
+mkdir -p /flash/plumos-probe || exit 0
+printf '%s\n' "$line" > /flash/plumos-probe/system-stage.tmp || exit 0
+sync
+mv -f /flash/plumos-probe/system-stage.tmp /flash/plumos-probe/system-stage.txt || exit 0
+sync

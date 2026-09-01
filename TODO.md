@@ -45,6 +45,8 @@
 - [ ] `BUB-P2-01` Boot ROM -> loader -> U-Boot -> kernel -> initrd/early init -> `SYSTEM` -> systemd -> FE の実行経路を証明する。
 - [ ] `BUB-P2-02` U-Boot の boot source selection、environment、root UUID、initrd variables、fallback を記録する。
 - [ ] `BUB-P2-03` boot milestone を serial/FAT/persistent log に記録し、cold/warm boot baseline を測る。
+  - U-Boot `S10..E20`、systemd/frontend `S40..S90/E80`の二系統probeとclone-only guardを実装済み。
+  - 複製SDでのreadback、cold/warm boot実測は未実施。
 - [ ] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
 - [ ] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
 - [ ] `BUB-P2-06` stock FE を開始せず、plumOS marker、log、recovery SSH を保持できることを実機確認する。
@@ -131,5 +133,6 @@
 
 ## Next action
 
-- [ ] U-Boot active environment、initrd handoff、起動中process/library/device ownershipをread-onlyで特定する。
-- [ ] 別の複製用SDを用意し、original OS SDのdevice-to-device cloneとreadbackを行う。
+- [ ] original OS SDと別の複製用SDをmacOSへ接続し、whole-disk identifierを確定する。
+- [ ] clone scriptでdevice-to-device clone、source-size全block readback、clone marker作成を行う。
+- [ ] cloneにU-Boot probeを適用し、cold boot後にFAT stageとstock hardware/SSHを確認する。

@@ -1,0 +1,31 @@
+#!/bin/sh
+set -u
+
+probe_root=/storage/plumos/boot-probe
+boot_id=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown-boot)
+snapshot=$probe_root/logs/$boot_id.snapshot.txt
+
+mkdir -p "$probe_root/logs" || exit 1
+{
+    echo '=== identity ==='
+    date -u '+timestamp=%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || true
+    printf 'boot_id='; cat /proc/sys/kernel/random/boot_id 2>/dev/null || true
+    printf 'uname='; uname -a
+    printf 'cmdline='; cat /proc/cmdline
+    echo '=== mounts ==='
+    awk '$5 == "/" || $5 == "/flash" || $5 == "/storage" || $5 == "/storage/roms" {print}' /proc/self/mountinfo
+    echo '=== block ==='
+    lsblk -o NAME,MAJ:MIN,SIZE,FSTYPE,LABEL,UUID,MOUNTPOINTS 2>/dev/null || lsblk 2>/dev/null || true
+    echo '=== boot inputs ==='
+    sha256sum /flash/Image /flash/boot.scr /flash/boot.cmd /flash/uEnv.txt 2>&1 || true
+    echo '=== systemd ==='
+    systemd-analyze time 2>&1 || true
+    systemctl show -p UnitPath 2>&1 || true
+    systemctl show -p ActiveState -p SubState sshd.service miniplus-automount.service emustation.service 2>&1 || true
+    echo '=== network ==='
+    ip -brief link 2>/dev/null || ip link 2>/dev/null || true
+    ip -brief address 2>/dev/null || ip address 2>/dev/null || true
+    echo '=== recent kernel log ==='
+    dmesg | tail -200
+} > "$snapshot"
+sync

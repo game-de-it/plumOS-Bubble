@@ -1,0 +1,16 @@
+[Unit]
+Description=plumOS Bubble persistent boot milestone probe
+ConditionPathExists=/storage/plumos/boot-probe/enabled
+After=local-fs.target
+Before=emustation.service miniplus.target
+
+[Service]
+Type=oneshot
+ExecStart=/storage/plumos/boot-probe/bin/plumos-boot-probe-log --fat S40_SYSTEMD_REACHED
+ExecStart=/storage/plumos/boot-probe/bin/plumos-boot-probe-log S45_STORAGE_LOG_WRITABLE
+ExecStart=/storage/plumos/boot-probe/bin/plumos-boot-probe-snapshot
+ExecStart=/storage/plumos/boot-probe/bin/plumos-boot-probe-log S60_RUNTIME_SNAPSHOT_SAVED
+RemainAfterExit=yes
+
+[Install]
+WantedBy=miniplus.target
