@@ -110,6 +110,11 @@ FAT p1はread-only mountしてhashを取得した。active boot inputのexpected
 存在するため、boot artifact captureでは明示したkernel/DTB/scriptだけを対象にし、ROM treeを
 コピーまたはhash inventoryへ含めない。
 
+未選択分を含む`/flash/dtbs`全体は56 DTB/DTBO、合計323,306 bytesだった。binaryを無差別に
+repositoryへ入れず、stock path、size、SHA-256の完全なinventoryをignored artifactとして保持した。
+inventoryのSHA-256は`6e360a137feb04c595fd4039c494218963c97f8277d1dc4ffe37e969d08983fa`である。
+必要なactive matching setだけを個別captureし、expected hashへ固定している。
+
 ### Runtime DTB と kernel ABI
 
 起動後の`/sys/firmware/fdt`をexact 147,584 bytesで採取した。SHA-256は
