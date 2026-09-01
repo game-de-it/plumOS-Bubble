@@ -26,11 +26,21 @@ macOSのFAT checkが`FSCK0000.000`として回収した。そのためU-Boot sta
 | --- | --- |
 | `S10` | U-Bootがinstrumented `boot.scr`へ入った |
 | `S11` | `uEnv.txt` importを完了した |
-| `S12` / `E12` | kernel `Image` load成功 / 失敗 |
-| `S13` / `E13` | selected DTB load成功 / 失敗 |
-| `S14` | overlay/fixup処理を完了した |
+| `S12` / `E12` | 2 partition seedではkernel、external probeではinitramfsのload成功 / 失敗 |
+| `S13` / `E13` | 2 partition seedではselected DTB、external probeではkernelのload成功 / 失敗 |
+| `S14` / `E14` | 2 partition seedではoverlay完了、external probeではselected DTBのload成功 / 失敗 |
+| `S15` | external probeのoverlay/fixup処理を完了した |
 | `S19` | `booti`呼出し直前 |
 | `E20` | `booti`が戻った。kernel handoff失敗 |
+| `S21` | external initramfs entryへ到達 |
+| `S22` | proc/sys/dev/run/tmpを準備し、共通plumOS logoを描画 |
+| `S23` / `E23` | `PLUMBOOT`からOS SDとp1/p2/p3を解決 / identity不一致 |
+| `S24` / `E24` | one-shot用exact geometryとp4不在を確認 / geometry不一致 |
+| `S25` / `E25` | p1 read-only、p3 read-writeでauthorization確認 / mountまたはmarker不一致 |
+| `S26` / `E26` | p2 raw partition全体のSHAとnewc magic確認 / matching bundle不一致 |
+| `S27` / `E27` | System A/Bとactive slotのSHA確認 / slot metadata不一致 |
+| `S28` / `E28` | selected Systemをread-only loop mount / System contract不一致 |
+| `S29` / `E29` | p1を`/flash`、p3を`/storage`へ移動してswitch root / handoff失敗 |
 | `S30` | stock built-in initramfsがplumOS `SYSTEM` entrypointを実行した |
 | `S31` / `E31` | p2 ext4 `/storage` mount成功 / 失敗 |
 | `S32` / `E32` | p1 FAT `/flash` mount成功 / 失敗 |
@@ -81,6 +91,25 @@ build/verify:
 ```sh
 scripts/build-bubble-seed-image.sh
 scripts/verify-bubble-seed-image.sh
+```
+
+external initramfsのread-only boundary probeは次でbuild/verifyする。これは3 partitionだが、
+p2 direct boot、first-boot expansion、p4作成をまだ含まない。external initramfsは
+`/storage/plumos/logs/external-initramfs.log`へstageを残し、`S29`後は既存minimal Systemの
+Wi-Fi/SSH recoveryへ引き渡す。
+
+```sh
+scripts/build-bubble-external-initramfs-probe-image.sh
+scripts/verify-bubble-external-initramfs-probe-image.sh
+```
+
+実機用credentialはbaseを変更せずprivate派生のp3へだけ注入する。
+
+```sh
+scripts/personalize-bubble-external-initramfs-probe-wifi.sh \
+  output/image/bubble-external-probe/plumOS-Bubble-0.1.0-dev-external-initramfs-probe.img \
+  /absolute/private/path/wpa_supplicant.conf \
+  output/image/bubble-external-probe/plumOS-Bubble-0.1.0-dev-external-initramfs-probe-wifi-private.img
 ```
 
 Wi-Fi credentialは共通imageへ入れない。通常形式の`wpa_supplicant.conf`をrepository外に作り、

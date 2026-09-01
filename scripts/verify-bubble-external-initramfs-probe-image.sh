@@ -20,14 +20,28 @@ prefix=$repo_root/artifacts/vendor/bubble-stock-source/rockchip-boot-prefix.bin
 boot_source=$repo_root/artifacts/vendor/bubble-stock-source/boot
 system=$repo_root/output/system-rootfs/bubble-minimal/payload/SYSTEM
 initramfs=$repo_root/output/initramfs/bubble-external-probe/payload/initramfs-plumos-bubble-external-probe.cpio.gz
-manifest=${image%/*}/image.manifest
+base_manifest=${image%/*}/image.manifest
+personalized_manifest=$image.manifest
+manifest=$base_manifest
+personalized=no
+if [ -f "$personalized_manifest" ] && \
+    grep -q '^format=plumos-bubble-personalized-external-initramfs-probe-v1$' \
+        "$personalized_manifest"; then
+    manifest=$personalized_manifest
+    personalized=yes
+    base_image_sha=$(awk -F= '$1 == "base_image_sha256" {print $2}' "$manifest")
+    test "$base_image_sha" = \
+        "$(awk -F= '$1 == "image_sha256" {print $2}' "$base_manifest")"
+    grep -q '^credential_hash_recorded=no$' "$manifest"
+    grep -q '^publishable=no$' "$manifest"
+fi
 verify=$repo_root/work/bubble-external-initramfs-probe-verify
 find "$verify" -depth -delete 2>/dev/null || true
 mkdir -p "$verify/matching" "$verify/initramfs"
 
 expected_size=$(awk -F= '$1 == "image_size" {print $2}' "$manifest")
 expected_sha=$(awk -F= '$1 == "image_sha256" {print $2}' "$manifest")
-expected_p2_sha=$(awk -F= '$1 == "p2_raw_partition_sha256" {print $2}' "$manifest")
+expected_p2_sha=$(awk -F= '$1 == "p2_raw_partition_sha256" {print $2}' "$base_manifest")
 test "$expected_size" -eq 2231369728
 test "$(stat -c '%s' "$image")" = "$expected_size"
 test "$(sha256sum "$image" | cut -d' ' -f1)" = "$expected_sha"
@@ -90,6 +104,10 @@ debugfs -R 'cat /plumos/external-initramfs-probe.manifest' \
 grep -q '^authorized=yes$' "$verify/runtime.manifest"
 grep -q '^partition_expansion=not-included$' "$verify/runtime.manifest"
 grep -q '^p4_creation=not-included$' "$verify/runtime.manifest"
+if [ "$personalized" = yes ]; then
+    debugfs -R 'stat /plumos/config/wpa_supplicant.conf' \
+        "$verify/runtime.ext4" 2>/dev/null | grep -q 'Mode:  0600'
+fi
 
 MTOOLS_SKIP_CHECK=1 mtype -i "$verify/flash.fat" \
     ::/plumos-image.manifest > "$verify/plumos-image.manifest"
@@ -98,4 +116,4 @@ grep -q '^layout=probe-v1,raw-prefix-16MiB,p1-fat32-512MiB,p2-raw-64MiB,p3-ext4-
 grep -q '^final_partition_contract=no$' "$verify/plumos-image.manifest"
 grep -q '^publishable=no$' "$verify/plumos-image.manifest"
 
-echo "bubble_external_probe_verify=result-ok image=$image sha256=$expected_sha"
+echo "bubble_external_probe_verify=result-ok image=$image sha256=$expected_sha personalized=$personalized"

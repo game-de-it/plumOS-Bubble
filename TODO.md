@@ -44,6 +44,8 @@
     残領域にp4を作る。中断再開と未知p4/SD2非破壊をhost fixtureで先に検証する。
   - stock embedded initramfsは`SYSTEM_IMAGE=`に対応するがstorageをp2固定するため、
     p3 runtimeにはexternal provisioning initramfsが必要とhash固定解析で確定した。
+  - external initramfsのread-only one-shotとしてp1=512 MiB、p2 raw=64 MiB、
+    p3 ext4=1536 MiBをhost build/verifyした。これは容量・p2形式の最終決定ではない。
 - [ ] `BUB-P1-08` sector image から複製 OS SD を作り、write後block readbackを実施する。
 - [ ] `BUB-P1-09` 複製 SD で cold boot、LCD、controller、audio、AP6330 Wi-Fi、SSH、ROM SD mount を物理確認する。
 - [ ] `BUB-P1-10` known-good SD 交換、boot log、SSH、可能なら UART を含む recovery procedure を実証する。
@@ -58,6 +60,8 @@
   - stock U-Bootの`fatwrite`は`S19\n`の孤立clusterを作ったため廃止し、UART/consoleと
     early-init由来の記録に限定する。
   - warm bootと時間baselineは未実施。
+  - external initramfs用にU-Boot `S12/E12` initrd、`S13/E13` kernel、`S14/E14` DTB、
+    early userspace `S21..S29/E23..E29`とp3 persistent logをhost検証済み。
 - [ ] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
 - [x] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
   - AArch64 static BusyBox、stock handoff互換entrypoint、FAT/ext4/console/kmsg stage、
@@ -166,6 +170,10 @@
 - [x] Bubble独自S33画面を廃止し、V90S/A30/MF共通plumOS logoのexact assetへ置換・検証する。
 - [x] diagnostic seedを正式layoutからmanifest/verifierで機械的に区別し、release対象にしない。
 - [ ] V90S型first-boot provisioningとSystem A/B/update metadataをBubble geometryへ移植する。
+- [x] partition変更を行わないexternal initramfs one-shot、p1 System A/B、p2 raw matching bundle、
+  p3 runtimeの3 partition probeを再現buildし、独立readback verifierへ合格させる。
+- [ ] private 3 partition probeを新SDへfull write/readbackし、実機で`S21..S39`、Wi-Fi、SSH、
+  normal shutdown、p1/p2不変、FAT/ext4 cleanを確認する。
 - [ ] cold bootし、Wi-Fi association、DHCP、SSH、log、normal shutdown後のext4 cleanを確認する。
   - association、DHCP、SSH、persistent log、normal shutdown、SD readbackのext4 cleanは合格。
   - p1 FATはmacOS自動check前のclean状態が未証明。U-Boot `fatwrite`廃止後の次回SDで再確認する。

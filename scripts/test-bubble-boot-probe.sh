@@ -25,6 +25,7 @@ trap cleanup EXIT HUP INT TERM
     "$repo_root/scripts/build-bubble-seed-image.sh" \
     "$repo_root/scripts/capture-bubble-boot-substrate-over-ssh.sh" \
     "$repo_root/scripts/personalize-bubble-seed-wifi.sh" \
+    "$repo_root/scripts/personalize-bubble-external-initramfs-probe-wifi.sh" \
     "$repo_root/scripts/verify-bubble-external-initramfs-probe-image.sh" \
     "$repo_root/scripts/verify-bubble-seed-image.sh" \
     "$repo_root/scripts/write-bubble-seed-image-macos.sh" \
