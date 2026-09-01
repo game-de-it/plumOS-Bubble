@@ -59,6 +59,8 @@ install -m 0644 "$repo_root/configs/retroarch/bubble-software-drm.cfg" \
 install -m 0644 "$repo_root/configs/retroarch/autoconfig/udev/gkd-bubble-retrogame-joypad.cfg" \
     "$root/factory-defaults/retroarch/autoconfig/udev/"
 cp -a /usr/share/alsa/. "$root/share/alsa/"
+install -m 0644 "$repo_root/configs/alsa/bubble-minimal.conf" \
+    "$root/share/alsa/alsa.conf"
 install -m 0644 /usr/share/doc/libasound2/copyright \
     "$root/licenses/libasound2-copyright"
 install -m 0644 /usr/share/doc/libasound2-data/copyright \
