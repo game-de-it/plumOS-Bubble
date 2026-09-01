@@ -134,7 +134,8 @@ grep -q '^layout=validation-seed-v2,raw-prefix-16MiB,p1-fat32-512MiB,p2-raw-64Mi
     "$verify/plumos-image.manifest"
 grep -q '^format=plumos-bubble-full-stack-validation-image-v2$' "$verify/plumos-image.manifest"
 grep -q '^frontend=cpu-drm-dumb-buffer$' "$verify/plumos-image.manifest"
-grep -q '^retroarch=software-plain-drm-rgui$' "$verify/plumos-image.manifest"
+grep -q '^retroarch=software-plain-drm-and-hardware-kms-egl-gles-rgui$' \
+    "$verify/plumos-image.manifest"
 grep -q '^core_baseline=all-114-source-records$' "$verify/plumos-image.manifest"
 grep -q '^catalog_systems=98$' "$verify/plumos-image.manifest"
 grep -q '^catalog_launch_profile_occurrences=196$' "$verify/plumos-image.manifest"
@@ -165,8 +166,14 @@ grep -Fqx 'bubble_libretro_load_smoke=result-ok pass=114 fail=0' \
 readelf -h "$app/bin/plumos-controller-ui-fbdev" | grep -q 'Machine:.*AArch64'
 readelf -h "$app/bin/retroarch" | grep -q 'Machine:.*AArch64'
 readelf -h "$app/cores/quicknes_libretro.so" | grep -q 'Machine:.*AArch64'
-! readelf -d "$app/bin/retroarch" | grep -Eq 'lib(EGL|GLES|gbm|GL)'
+for library in libEGL.so.1 libGLESv2.so.2 libgbm.so.1; do
+    readelf -d "$app/bin/retroarch" | grep -q "Shared library: \[$library\]"
+done
 grep -q 'video_driver = "drm"' "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
+grep -q 'video_context_driver = ""' \
+    "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
+grep -q 'video_driver = "gl"' "$app/bin/plumos-retroarch-launch"
+grep -q 'video_context_driver = "kms"' "$app/bin/plumos-retroarch-launch"
 grep -q 'menu_driver = "rgui"' "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
 grep -q 'rgui_show_start_screen = "false"' \
     "$app/factory-defaults/retroarch/retroarch-bubble.cfg"

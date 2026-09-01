@@ -45,12 +45,56 @@ export ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf"
 export XDG_CONFIG_HOME="$PLUMOS_ROOT/config"
 core_id=${core##*/}
 core_id=${core_id%_libretro.so}
+append_config=
+case "$core_id" in
+    flycast|flycast_xtreme|km_duckswanstation_xtreme_amped|\
+    mupen64plus_next|parallel_n64|yabasanshiro)
+        append_config="$RUNTIME_ROOT/retroarch/launch.$$.cfg"
+        {
+            printf '%s\n' 'video_driver = "gl"'
+            printf '%s\n' 'video_context_driver = "kms"'
+        } >"$append_config"
+        ;;
+esac
+retroarch_pid=
+cleanup() {
+    [ -z "$append_config" ] || $BB rm -f "$append_config"
+}
+terminate_retroarch() {
+    signal_rc=$1
+    if [ -n "$retroarch_pid" ] && kill -0 "$retroarch_pid" 2>/dev/null; then
+        kill -TERM "$retroarch_pid" 2>/dev/null || true
+        terminate_wait=0
+        while kill -0 "$retroarch_pid" 2>/dev/null && \
+            [ "$terminate_wait" -lt 50 ]; do
+            $BB usleep 100000
+            terminate_wait=$((terminate_wait + 1))
+        done
+        kill -0 "$retroarch_pid" 2>/dev/null && \
+            kill -KILL "$retroarch_pid" 2>/dev/null || true
+        wait "$retroarch_pid" 2>/dev/null || true
+    fi
+    cleanup
+    trap - EXIT HUP INT TERM
+    exit "$signal_rc"
+}
+trap cleanup EXIT
+trap 'terminate_retroarch 129' HUP
+trap 'terminate_retroarch 130' INT
+trap 'terminate_retroarch 143' TERM
 printf 'retroarch_game=stage-S70 system=%s core=%s\n' "$system" "$core_id" >>"$PLUMOS_ROOT/logs/session.log"
 set +e
-"$PLUMOS_ROOT/bin/retroarch" -v -c "$config" -L "$core" "$rom" \
-    >>"$PLUMOS_ROOT/logs/retroarch-${system}-${core_id}.log" 2>&1
+set -- "$PLUMOS_ROOT/bin/retroarch" -v -c "$config"
+[ -z "$append_config" ] || set -- "$@" --appendconfig "$append_config"
+set -- "$@" -L "$core" "$rom"
+"$@" >>"$PLUMOS_ROOT/logs/retroarch-${system}-${core_id}.log" 2>&1 &
+retroarch_pid=$!
+wait "$retroarch_pid"
 rc=$?
+retroarch_pid=
 set -e
 printf 'retroarch_game=stage-S79 system=%s core=%s rc=%s\n' \
     "$system" "$core_id" "$rc" >>"$PLUMOS_ROOT/logs/session.log"
+cleanup
+trap - EXIT HUP INT TERM
 exit "$rc"
