@@ -62,6 +62,7 @@ grep -qx -- --appendconfig "$tmp/software.args"
 grep -qx 'video_driver = "drm"' "$tmp/software.append"
 grep -qx 'video_context_driver = ""' "$tmp/software.append"
 grep -qx 'video_threaded = "true"' "$tmp/software.append"
+grep -qx 'system_directory = "/storage/BIOS"' "$tmp/software.append"
 ! grep -q '^config_save_on_exit = ' "$tmp/software.append"
 ! find "$runtime/retroarch" -type f -name 'launch.*.cfg' -print -quit | grep -q .
 
@@ -71,6 +72,7 @@ run_launcher "$tmp/hardware" --system n64 \
 grep -qx 'video_driver = "gl"' "$tmp/hardware.append"
 grep -qx 'video_context_driver = "kms"' "$tmp/hardware.append"
 grep -qx 'video_threaded = "true"' "$tmp/hardware.append"
+grep -qx 'system_directory = "/storage/BIOS"' "$tmp/hardware.append"
 ! grep -q '^config_save_on_exit = ' "$tmp/hardware.append"
 ! find "$runtime/retroarch" -type f -name 'launch.*.cfg' -print -quit | grep -q .
 

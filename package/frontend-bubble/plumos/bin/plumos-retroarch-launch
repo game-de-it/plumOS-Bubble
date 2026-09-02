@@ -3,6 +3,7 @@ set -eu
 
 PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
 PLUMOS_ROM_ROOT=${PLUMOS_ROM_ROOT:-/storage/Roms}
+PLUMOS_BIOS_ROOT=${PLUMOS_BIOS_ROOT:-/storage/BIOS}
 RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 system=
@@ -79,6 +80,10 @@ case "$core_id" in
         } >"$append_config"
         ;;
 esac
+# The shared cfg keeps the V90S-compatible factory baseline, while Bubble may
+# own BIOS on SD2. Resolve that active media root per launch without rewriting
+# the user's persistent RetroArch configuration.
+printf 'system_directory = "%s"\n' "$PLUMOS_BIOS_ROOT" >>"$append_config"
 retroarch_pid=
 cleanup() {
     [ -z "$append_config" ] || $BB rm -f "$append_config"
