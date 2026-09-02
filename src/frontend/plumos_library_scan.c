@@ -1249,7 +1249,14 @@ static void scan_alias_dir(struct scan_ctx *ctx, size_t system_index, const char
 }
 
 static void scan_systems(struct scan_ctx *ctx) {
-  static const char *rom_root_names[] = {"Roms", "roms"};
+  /*
+   * Keep the common plumOS Roms/roms layouts and also accept removable media
+   * whose system directories live at the filesystem root. Bubble's stock ROM
+   * SD uses that direct layout (for example, /run/media/sd2/nes). The existing
+   * inode-based alias de-duplication prevents the same directory from being
+   * indexed twice when one layout is linked to another.
+   */
+  static const char *rom_root_names[] = {"Roms", "roms", ""};
   char rom_root[PATH_MAX];
   size_t s;
   size_t r;
