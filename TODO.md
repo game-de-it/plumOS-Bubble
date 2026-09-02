@@ -133,11 +133,14 @@
 - [ ] `BUB-P4-A02` supported rate/format、hardware pointer、XRUN、5分継続を speaker で確認する。
   - QuickNES/gpSP/PCSX-ReARMed/Flycast Xtreme/YabaSanshiroでALSA `RUNNING`と
     pointer進行を実機確認した。N64 2 coreは`PREPARED`/`hw_ptr=0`のため未解決。
-    speaker実聴、XRUN、5分継続は未確認。
+    route横断のspeaker実聴、XRUN、5分継続は未確認。
   - RetroArch FCEUmmのNES実聴で音飛びを確認。CPU idle 82-87%でもPCMが
     `RUNNING`から`PREPARED`へ戻るunderrunを採取したため、CPU性能設定ではなく
     DRM page-flip待ちを`video_threaded=true`でproducerから分離した。通常の
-    `ondemand`で同一contentを再試験し、5分継続と実聴を満たすまでopen。
+    `ondemand`で同一contentを再起動し、利用者が音飛び解消を実聴確認した。PCMは
+    324秒時点まで95/95 sampleが`RUNNING`、`PREPARED=0`、owner PID不変、hardware
+    pointer継続進行、`avail_max < buffer_size`を満たした。FCEUmm NES音声は合格。
+    N64、headphone、他routeの同等確認が残るためA02全体はopenを維持する。
 - [ ] `BUB-P4-A03` headphone 接続/抜去、ゲーム終了、suspend/resume 後の route 復帰を確認する。
 - [ ] `BUB-P4-P01` backlight 0..255 の安全範囲、段階、persist policy を決める。
 - [ ] `BUB-P4-P02` battery/charger node、capacity、charging状態、volume/power keyをhelperへ閉じ込める。

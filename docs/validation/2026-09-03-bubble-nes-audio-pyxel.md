@@ -65,15 +65,15 @@ pyxel_import=result-ok version=2.9.3
 Library soname: [libdl.so.2]
 ```
 
-## Remaining device acceptance
+## Device acceptance gates
 
 Deployment must preserve the active RetroArch config and all ROM, BIOS, save,
-state and frontend data. After relaunching the same FCEUmm content, acceptance
-requires sustained ALSA `RUNNING` without a return to `PREPARED`, no audible
-skip at normal `ondemand`, correct picture/aspect/input, and normal FE return.
-Pyxel requires an FE launch of actual `.pyxapp` content, visible picture,
-input, audio where applicable and normal FE return. Neither item is closed by
-the host import test alone.
+state and frontend data. The same FCEUmm content must sustain ALSA `RUNNING`
+without a return to `PREPARED` and have no audible skip at normal `ondemand`.
+Picture, aspect, input and normal FE return remain separate route gates. Pyxel
+requires an FE launch of actual `.pyxapp` content, visible picture, input,
+audio where applicable and normal FE return. Pyxel is not closed by the host
+import test alone.
 
 ## Managed live deployment
 
@@ -105,3 +105,36 @@ and `a623fcc8319e92114ba0c4fe6710961d07324f3a45d579ba4da703741f3ac063`.
 The running game retained its original PID and therefore still used the old
 non-threaded launch. NES audio acceptance begins only after the user exits and
 relaunches that content.
+
+## Post-relaunch NES audio acceptance
+
+After a device reboot and FCEUmm relaunch, the launch-scoped config was active:
+
+```text
+retroarch_pid=1634
+video_driver=drm
+video_context_driver=
+video_threaded=true
+audio=S16_LE stereo 48000 Hz, period=768, buffer=3072
+governor=ondemand
+```
+
+The user physically confirmed that the audible skipping had disappeared.
+Two consecutive status windows sampled the same ALSA owner 95 times over 95
+seconds; all 95 samples were `RUNNING`, none was `PREPARED`, and `hw_ptr`
+advanced monotonically. At the final read the uninterrupted stream had passed
+five minutes:
+
+```text
+owner_pid=1634
+samples=95 running=95 prepared=0 other=0
+hw_ptr=15623984
+stream_duration=325.5 seconds at 48000 Hz
+largest observed avail_max=2267 < buffer_size=3072
+governor=ondemand
+```
+
+This closes the FCEUmm NES speaker-audio regression without a performance
+governor override. It does not generalize the result to N64, headphones or any
+other core/route; those remain open under `BUB-P4-A02` and `BUB-P6-10`. Pyxel
+physical FE launch and return also remain open.
