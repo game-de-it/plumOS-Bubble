@@ -17,7 +17,7 @@ pre_v90s_full_factory_sha256=0a10e596d378325e9449fa8374f3f62d9c198461b3db4a69f61
 # Bubble factory generation that assigned Function2 to RGUI and Function1 to
 # screenshots. The physical acceptance policy now assigns every emulator menu
 # to Function1. Only migrate the exact managed pair; user remaps still win.
-function2_menu_factory_sha256=23878b8ce1e45f1418335dad9bbb8bc75b34d28f7aeec17afe81fb7cd7a17ed8
+function2_menu_factory_sha256=23878b2e84b5145f43925f15aae1a424be75748e84b5ba209fbe7b4231de9635
 
 [ -s "$factory" ] || {
     printf 'retroarch_config=result-error reason=factory-missing path=%s\n' "$factory" >&2

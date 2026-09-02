@@ -154,7 +154,7 @@ sed -i \
     -e 's/^input_menu_toggle_btn = "17"$/input_menu_toggle_btn = "10"/' \
     -e 's/^input_screenshot_btn = "10"$/input_screenshot_btn = "17"/' \
     "$function_root/config/retroarch/retroarch-bubble.cfg"
-printf '%s\n' '23878b8ce1e45f1418335dad9bbb8bc75b34d28f7aeec17afe81fb7cd7a17ed8' \
+printf '%s\n' '23878b2e84b5145f43925f15aae1a424be75748e84b5ba209fbe7b4231de9635' \
     >"$function_root/state/retroarch/factory-config.sha256"
 PLUMOS_ROOT=$function_root PLUMOS_BUSYBOX=/bin/busybox \
     "$function_root/bin/plumos-retroarch-config-merge" >"$tmp/function1.log"
@@ -168,7 +168,7 @@ grep -qx 'input_menu_toggle_btn = "10"' \
 
 sed -i 's/^input_menu_toggle_btn = "17"$/input_menu_toggle_btn = "9"/' \
     "$function_active"
-printf '%s\n' '23878b8ce1e45f1418335dad9bbb8bc75b34d28f7aeec17afe81fb7cd7a17ed8' \
+printf '%s\n' '23878b2e84b5145f43925f15aae1a424be75748e84b5ba209fbe7b4231de9635' \
     >"$function_root/state/retroarch/factory-config.sha256"
 PLUMOS_ROOT=$function_root PLUMOS_BUSYBOX=/bin/busybox \
     "$function_root/bin/plumos-retroarch-config-merge" >"$tmp/function1-user.log"
