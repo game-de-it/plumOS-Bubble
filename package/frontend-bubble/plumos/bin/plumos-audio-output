@@ -18,6 +18,19 @@ prepare() {
     tmp=$CONFIG.tmp.$$
     trap 'rm -f "$tmp" "$STATUS.tmp.$$"' EXIT HUP INT TERM
     cat >"$tmp" <<'EOF'
+# ALSA's softvol plugin opens its control as "hw:CARD" even when the PCM
+# slave is declared inline.  ALSA_CONFIG_PATH replaces the distribution
+# alsa.conf completely on stockOS, so retain the minimum hw control alias.
+ctl.hw {
+    @args [ CARD ]
+    @args.CARD {
+        type string
+        default 0
+    }
+    type hw
+    card $CARD
+}
+
 ctl.!default {
     type hw
     card 0

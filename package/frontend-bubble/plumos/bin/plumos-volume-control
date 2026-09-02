@@ -95,7 +95,8 @@ change() {
     next=$((current + $1))
     [ "$next" -ge 0 ] || next=0
     [ "$next" -le 20 ] || next=20
-    write_persisted "$next" && apply "$next"
+    write_persisted "$next" || return 1
+    apply "$next" || return 1
     printf 'volume=%s\n' "$next"
 }
 

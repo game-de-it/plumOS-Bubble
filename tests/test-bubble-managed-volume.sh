@@ -7,12 +7,15 @@ volume=$repo_root/package/frontend-bubble/plumos/bin/plumos-volume-control
 
 sh -n "$audio" "$volume"
 grep -q '^pcm\.plumos_softvol {' "$audio"
+grep -q '^ctl\.hw {' "$audio"
+grep -q 'card \$CARD' "$audio"
 grep -q '^pcm\.plumos_output {' "$audio"
 grep -q '^pcm\.plumos_pyxel {' "$audio"
 grep -q 'name "Soft Volume Master"' "$audio"
 grep -q 'min_dB -90.0' "$audio"
 grep -q 'plumos-aplay' "$volume"
 grep -q 'value \* 255' "$volume"
+grep -q 'apply "$next" || return 1' "$volume"
 
 for launcher in \
     "$repo_root/package/frontend-bubble/plumos/bin/plumos-retroarch-launch" \
