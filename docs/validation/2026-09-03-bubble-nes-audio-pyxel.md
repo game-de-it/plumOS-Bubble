@@ -138,3 +138,48 @@ This closes the FCEUmm NES speaker-audio regression without a performance
 governor override. It does not generalize the result to N64, headphones or any
 other core/route; those remain open under `BUB-P4-A02` and `BUB-P6-10`. Pyxel
 physical FE launch and return also remain open.
+
+## RetroArch configuration and RGUI resume correction
+
+The user subsequently reported that the plumOS hotkeys and RGUI theme were not
+active, and that returning to content after opening RGUI hung. Device readback
+showed why the configuration looked only partially ported. The active file was
+created by the first full-config migration, which appended missing keys but
+correctly preserved all existing values. Those existing values were the 123
+defaults serialized from the earlier 58-key Bubble configuration, including
+`rgui_menu_color_theme = "4"`; preserving them therefore also preserved the
+wrong baseline.
+
+The merger now performs a bounded three-way migration for that exact factory
+generation. It replaces a value only when the active line still exactly equals
+the captured pre-port default and the new V90S-derived factory has a different
+value. Explicit user changes continue to win. Before switching the active file,
+it stores the original at `state/retroarch/pre-v90s-active.cfg`. The factory
+mapping was also corrected to the measured Bubble layout: D-pad buttons 13-16,
+L3/R3 buttons 11/12, right-stick axes 2/3, Function2 menu and Function1
+screenshot. Conflicting L2 hold-fast-forward and R2 rewind bindings were
+removed.
+
+The RGUI hang was independent of the cfg migration. The plain DRM driver set up
+a new menu surface on the page that the producer was also about to reuse. A
+commit of an already-scanned framebuffer may not generate the expected page
+flip event, leaving the resume path waiting indefinitely. Patch 014 records the
+surface role, gives RGUI three pages, advances the producer away from initial
+scanout, and keeps the RGUI commit synchronous while game frames retain the
+threaded non-blocking submission path.
+
+Host verification passed the 3376-key migration fixture, clean patch
+application, AArch64 RetroArch build, 114/114 core catalog, and complete
+app-layer assembly. Managed deployment source `4419415` then passed device-side
+verification: frontend 141/141, RetroArch 110/110, libretro core component
+1425/1425, and app layer 4978/4978. The previous managed files are retained in
+`state/update-rollback/4039c74-to-4419415-ra-menu.tar` with SHA-256
+`fec77b152c057a61245ce8547ef3de57162306af82376eaff3c1166428c98372`.
+
+The active cfg migration reported `result-migrated-pre-v90s added=123`; its
+pre-migration SHA-256 is preserved by the backup as
+`f3ffcb254b82028deed04217bccde5150e57c61dad7ce22e0ef91a113bb36407`.
+Frontend and system configuration hashes remained unchanged. Physical
+acceptance still requires launching content with the new binary, opening RGUI
+with Function2, resuming repeatedly without a hang, checking the theme and
+Function1 screenshot, and returning normally to the frontend.

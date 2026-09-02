@@ -110,6 +110,9 @@
 - [ ] `BUB-P4-D02` CPU-rendered DRM dumb-buffer double buffering と page-flip completion を実装する。
   - MFの共通rendererとRetroArch DRM修正をBubbleへ移植し、FEとRetroArch RGUIの実パネル表示、
     DRM handoff、FEへの再取得まで確認した。page-flip継続計測を残す。
+  - RGUIからcontentへ戻る際のhangを実機で確認。menu surfaceがscanout中のpageを再利用し、
+    発生しないflip eventを待つ経路を修正した。game/menuのsurface roleを分離し、menuを
+    triple buffer化したAArch64 buildを実機deploy済み。複数回のmenu往復を物理確認する。
 - [ ] `BUB-P4-D03` 640x480 panel の実 refresh、scroll pacing、input-to-visible response を測定する。
 - [ ] `BUB-P4-D04` fbdev/DRM handoff、FE/game/menu、終了後のscanout ownershipを物理確認する。
 - [ ] `BUB-P4-D05` vendor `libmali` のlicense、redistribution、DDK/kernel ABIを監査し、採用・隔離・不採用を決定する。
@@ -120,6 +123,9 @@
 - [ ] `BUB-P4-I02` 全物理button、D-pad、ABXY、shoulder、START/SELECT、analog、stick click をpress/release採取する。
 - [ ] `BUB-P4-I03` `gpio-keys`、power key、G-sensor、rumble の物理対応と必要性を確定する。
 - [ ] `BUB-P4-I04` hotkey、volume、brightness、menu、exit の競合しない ownership policy を決める。
+  - V90S由来cfgの不足key追加だけでは旧RA defaultが残る問題を修正。変更されていない旧default
+    だけを三者比較で移行し、利用者変更値と旧cfg backupを保持する。Function2=RA menu、
+    Function1=screenshotを実機cfgへ反映済み。物理hotkey確認を残す。
 - [ ] `BUB-P4-I05` normalized Bubble controller を公開し、FE/RetroArch/standaloneで1入力1反応を確認する。
   - FEとRetroArch RGUIでD-pad/A/B、SELECT+START終了を物理確認した。standaloneと全buttonを残す。
   - PicoArch QuickNESで物理A/B、Function1/2 menu、menu A決定/B戻る、FE復帰を利用者確認済み。
@@ -240,6 +246,8 @@
     Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。
   - PicoArchのA/B逆転、L3/R3欠落、Function1欠落と、誤ったABS_Z/RZ trigger前提を修正した。
     RetroArchはFunction2=menu、Function1=screenshot、PicoArchは両Function=menu fallbackとした。
+  - RetroArch factory/active cfgもD-pad button 13..16、L3/R3 11/12、right stick axes 2/3へ
+    修正し、競合していたL2 hold-fast-forwardとR2 rewindを解除した。実機の全button確認を残す。
   - PicoArch QuickNESのA/B、両Function menu、menu A決定/B戻る、FE復帰は物理合格。
   - standalone各機種固有layout、全runtimeの物理操作、menu/exit、system-owned volume/powerを残す。
 - [ ] `BUB-P6-10` 全system/coreをdisplay分類し、向き・content/menu rotation・aspect・audioを実機確認する。
