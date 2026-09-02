@@ -261,7 +261,8 @@
     app-layer 4978/4978でlive deployしたが再発。gdb backtraceで実停止箇所はDRMでなく
     `audio_driver_flush -> alsa_write -> snd_pcm_wait`と確定した。PCMは`RUNNING`表示のまま
     1秒以上hw/appl pointerが不変であり、vendor 4.19 RK817のpause解除後DMA停止を特定。
-    menu開始をPCM drop、復帰をprepareへ変更して実機再確認する。
+    menu開始をPCM drop、復帰をprepareへ変更したsource `afd8801`をRetroArch 110/110、
+    app-layer 4978/4978でlive deploy済み。menu往復、DMA pointer進行、音声を実機再確認する。
   - PicoArch QuickNESのA/B、両Function menu、menu A決定/B戻る、FE復帰は物理合格。
   - standalone各機種固有layout、全runtimeの物理操作、menu/exit、system-owned volume/powerを残す。
 - [ ] `BUB-P6-10` 全system/coreをdisplay分類し、向き・content/menu rotation・aspect・audioを実機確認する。

@@ -306,3 +306,13 @@ Patch 018 replaces the Bubble RetroArch menu audio lifecycle only:
 instead of relying on the broken pause-release path. Both transitions emit
 immediately flushed stage logs. This is a device-driver compatibility fix, not
 a CPU governor, latency or other performance workaround.
+
+The Patch 018 AArch64 build and complete app-layer assembly passed at source
+`afd8801`. The five-file managed delta matched its host hashes in the device
+stage, then post-switch verification passed RetroArch 110/110 and app layer
+4978/4978. The deployed RetroArch SHA-256 is
+`9adcb92d398f7f860636599f7a3811a07fd8e68462b45ca2facf86cbd7e45d82`.
+The preceding managed set is preserved at
+`state/update-rollback/afd8801-audio-resume.tar`, SHA-256
+`6e9ec0b8ad00f4644a170aaf51c84ba84dea9d5647c672d9775eadfcbd205ef4`.
+Frontend PID 994 remained alive and mutable user data was not replaced.
