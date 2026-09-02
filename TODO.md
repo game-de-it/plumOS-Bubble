@@ -219,9 +219,13 @@
     visible unsupported。各runtimeの実機検証を残す。
   - PicoArchの欠落SDL2をcomponent内へ追加し、QuickNES contentと停止時child回収を実機確認。
   - PyxelはBubble Systemに無い`libdl.so.2`でimport前に失敗していた。互換DSOを
-    component-scopedで同梱し、Pyxel 2.9.3のhost/device importまで合格。実機FEからの
-    `.pyxapp`表示・入力・音声・終了復帰は未確認。
+    component-scopedで同梱し、Pyxel 2.9.3のhost/device importまで合格。さらにBubble
+    vendor MaliをEGL/GLESで統一したKMSDRM/ALSA経路で、正常な`.pyxapp`のDRM、PCM
+    `RUNNING`、256x240から512x480への16:15表示契約まで実機合格。SD2上の2ファイルは
+    CRC/zlib破損のため、媒体修復後のFE入力・終了復帰を残す。
     standalone YabaSanshiroもSaturn content、GLES、ALSA、正常終了に合格した。
+  - OpenBORはgeneric SDL2 software rendererでKMSDRM surface生成に失敗していたため、
+    Pyxel/PCSXと同じBubble SDL2 + Mali GLES2へ統一。DRM ownerとPCM `RUNNING`を実機合格。
 - [ ] `BUB-P6-04` package済みcoreからFE導線、FE導線からlauncher/coreを双方向検証し、
   実行不能な導線も`未実装`/`未対応`理由付きで表示する。QuickNES-only app-layerはreleaseを拒否する。
   - 98 system / 196 profile / RetroArch 116 id / PicoArch 20 id / standalone 5 idと
@@ -243,6 +247,10 @@
   - direct-root走査でROM SDのFATから`invalid start cluster`、`corrupted directory`を実機検出。
     自動fsckは行わず、scanを180秒で打ち切って既存indexを保全しFEを起動する。
     SDの退避・ホストfsck・再走査は利用者と媒体変更境界を確定してから行う。
+  - volume persistent/runtime/softvolを全て0にして98 system / 196 profileを機械走査。
+    clean contentの再試験を合算して89導線起動、BlueMSX 1導線失敗、DraStic 1導線visible
+    unsupported、clean content不足またはexternal 105導線。未試験導線は削除していない。
+    MSX標準は合格したfMSXへ変更し、BlueMSXも失敗理由付きで選択肢を維持する。
 - [ ] `BUB-P6-09` Bubble全物理入力を実機captureから固定し、全runtimeへ割り当てて物理確認する。
   - event0/1/2、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`から、D-pad、ABXY、
     Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。
@@ -269,6 +277,10 @@
 - [ ] `BUB-P6-10` 全system/coreをdisplay分類し、向き・content/menu rotation・aspect・audioを実機確認する。
   - horizontal、vertical arcade、rotated handheld、square、wide、dual-screen、GLES経路を分離し、
     QuickNES一件の合格を他coreへ一般化しない。未試験導線はFEから消さず理由付きで維持する。
+  - runtime logのframe/aspect/rotation/viewport/scanoutとPyxel fitを機械検査するverifierを追加。
+    62 observed contractは全て640x480内・中央・回転後aspect一致。縦FBNeoはrotation 3、
+    360x480+140+0で3:4を維持した。geometryを公開しないPicoArch/hardware core/standalone、
+    dual-screen、clean content不足routeのLCD実見とspeaker実聴は未完了。
 
 ## P7: update, lifecycle and release
 

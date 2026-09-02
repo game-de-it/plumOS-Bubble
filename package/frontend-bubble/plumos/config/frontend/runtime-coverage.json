@@ -81,6 +81,18 @@
       "physical_validation": "pending",
       "todo": "BUB-P4-D05"
     },
+    "retroarch:bluemsx": {
+      "state": "visible-runtime-failed-bubble-bus-error-or-segfault-before-first-frame",
+      "release_eligible": false,
+      "physical_validation": "failed-msx-clean-rom",
+      "fallback": "retroarch:fmsx",
+      "todo": "BUB-P6-08"
+    },
+    "retroarch:fmsx": {
+      "state": "physical-bounded-launch-passed",
+      "physical_validation": "drm-aspect-audio-passed-msx-clean-rom",
+      "todo": "BUB-P6-08"
+    },
     "standalone:drastic": {
       "state": "visible-unsupported-missing-bubble-input-bridge",
       "redistribution": "unresolved",
