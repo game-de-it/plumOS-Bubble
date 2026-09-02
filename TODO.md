@@ -157,6 +157,8 @@
     FAT checkerがある場合も`-n`と120秒timeoutだけを使用する。実機表示確認を残す。
   - supervisorのgeneric `/storage` exportよりmounted SD2を優先し、scan後にもkernel errorを
     再観測する。これによりscan中に初めて現れるFAT errorも警告状態へ残す。
+  - passive observeではdirtyをclean扱いに戻さず、complete indexがあるdirty媒体はboot scanを
+    省略する。既存indexと警告を即時表示し、明示的なread-only checkだけが状態を更新する。
 
 ## P5: frontend and minimum game-path baseline
 

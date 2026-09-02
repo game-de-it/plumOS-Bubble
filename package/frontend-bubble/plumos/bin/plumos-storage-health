@@ -36,6 +36,10 @@ options=$(printf '%s\n' "$mount_line" | "$BB" awk -F '\t' '{print $3}')
 last_check=$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown)
 result=not_mounted
 evidence='media root is not mounted'
+previous_result=
+if [ -r "$STATUS" ]; then
+    previous_result=$($BB awk -F= '$1 == "result" { print $2; exit }' "$STATUS")
+fi
 
 if [ -n "$device" ]; then
     kernel_name=${device##*/}
@@ -43,8 +47,16 @@ if [ -n "$device" ]; then
         result=dirty
         evidence='kernel reported filesystem corruption; no repair attempted'
     elif [ "$ACTION" = observe ]; then
-        result=observed
-        evidence='no filesystem error found in current boot log'
+        case "$previous_result" in
+            dirty|inconsistent)
+                result=$previous_result
+                evidence='previous filesystem error remains until a read-only check proves clean'
+                ;;
+            *)
+                result=observed
+                evidence='no filesystem error found in current boot log'
+                ;;
+        esac
     elif ! printf ',%s,' "$options" | "$BB" grep -q ',ro,'; then
         result=check_refused
         evidence='read-only check refused because media is mounted read-write'

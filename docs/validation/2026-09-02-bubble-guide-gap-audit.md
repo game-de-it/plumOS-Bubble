@@ -43,6 +43,8 @@ Status meanings:
 3. Implement the previously missing storage-health backend without any repair
    mode, and observe dirty-media evidence before and after the library scan.
    A mounted SD2 also overrides the supervisor's generic `/storage` default.
+   Passive observation cannot clear a dirty result, and boot preserves a
+   completed index instead of repeatedly scanning known-dirty media.
 4. Record the user's physical PicoArch QuickNES input/display/audio acceptance
    without extending that result to untested routes.
 
