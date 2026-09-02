@@ -10,6 +10,7 @@ grep -Eq '([[:space:]\\])file([[:space:]\\]|$)' "$dockerfile"
 grep -Fq 'find_target_lib libdl.so.2' "$builder"
 grep -Fq 'install -m 0644 "$compat_path" "$PYXEL_LIB/libdl.so.2"' "$builder"
 grep -Fq 'test -f "$PYXEL_LIB/libdl.so.2"' "$builder"
+grep -Fq '"source_ref": "$source_ref"' "$builder"
 if [ -d "$repo_root/output/pyxel/bubble/plumos" ]; then
     test -f "$repo_root/output/pyxel/bubble/plumos/apps/pyxel/lib/libdl.so.2"
     for library in \

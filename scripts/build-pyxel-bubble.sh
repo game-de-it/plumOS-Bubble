@@ -18,6 +18,9 @@ SDL_BUILD_ROOT="$ROOT_DIR/build/pyxel-bubble-sdl2"
 READELF="${READELF:-readelf}"
 STRIP="${STRIP:-strip}"
 CC="${CC:-gcc}"
+source_ref="$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || printf unknown)"
+source_epoch="${SOURCE_DATE_EPOCH:-}"
+[ -n "$source_epoch" ] || source_epoch="$(git -C "$ROOT_DIR" show -s --format=%ct HEAD 2>/dev/null || date +%s)"
 
 fail() {
     printf 'error: %s\n' "$*" >&2
@@ -477,6 +480,8 @@ cat >"$TARGET_DIR/plumos/components/pyxel/manifest.json" <<EOF
   "name": "plumOS Pyxel runtime for Bubble",
   "component": "pyxel",
   "device": "bubble",
+  "source_ref": "$source_ref",
+  "source_date_epoch": $source_epoch,
   "architecture": "aarch64",
   "python": "$PYTHON_VERSION",
   "pip": "$PIP_VERSION",
