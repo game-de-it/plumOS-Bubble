@@ -69,6 +69,13 @@ if [ -e "$BUILD_ROOT" ]; then
 fi
 git -C "$SOURCE_ROOT" worktree prune
 git -C "$SOURCE_ROOT" worktree add --detach "$BUILD_ROOT" "$PCSX_REF"
+# Git records the container-only /work path in a linked worktree's .git file.
+# Replace only that indirection with a sibling-relative path so the generated
+# tree remains verifiable both inside Docker and from the macOS checkout.
+worktree_gitdir=$(sed -n 's/^gitdir: //p' "$BUILD_ROOT/.git")
+worktree_name=${worktree_gitdir##*/}
+printf 'gitdir: ../pcsx-rearmed-bubble-probe/.git/worktrees/%s\n' \
+    "$worktree_name" >"$BUILD_ROOT/.git"
 git -C "$BUILD_ROOT" submodule update --init frontend/libpicofe
 git -C "$BUILD_ROOT" apply --ignore-space-change --ignore-whitespace "$PCSX_PATCH"
 git -C "$BUILD_ROOT" apply --ignore-space-change --ignore-whitespace "$PCSX_BATCH_PATCH"
