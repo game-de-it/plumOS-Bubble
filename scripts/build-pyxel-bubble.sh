@@ -258,6 +258,12 @@ PYTHON_LIBRARY_PATH="$PYXEL_ROOT/lib:$PYTHON_ROOT/lib:/usr/lib"
 if [ -n "${PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH:-}" ]; then
   PYTHON_LIBRARY_PATH="${PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH}:$PYTHON_LIBRARY_PATH"
 fi
+# The stock BusyBox shell and the bundled Python runtime use different libc
+# environments. Defer preload activation until this shell execs Python's
+# explicit glibc loader; exporting it in the outer launcher crashes BusyBox.
+if [ -n "${PLUMOS_BUBBLE_PYTHON_LD_PRELOAD:-}" ]; then
+  export LD_PRELOAD="$PLUMOS_BUBBLE_PYTHON_LD_PRELOAD"
+fi
 exec "$LOADER" \
   --library-path "$PYTHON_LIBRARY_PATH" \
   --argv0 "$PLUMOS_ROOT/bin/python3" \
@@ -323,13 +329,12 @@ export __EGL_VENDOR_LIBRARY_FILENAMES="${__EGL_VENDOR_LIBRARY_FILENAMES:-$PYXEL_
 export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
 export MESA_LOADER_DRIVER_OVERRIDE="${MESA_LOADER_DRIVER_OVERRIDE:-kms_swrast}"
 export MESA_SHADER_CACHE_DISABLE="${MESA_SHADER_CACHE_DISABLE:-true}"
-export LD_LIBRARY_PATH="$PYXEL_ROOT/lib:$PYTHON_ROOT/lib:/usr/lib"
 export SDL_GAMECONTROLLERCONFIG="${SDL_GAMECONTROLLERCONFIG:-190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b17,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,}"
 if [ -r "$FIT_LIBRARY" ] && [ "${PLUMOS_PYXEL_FIT:-1}" != "0" ]; then
   export PLUMOS_PYXEL_FIT=1
   export PLUMOS_PYXEL_FIT_WIDTH="${PLUMOS_PYXEL_FIT_WIDTH:-640}"
   export PLUMOS_PYXEL_FIT_HEIGHT="${PLUMOS_PYXEL_FIT_HEIGHT:-480}"
-  export LD_PRELOAD="$FIT_LIBRARY${LD_PRELOAD:+:$LD_PRELOAD}"
+  export PLUMOS_BUBBLE_PYTHON_LD_PRELOAD="$FIT_LIBRARY${PLUMOS_BUBBLE_PYTHON_LD_PRELOAD:+:$PLUMOS_BUBBLE_PYTHON_LD_PRELOAD}"
 fi
 
 exec "$BB" sh "$PLUMOS_ROOT/bin/plumos-python-bubble" "$@" >>"$LOG_DIR/runtime.log" 2>&1
