@@ -217,3 +217,20 @@ The complete managed rollback is
 Physical acceptance now requires launching content, opening RGUI with
 Function1, resuming repeatedly without a hang, checking the theme and Function2
 screenshot, and returning normally to the frontend.
+
+The next physical retest still hung when RGUI was closed. This time the deployed
+Patch 015 had already removed event waiting from every RGUI-layer commit, so the
+preserved live process distinguishes the failing stage: the main RetroArch
+thread was in syscall 73 (`ppoll`) after the plane had been switched back to the
+game surface. It still owned `/dev/dri/card0`, `/dev/input/event2` and the ALSA
+PCM fd; PCM remained `RUNNING`. The failure is therefore the first asynchronous
+game-layer flip after the RGUI-to-game plane transition, not emulation load or
+the RGUI commit itself. Kernel debugfs DRM state was unavailable on stockOS.
+
+Patch 016 adds a plane-switch barrier. A successful `drmModeSetPlane` arms the
+surface; its next atomic flip is a blocking commit without a page-flip event.
+After that one transition frame, steady-state game presentation returns to the
+existing nonblocking event-paced path, preserving the NES audio pacing that
+already passed. RGUI remains blocking as in Patch 015. Barrier completions,
+commit errors and one-second event-timeout diagnostics explicitly flush stderr,
+so the redirected runtime log records the failing stage before process exit.

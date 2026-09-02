@@ -1,0 +1,92 @@
+diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
+index 50439c511f..a6b2dd27e4 100644
+--- a/gfx/drivers/drm_gfx.c
++++ b/gfx/drivers/drm_gfx.c
+@@ -119,6 +119,10 @@ struct drm_surface
+    float aspect;
+    struct video_viewport viewport;
+    unsigned int flip_page;
++
++   /* The first atomic flip after drmModeSetPlane must be synchronous on
++    * Bubble's stock RK3566 DRM driver; its asynchronous event can be lost. */
++   bool plane_switch_pending;
+ };
+ 
+ struct drm_struct
+@@ -359,6 +363,8 @@ static bool drm_page_flip(struct drm_surface *surface)
+    struct pollfd pfd;
+    bool pending = true;
+    bool menu_surface = surface && surface->layer == 2;
++   bool plane_switch = surface && surface->plane_switch_pending;
++   bool synchronous_commit = menu_surface || plane_switch;
+    uint32_t target_fb_id = surface->pages[surface->flip_page].buf.fb_id;
+    unsigned timeout_count = 0;
+    int ret;
+@@ -394,22 +398,34 @@ static bool drm_page_flip(struct drm_surface *surface)
+     * atomic commit without emitting the requested page-flip event. Waiting
+     * for that event deadlocks the frontend thread when returning to content.
+     * For the menu surface, the blocking commit itself is the completion
+-    * boundary. Game frames retain nonblocking event-paced presentation.
++    * boundary.
++    *
++    * The first game flip after switching the shared plane back from RGUI can
++    * lose its event too. Make that transition flip blocking, then retain
++    * nonblocking event-paced presentation for steady-state game frames.
+     */
+-   uint32_t commit_flags = menu_surface ? 0 :
++   uint32_t commit_flags = synchronous_commit ? 0 :
+          (DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT);
+ 
+    ret = drmModeAtomicCommit(drm.fd, req,
+-         commit_flags, menu_surface ? NULL : &pending);
++         commit_flags, synchronous_commit ? NULL : &pending);
+    drmModeAtomicFree(req);
+    if (ret < 0)
+    {
+       RARCH_ERR("[DRM] Failed to commit for pageflip: %s.\n",
+             strerror(errno));
++      fflush(stderr);
+       return false;
+    }
+ 
+-   if (menu_surface)
++   if (plane_switch)
++   {
++      RARCH_LOG("[DRM] Completed synchronous plane-switch barrier: "
++            "layer=%u target_fb=%u.\n", surface->layer, target_fb_id);
++      fflush(stderr);
++   }
++
++   if (synchronous_commit)
+       goto pageflip_complete;
+ 
+    memset(&event_context, 0, sizeof(event_context));
+@@ -439,6 +455,7 @@ static bool drm_page_flip(struct drm_surface *surface)
+                "scanout_fb=%u waited_ms=%u; still waiting.\n",
+                surface->layer, target_fb_id, scanout_fb_id,
+                timeout_count * 1000);
++         fflush(stderr);
+          if (plane)
+             drmModeFreePlane(plane);
+          continue;
+@@ -460,6 +477,7 @@ static bool drm_page_flip(struct drm_surface *surface)
+ 
+ pageflip_complete:
+    surface->current_page = &surface->pages[surface->flip_page];
++   surface->plane_switch_pending = false;
+    surface->flip_page = (surface->flip_page + 1) % surface->numpages;
+    return true;
+ }
+@@ -864,7 +882,12 @@ static void drm_plane_setup(struct drm_surface *surface)
+             src_x<<16, src_y<<16, src_w<<16, src_h<<16))
+    {
+       RARCH_ERR("[DRM] Failed to enable plane.\n");
++      fflush(stderr);
+    }
++   else
++   {
++      surface->plane_switch_pending = true;
++   }
+ 
+    RARCH_DBG("[DRM] src_w %d, src_h %d, plane_w %d, plane_h %d\n",
+          src_w, src_h, plane_w, plane_h);

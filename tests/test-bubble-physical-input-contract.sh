@@ -47,6 +47,11 @@ drm_patch=patches/retroarch/015-bubble-drm-rgui-blocking-commit.patch
 grep -Fq 'uint32_t commit_flags = menu_surface ? 0' "$drm_patch"
 grep -Fq 'commit_flags, menu_surface ? NULL : &pending' "$drm_patch"
 grep -Fq 'scanout_fb=%u waited_ms=%u' "$drm_patch"
+resume_patch=patches/retroarch/016-bubble-drm-plane-switch-barrier.patch
+grep -Fq 'bool synchronous_commit = menu_surface || plane_switch' "$resume_patch"
+grep -Fq 'surface->plane_switch_pending = true' "$resume_patch"
+grep -Fq 'Completed synchronous plane-switch barrier' "$resume_patch"
+grep -Fq 'fflush(stderr)' "$resume_patch"
 ! grep -Fq 'ABS_Z/RZ triggers' scripts/build-picoarch-bubble.sh
 
 echo 'bubble_physical_input_contract=result-ok'

@@ -252,6 +252,8 @@
     保持。PicoArch/PCSX/YabaSanshiro/DraStic/SDL standaloneのmappingをbuild/deploy済み。
   - RetroArch factory/active cfgもD-pad button 13..16、L3/R3 11/12、right stick axes 2/3へ
     修正し、競合していたL2 hold-fast-forwardとR2 rewindを解除した。実機の全button確認を残す。
+  - RGUIを閉じた直後のgame layer page-flip event欠落を実機で特定。plane切替後の最初の1 frameだけ
+    blocking atomic commitにするbarrierと即時flush診断ログを追加し、実機再確認を残す。
   - PicoArch QuickNESのA/B、両Function menu、menu A決定/B戻る、FE復帰は物理合格。
   - standalone各機種固有layout、全runtimeの物理操作、menu/exit、system-owned volume/powerを残す。
 - [ ] `BUB-P6-10` 全system/coreをdisplay分類し、向き・content/menu rotation・aspect・audioを実機確認する。
