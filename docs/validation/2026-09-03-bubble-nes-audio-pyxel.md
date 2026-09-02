@@ -51,7 +51,9 @@ driver saved by one renderer class from leaking into the next route.
 
 The Pyxel component now ships its own AArch64 `libdl.so.2`, following the same
 component-scoped ABI boundary already used by RetroArch. The Bubble tool image
-also includes `python3-pip`, which the Pyxel builder requires.
+also includes `python3-pip` and `file`: the builder requires pip, and uses
+`file` to discover every ELF extension before recursively collecting Python
+standard-library dependencies.
 
 ## Host verification
 
