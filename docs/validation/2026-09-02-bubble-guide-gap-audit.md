@@ -24,7 +24,7 @@ Status meanings:
 | Preserve the stock boot boundary before replacement | Stock boot artifacts, runtime DT, kernel/module/firmware inventories and matching hashes exist. Full offline recovery image, active U-Boot environment ownership, and failure rollback proof do not. | **device partial**; retain P1/P2 gates. Do not replace the preserved substrate yet. |
 | Make boot/provisioning progress and failure visible | Persistent `S10..S90` stage logs and recovery SSH exist. First-boot p3 expansion/p4 creation completed, but the common logo hides progress. | **open**; V90S-style progress renderer and failure screen remain required before release. |
 | Separate system, managed runtime, mutable config, and user media | Component-scoped libraries, app-layer checksums, factory defaults and active config separation exist. Live deploy preserves config hashes. | **device partial**; System A/B and final mount contract remain open. |
-| Do not auto-repair dirty removable media; warn and keep it read-only | SD2 is resolved separately and mounted read-only. Kernel reported FAT corruption. The FE exposed a Storage Check entry but its helper was absent. | **implemented now, device proof pending**: packaged `plumos-storage-health`; startup observation records kernel errors, manual checks refuse read-write mounts and only use `fsck -n` with a timeout. |
+| Do not auto-repair dirty removable media; warn and keep it read-only | SD2 is resolved separately. Kernel reported FAT corruption. The FE exposed a Storage Check entry but its helper was absent, and the minimal System did not remount SD2 after reboot. | **implemented now, device proof pending**: packaged a guarded read-only SD2 mount and `plumos-storage-health`; startup observation records kernel errors, manual checks refuse read-write mounts and only use `fsck -n` with a timeout. |
 | Fonts and other UI assets must be owned independently of ROM media | UTF-8 Japanese names are correct in `library-index.json`, but font lookup followed SD2 and fell back to built-in ASCII. | **implemented now, device proof pending**: primary/fallback fonts resolve from `/storage/plumos/fonts` first; build probes Japanese glyphs. |
 | Capture physical input and preserve printed button labels | Full evdev/js identity map is recorded. PicoArch A/B, missing L3/R3 and Function1 were corrected. The user passed the PicoArch QuickNES A/B/menu/exit sequence. | **device partial**; X/Y, shoulders, both sticks, standalone layouts, volume and power remain per-route gates. |
 | Validate display by renderer/content class | Software RetroArch, GLES RetroArch, PicoArch and GLES standalone processes ran. PicoArch QuickNES orientation/aspect is physically accepted. | **device partial**; vertical arcade, rotated handheld, square/wide/dual-screen, GLES and standalone classes remain separate physical gates. |
@@ -41,7 +41,8 @@ Status meanings:
 2. Log the selected primary and fallback font at FE startup so a future failure
    can be distinguished from malformed filenames.
 3. Implement the previously missing storage-health backend without any repair
-   mode, and observe dirty-media evidence before the library scan.
+   mode, and observe dirty-media evidence before and after the library scan.
+   A mounted SD2 also overrides the supervisor's generic `/storage` default.
 4. Record the user's physical PicoArch QuickNES input/display/audio acceptance
    without extending that result to untested routes.
 

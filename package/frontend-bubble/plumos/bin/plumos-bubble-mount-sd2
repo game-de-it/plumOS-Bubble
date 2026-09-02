@@ -1,0 +1,40 @@
+#!/bin/sh
+set -eu
+
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+DEVICE=${PLUMOS_SD2_DEVICE:-/dev/mmcblk3p1}
+TARGET=${PLUMOS_SD2_MOUNTPOINT:-/run/media/sd2}
+LOG=${PLUMOS_ROOT:-/storage/plumos}/logs/storage-health.log
+
+mounted_source=$($BB awk -v path="$TARGET" '$2 == path { print $1; exit }' /proc/mounts)
+if [ -n "$mounted_source" ]; then
+    if [ "$mounted_source" = "$DEVICE" ]; then
+        printf 'sd2_mount=result-already-mounted device=%s target=%s\n' "$DEVICE" "$TARGET"
+        exit 0
+    fi
+    printf 'sd2_mount=result-refused reason=target-owned source=%s target=%s\n' \
+        "$mounted_source" "$TARGET" >&2
+    exit 1
+fi
+
+[ -b "$DEVICE" ] || {
+    printf 'sd2_mount=result-unavailable device=%s\n' "$DEVICE"
+    exit 0
+}
+storage_source=$($BB awk '$2 == "/storage" { print $1; exit }' /proc/mounts)
+if [ -n "$storage_source" ] && [ "$storage_source" = "$DEVICE" ]; then
+    printf 'sd2_mount=result-refused reason=os-storage-device device=%s\n' "$DEVICE" >&2
+    exit 1
+fi
+
+$BB mkdir -p "$TARGET" "${LOG%/*}"
+if $BB mount -t vfat -o ro,utf8,shortname=mixed,errors=remount-ro \
+    "$DEVICE" "$TARGET"; then
+    printf 'sd2_mount=result-ok device=%s target=%s mode=read-only\n' \
+        "$DEVICE" "$TARGET" | $BB tee -a "$LOG"
+    exit 0
+fi
+printf 'sd2_mount=result-failed device=%s target=%s\n' "$DEVICE" "$TARGET" |
+    $BB tee -a "$LOG" >&2
+exit 1
+

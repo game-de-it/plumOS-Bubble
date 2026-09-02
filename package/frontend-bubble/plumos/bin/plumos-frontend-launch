@@ -8,12 +8,16 @@ LOG=$PLUMOS_ROOT/logs/frontend.log
 SCAN_TIMEOUT=${PLUMOS_LIBRARY_SCAN_TIMEOUT:-180}
 case "$SCAN_TIMEOUT" in *[!0-9]*|'') SCAN_TIMEOUT=180 ;; esac
 export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT"
-if [ -z "${PLUMOS_SDCARD_ROOT:-}" ]; then
-    if $BB grep -qs ' /run/media/sd2 ' /proc/mounts; then
-        PLUMOS_SDCARD_ROOT=/run/media/sd2
-    else
-        PLUMOS_SDCARD_ROOT=/storage
-    fi
+if [ -x "$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2" ]; then
+    "$BB" sh "$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2" || true
+fi
+if $BB grep -qs ' /run/media/sd2 ' /proc/mounts &&
+    { [ -z "${PLUMOS_SDCARD_ROOT:-}" ] || [ "$PLUMOS_SDCARD_ROOT" = /storage ]; }; then
+    # The boot supervisor exports /storage as a generic default. A mounted SD2
+    # is the Bubble ROM owner and must take precedence over that default.
+    PLUMOS_SDCARD_ROOT=/run/media/sd2
+elif [ -z "${PLUMOS_SDCARD_ROOT:-}" ]; then
+    PLUMOS_SDCARD_ROOT=/storage
 fi
 if [ -z "${PLUMOS_ROM_ROOT:-}" ]; then
     case "$PLUMOS_SDCARD_ROOT" in
@@ -67,6 +71,10 @@ else
     scan_rc=$?
     printf 'frontend_scan=bounded_failure rc=%s timeout=%s index=preserved\n' \
         "$scan_rc" "$SCAN_TIMEOUT" >>"$LOG"
+fi
+if [ -x "$PLUMOS_ROOT/bin/plumos-storage-health" ]; then
+    "$BB" sh "$PLUMOS_ROOT/bin/plumos-storage-health" observe >>"$LOG" 2>&1 ||
+        printf 'frontend_storage_health=post-scan-observe-failed\n' >>"$LOG"
 fi
 printf 'frontend_exec=stage-S42\n' >>"$LOG"
 exec "$BB" sh "$PLUMOS_ROOT/bin/plumos-controller-ui-bubble" "$@" >>"$LOG" 2>&1

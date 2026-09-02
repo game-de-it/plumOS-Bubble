@@ -148,10 +148,15 @@
 - [ ] `BUB-P4-N02` first connect、credential persist、cold boot reconnect、Wi-Fi OFF persist、bounded recovery を確認する。
 - [ ] `BUB-P4-N03` USB host/device/charging controller と同時利用制約を調査し、product policy を決める。
 - [ ] `BUB-P4-S01` OS SD と ROM SD を UUID/label/partition identity で安全に解決する。
+  - Bubble runtime inventoryで固定したsecondary controller `/dev/mmcblk3p1`だけを、
+    OS `/storage` sourceとの非一致を確認して`/run/media/sd2`へread-only mountするhelperを追加。
+    UUID/labelによる可搬なidentityと抜差し再mountは引き続き未完了。
 - [ ] `BUB-P4-S02` dirty ROM SD を自動修復せず、警告・read-only・退避手順を定義する。
   - startup時のkernel filesystem errorをmanaged stateへ記録し、System Settingsへ表示する
     `plumos-storage-health observe`を追加した。手動checkはread-write mountを拒否し、
     FAT checkerがある場合も`-n`と120秒timeoutだけを使用する。実機表示確認を残す。
+  - supervisorのgeneric `/storage` exportよりmounted SD2を優先し、scan後にもkernel errorを
+    再観測する。これによりscan中に初めて現れるFAT errorも警告状態へ残す。
 
 ## P5: frontend and minimum game-path baseline
 
