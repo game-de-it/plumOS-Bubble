@@ -74,3 +74,34 @@ skip at normal `ondemand`, correct picture/aspect/input, and normal FE return.
 Pyxel requires an FE launch of actual `.pyxapp` content, visible picture,
 input, audio where applicable and normal FE return. Neither item is closed by
 the host import test alone.
+
+## Managed live deployment
+
+The managed delta was deployed without stopping the already-running FCEUmm
+session. Device-side staging hashes passed before atomic rename. The rollback
+archive is
+`state/update-rollback/4039c74-20260902T152139Z-pre.tar` with SHA-256
+`2b258ed3f2468b2564f573ba2837bb5653721241036d6cbdfa20c370cc401ec6`.
+It contains the 12 pre-existing changed files; `apps/pyxel/lib/libdl.so.2` and
+`bin/plumos-retroarch-config-merge` were absent despite entries in the old
+managed metadata, so there was no old payload to archive for those two paths.
+
+Post-switch verification passed:
+
+```text
+source_ref=4039c74
+frontend checksums=141/141
+retroarch checksums=109/109
+pyxel checksums=2210/2210
+app-layer checksums=4977/4977
+device_pyxel_import=result-ok version=2.9.3
+governors=ondemand
+```
+
+The active RetroArch, frontend and system setting hashes remained respectively
+`13399c597e7ef33dc33e7bfa158d9c6810b85b79c1a8575aeb7a86445d288628`,
+`1fece30c9240a260ed5c480c5da9873f9af3052b7ba796a129ffa065c7d64ee4`,
+and `a623fcc8319e92114ba0c4fe6710961d07324f3a45d579ba4da703741f3ac063`.
+The running game retained its original PID and therefore still used the old
+non-threaded launch. NES audio acceptance begins only after the user exits and
+relaunches that content.

@@ -208,7 +208,7 @@
     visible unsupported。各runtimeの実機検証を残す。
   - PicoArchの欠落SDL2をcomponent内へ追加し、QuickNES contentと停止時child回収を実機確認。
   - PyxelはBubble Systemに無い`libdl.so.2`でimport前に失敗していた。互換DSOを
-    component-scopedで同梱し、Pyxel 2.9.3 host importまで合格。実機FEからの
+    component-scopedで同梱し、Pyxel 2.9.3のhost/device importまで合格。実機FEからの
     `.pyxapp`表示・入力・音声・終了復帰は未確認。
     standalone YabaSanshiroもSaturn content、GLES、ALSA、正常終了に合格した。
 - [ ] `BUB-P6-04` package済みcoreからFE導線、FE導線からlauncher/coreを双方向検証し、
