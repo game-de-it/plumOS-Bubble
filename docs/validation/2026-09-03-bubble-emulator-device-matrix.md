@@ -90,13 +90,23 @@ Pyxel runtime.
 
 ## Deployed state
 
-The OpenBOR renderer correction was deployed as source `54a8a2a`. The staged
-files matched their host SHA-256 values before switching, then standalone and
-all 4,984 app-layer checksums passed on-device. Rollback archive:
+The OpenBOR renderer correction was first deployed as source `54a8a2a`. The
+MSX default and route-coverage correction then advanced the device to source
+`605f133`. Each staged file matched its host SHA-256 value before switching;
+the affected component and all 4,984 app-layer checksums passed after both
+deployments. Rollback archives:
 
 ```text
 /storage/plumos/state/update-rollback/c8a158d-to-54a8a2a-20260903T060500JST.tar
 SHA-256 6ba54e1896f5c30bf640c3baf478d91fc36f30353829883c0effcffd5168932d
+
+/storage/plumos/state/update-rollback/54a8a2a-to-605f133-20260903T062000JST.tar
+SHA-256 64bba69d6232e3174077aa92e1aaeadf3f3ba694d692f21ba88eb4b3992a0d3a
 ```
+
+The normal frontend was restored after the matrix. Exactly one
+`plumos-controller-ui-fbdev` process owned `/dev/fb0`; no validation bind mount
+or DRM owner remained. Persistent volume, runtime volume and softvol raw values
+were all verified as zero.
 
 No release was published.
