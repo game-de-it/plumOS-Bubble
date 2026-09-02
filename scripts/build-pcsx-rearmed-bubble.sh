@@ -59,10 +59,15 @@ cmake -S "$SDL12_ROOT" -B "$SDL12_ROOT/build-bubble" \
 cmake --build "$SDL12_ROOT/build-bubble" -j"$JOBS"
 cmake --install "$SDL12_ROOT/build-bubble"
 
+# Docker and macOS address the same checkout through different absolute paths.
+# Prune worktree metadata before and after removing the generated build tree so
+# a previous host/container build cannot leave an unusable .git indirection.
+git -C "$SOURCE_ROOT" worktree prune
 if [ -e "$BUILD_ROOT" ]; then
     git -C "$SOURCE_ROOT" worktree remove --force "$BUILD_ROOT" 2>/dev/null || true
     find "$BUILD_ROOT" -depth -delete 2>/dev/null || true
 fi
+git -C "$SOURCE_ROOT" worktree prune
 git -C "$SOURCE_ROOT" worktree add --detach "$BUILD_ROOT" "$PCSX_REF"
 git -C "$BUILD_ROOT" submodule update --init frontend/libpicofe
 git -C "$BUILD_ROOT" apply --ignore-space-change --ignore-whitespace "$PCSX_PATCH"

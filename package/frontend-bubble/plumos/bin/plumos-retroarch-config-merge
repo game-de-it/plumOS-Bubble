@@ -5,11 +5,15 @@ BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
 config=${PLUMOS_RETROARCH_CONFIG:-$PLUMOS_ROOT/config/retroarch/retroarch-bubble.cfg}
 factory=${PLUMOS_RETROARCH_FACTORY_CONFIG:-$PLUMOS_ROOT/factory-defaults/retroarch/retroarch-bubble.cfg}
+legacy_defaults=${PLUMOS_RETROARCH_LEGACY_DEFAULTS:-$PLUMOS_ROOT/factory-defaults/retroarch/retroarch-bubble-pre-v90s.cfg}
 state_dir=${PLUMOS_RETROARCH_CONFIG_STATE:-$PLUMOS_ROOT/state/retroarch}
 marker=$state_dir/factory-config.sha256
 # Initial Bubble factory shipped before the V90S configuration surface was
 # ported. It is safe to replace only when the active file is byte-identical.
 legacy_bubble_sha256=9e0cee764c7840a904403ba8fcde7c1cc4729d1b759aabbe4563e43f4112627b
+# First full V90S-derived Bubble factory. Its missing-key-only migration left
+# RetroArch's serialized pre-port defaults in every existing setting slot.
+pre_v90s_full_factory_sha256=0a10e596d378325e9449fa8374f3f62d9c198461b3db4a69f61634824ddc638a
 
 [ -s "$factory" ] || {
     printf 'retroarch_config=result-error reason=factory-missing path=%s\n' "$factory" >&2
@@ -66,6 +70,56 @@ merge_missing_keys() {
     fi
 }
 
+migrate_pre_v90s_defaults() {
+    migrate_next=${config}.next.$$
+    migrate_count=$state_dir/migrate-pre-v90s-count.$$
+    $BB awk '
+        NR == FNR {
+            if ($0 ~ /^[A-Za-z0-9_.-]+[[:space:]]*=/) {
+                key=$0
+                sub(/[[:space:]]*=.*/, "", key)
+                legacy[key]=$0
+            }
+            next
+        }
+        FILENAME == factory_path {
+            if ($0 ~ /^[A-Za-z0-9_.-]+[[:space:]]*=/) {
+                key=$0
+                sub(/[[:space:]]*=.*/, "", key)
+                replacement[key]=$0
+            }
+            next
+        }
+        {
+            line=$0
+            if ($0 ~ /^[A-Za-z0-9_.-]+[[:space:]]*=/) {
+                key=$0
+                sub(/[[:space:]]*=.*/, "", key)
+                if ((key in legacy) && (key in replacement) &&
+                    line == legacy[key] && line != replacement[key]) {
+                    line=replacement[key]
+                    changed++
+                }
+            }
+            print line
+        }
+        END { print changed + 0 > count_file }
+    ' count_file="$migrate_count" factory_path="$factory" \
+        "$legacy_defaults" "$factory" "$config" \
+        >"$migrate_next"
+    legacy_changed=$($BB sed -n '1p' "$migrate_count" 2>/dev/null || printf '0')
+    $BB rm -f "$migrate_count"
+    if [ "$legacy_changed" -gt 0 ]; then
+        legacy_backup=$state_dir/pre-v90s-active.cfg
+        [ -s "$legacy_backup" ] || atomic_copy "$config" "$legacy_backup"
+        $BB sync
+        $BB mv "$migrate_next" "$config"
+        $BB sync
+    else
+        $BB rm -f "$migrate_next"
+    fi
+}
+
 result=unchanged
 added=0
 if [ ! -s "$config" ]; then
@@ -79,6 +133,14 @@ else
         atomic_copy "$factory" "$config"
         result=replaced-legacy
         added=3315
+    elif [ -s "$legacy_defaults" ] && [ -r "$marker" ] &&
+         [ "$($BB sed -n '1p' "$marker")" = "$pre_v90s_full_factory_sha256" ]; then
+        # Three-way migration: update only values that still exactly match the
+        # defaults serialized from the pre-port cfg. Explicit user values win.
+        migrate_pre_v90s_defaults
+        merge_missing_keys
+        result=migrated-pre-v90s
+        added=$((legacy_changed + added))
     elif [ ! -r "$marker" ] ||
          [ "$($BB sed -n '1p' "$marker")" != "$factory_sha256" ]; then
         # User values always win. Only keys absent from the active config are

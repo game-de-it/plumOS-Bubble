@@ -62,6 +62,8 @@ strip "$bin/retroarch" "$bin/plumos-amixer"
 install -m 0644 "$work/COPYING" "$root/licenses/RetroArch-COPYING"
 install -m 0644 "$repo_root/configs/retroarch/bubble-software-drm.cfg" \
     "$root/factory-defaults/retroarch/retroarch-bubble.cfg"
+install -m 0644 "$repo_root/configs/retroarch/bubble-pre-v90s-expanded.cfg" \
+    "$root/factory-defaults/retroarch/retroarch-bubble-pre-v90s.cfg"
 install -m 0644 "$repo_root/configs/retroarch/autoconfig/udev/gkd-bubble-retrogame-joypad.cfg" \
     "$root/factory-defaults/retroarch/autoconfig/udev/"
 cp -a /usr/share/alsa/. "$root/share/alsa/"
