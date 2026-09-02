@@ -18,6 +18,9 @@ pre_v90s_full_factory_sha256=0a10e596d378325e9449fa8374f3f62d9c198461b3db4a69f61
 # screenshots. The physical acceptance policy now assigns every emulator menu
 # to Function1. Only migrate the exact managed pair; user remaps still win.
 function2_menu_factory_sha256=23878b2e84b5145f43925f15aae1a424be75748e84b5ba209fbe7b4231de9635
+# First full Bubble factory after the Function1 migration.  It accidentally
+# kept a fixed 4:3 aspect instead of MF's core-provided aspect policy.
+fixed_aspect_factory_sha256=04bf95ccb13544c17fe03dabe70024be8ed17e8a40f2ae9e3f313a09f5b82348
 
 [ -s "$factory" ] || {
     printf 'retroarch_config=result-error reason=factory-missing path=%s\n' "$factory" >&2
@@ -142,6 +145,22 @@ migrate_function1_menu_defaults() {
     fi
 }
 
+migrate_fixed_aspect_default() {
+    aspect_changed=0
+    if $BB grep -qx 'video_aspect_ratio_auto = "false"' "$config"; then
+        aspect_backup=$state_dir/pre-core-aspect-active.cfg
+        [ -s "$aspect_backup" ] || atomic_copy "$config" "$aspect_backup"
+        aspect_next=${config}.next.$$
+        $BB sed \
+            's/^video_aspect_ratio_auto = "false"$/video_aspect_ratio_auto = "true"/' \
+            "$config" >"$aspect_next"
+        $BB sync
+        $BB mv "$aspect_next" "$config"
+        $BB sync
+        aspect_changed=1
+    fi
+}
+
 result=unchanged
 added=0
 if [ ! -s "$config" ]; then
@@ -169,6 +188,12 @@ else
         merge_missing_keys
         result=migrated-pre-v90s
         added=$((legacy_changed + added))
+    elif [ -r "$marker" ] &&
+         [ "$($BB sed -n '1p' "$marker")" = "$fixed_aspect_factory_sha256" ]; then
+        migrate_fixed_aspect_default
+        merge_missing_keys
+        result=migrated-core-aspect
+        added=$((aspect_changed + added))
     elif [ ! -r "$marker" ] ||
          [ "$($BB sed -n '1p' "$marker")" != "$factory_sha256" ]; then
         # User values always win. Only keys absent from the active config are

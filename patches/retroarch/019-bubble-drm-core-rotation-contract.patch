@@ -80,7 +80,7 @@ diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
 +   }
     surface->pitch       = surface->src_width * bpp;
 +
-+   RARCH_LOG("[DRM] Bubble display-contract layer=%d frame=%dx%d "
++   fprintf(stderr, "[DRM] Bubble display-contract layer=%d frame=%dx%d "
 +         "aspect=%.6f rotation=%u viewport=%dx%d+%d+%d scanout=%dx%d.\n",
 +         layer, src_width, src_height, surface->aspect, surface->rotation,
 +         surface->viewport.width, surface->viewport.height,
@@ -265,7 +265,7 @@ diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
 +      _drmvars->rotation = (_drmvars->panel_rotation + 4 - core_rotation) & 3;
 +      if ((_drmvars->rotation & 1) && _drmvars->current_aspect > 0.0f)
 +         _drmvars->current_aspect = 1.0f / _drmvars->current_aspect;
-+      RARCH_LOG("[DRM] Bubble rotations panel=%u core=%u content=%u.\n",
++      fprintf(stderr, "[DRM] Bubble rotations panel=%u core=%u content=%u.\n",
 +            _drmvars->panel_rotation, core_rotation, _drmvars->rotation);
 +   }
 +
@@ -298,7 +298,7 @@ diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
 +
 +   _drmvars->rotation = next_rotation;
 +   _drmvars->panel_rotation = next_panel_rotation;
-+   RARCH_LOG("[DRM] Bubble rotations panel=%u core=%u content=%u.\n",
++   fprintf(stderr, "[DRM] Bubble rotations panel=%u core=%u content=%u.\n",
 +         next_panel_rotation, core_rotation, next_rotation);
 +   if (_drmvars->main_surface)
 +   {
@@ -335,4 +335,3 @@ diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
     drm_viewport_info,
     NULL, /* read_viewport */
     NULL, /* read_frame_raw */
-

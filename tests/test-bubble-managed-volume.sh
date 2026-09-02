@@ -26,4 +26,9 @@ for launcher in \
     grep -q 'plumos-volume-control' "$launcher"
 done
 
+grep -q 'managed_audio_device=plumos_output' \
+    "$repo_root/package/frontend-bubble/plumos/bin/plumos-retroarch-launch"
+grep -q 'audio_device = "plumos_output"' \
+    "$repo_root/package/frontend-bubble/plumos/bin/plumos-retroarch-menu-launch"
+
 printf 'bubble_managed_volume=result-ok range=0..20 backend=alsa-softvol\n'

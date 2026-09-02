@@ -29,11 +29,23 @@ else
     export ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf"
 fi
 export XDG_CONFIG_HOME="$PLUMOS_ROOT/config"
+append_config=
+cleanup() {
+    [ -z "$append_config" ] || $BB rm -f "$append_config"
+}
+trap cleanup EXIT HUP INT TERM
+if [ -n "${ALSA_CONFIG_PATH:-}" ] && [ -x "$PLUMOS_ROOT/bin/plumos-audio-output" ]; then
+    append_config="$RUNTIME_ROOT/retroarch/menu.$$.cfg"
+    printf '%s\n' 'audio_device = "plumos_output"' >"$append_config"
+fi
 printf 'retroarch_menu=stage-S60 begin\n' >>"$PLUMOS_ROOT/logs/session.log"
 set +e
-"$PLUMOS_ROOT/bin/retroarch" -v -c "$config" \
-    >>"$PLUMOS_ROOT/logs/retroarch-menu.log" 2>&1
+set -- "$PLUMOS_ROOT/bin/retroarch" -v -c "$config"
+[ -z "$append_config" ] || set -- "$@" --appendconfig "$append_config"
+"$@" >>"$PLUMOS_ROOT/logs/retroarch-menu.log" 2>&1
 rc=$?
 set -e
 printf 'retroarch_menu=stage-S69 end rc=%s\n' "$rc" >>"$PLUMOS_ROOT/logs/session.log"
+cleanup
+trap - EXIT HUP INT TERM
 exit "$rc"

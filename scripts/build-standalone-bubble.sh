@@ -43,6 +43,7 @@ for path in \
     "$PCSX_BUILD/frontend/pandora/skin/background.png" \
     "$PCSX_BUILD/frontend/pandora/skin/skin.txt" \
     "$SDL12_BUILD/libSDL-1.2.so.0" \
+    "$YABASANSHIRO_BUILD/lib/libSDL2-2.0.so.0" \
     "$YABASANSHIRO_BUILD/yabasanshiro" \
     "$YABASANSHIRO_BUILD/LICENSE" \
     "$DRASTIC_BUILD/drastic" \
@@ -178,6 +179,11 @@ install -m 0644 "$PCSX_BUILD/plugins/gpu-gles/gpu_gles.so" \
     "$PLUMOS_DIR/emulator/standalone/pcsx_rearmed/plugins/gpu_gles.so"
 install -m 0644 "$SDL12_BUILD/libSDL-1.2.so.0" \
     "$PLUMOS_DIR/emulator/standalone/pcsx_rearmed/lib/libSDL-1.2.so.0"
+# sdl12-compat loads SDL2 by SONAME at runtime.  Keep the matching AArch64
+# KMSDRM SDL2 in the same component directory instead of relying on another
+# standalone emulator's private library directory.
+install -m 0644 "$YABASANSHIRO_BUILD/lib/libSDL2-2.0.so.0" \
+    "$PLUMOS_DIR/emulator/standalone/pcsx_rearmed/lib/libSDL2-2.0.so.0"
 install -m 0644 "$PCSX_BUILD/frontend/pandora/skin/font.png" \
     "$PLUMOS_DIR/emulator/standalone/pcsx_rearmed/skin/fontx2.png"
 install -m 0644 "$PCSX_BUILD/frontend/pandora/skin/selector.png" \

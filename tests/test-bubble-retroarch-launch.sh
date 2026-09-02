@@ -44,8 +44,18 @@ if [ "${TEST_HOLD:-0}" = 1 ]; then
     while :; do sleep 1; done
 fi
 EOF
+cat >"$root/bin/plumos-audio-output" <<'EOF'
+#!/bin/sh
+mkdir -p "${PLUMOS_RUNTIME_ROOT:-/run/plumos}/audio"
+: >"${PLUMOS_RUNTIME_ROOT:-/run/plumos}/audio/asound.conf"
+EOF
+cat >"$root/bin/plumos-volume-control" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
 chmod 0755 "$root/bin/retroarch" "$root/bin/plumos-retroarch-launch" \
-    "$root/bin/plumos-retroarch-config-merge"
+    "$root/bin/plumos-retroarch-config-merge" "$root/bin/plumos-audio-output" \
+    "$root/bin/plumos-volume-control"
 
 run_launcher() {
     trace=$1
@@ -63,6 +73,7 @@ grep -qx 'video_driver = "drm"' "$tmp/software.append"
 grep -qx 'video_context_driver = ""' "$tmp/software.append"
 grep -qx 'video_threaded = "true"' "$tmp/software.append"
 grep -qx 'system_directory = "/storage/BIOS"' "$tmp/software.append"
+grep -qx 'audio_device = "plumos_output"' "$tmp/software.append"
 ! grep -q '^config_save_on_exit = ' "$tmp/software.append"
 ! find "$runtime/retroarch" -type f -name 'launch.*.cfg' -print -quit | grep -q .
 
@@ -73,6 +84,7 @@ grep -qx 'video_driver = "gl"' "$tmp/hardware.append"
 grep -qx 'video_context_driver = "kms"' "$tmp/hardware.append"
 grep -qx 'video_threaded = "true"' "$tmp/hardware.append"
 grep -qx 'system_directory = "/storage/BIOS"' "$tmp/hardware.append"
+grep -qx 'audio_device = "plumos_output"' "$tmp/hardware.append"
 ! grep -q '^config_save_on_exit = ' "$tmp/hardware.append"
 ! find "$runtime/retroarch" -type f -name 'launch.*.cfg' -print -quit | grep -q .
 

@@ -50,6 +50,7 @@ if [ -x "$PLUMOS_ROOT/bin/plumos-audio-output" ]; then
     "$BB" sh "$PLUMOS_ROOT/bin/plumos-audio-output" prepare \
         >>"$PLUMOS_ROOT/logs/retroarch-audio.log" 2>&1
     export ALSA_CONFIG_PATH="$RUNTIME_ROOT/audio/asound.conf"
+    managed_audio_device=plumos_output
     [ -x "$PLUMOS_ROOT/bin/plumos-volume-control" ] &&
         "$BB" sh "$PLUMOS_ROOT/bin/plumos-volume-control" apply \
         >>"$PLUMOS_ROOT/logs/retroarch-audio.log" 2>&1 || true
@@ -84,6 +85,11 @@ esac
 # own BIOS on SD2. Resolve that active media root per launch without rewriting
 # the user's persistent RetroArch configuration.
 printf 'system_directory = "%s"\n' "$PLUMOS_BIOS_ROOT" >>"$append_config"
+# The generated Bubble ALSA graph intentionally exposes only the managed
+# softvol PCM.  Do not inherit the shared hw:0,0 setting, which both bypasses
+# the zero-volume validation guard and is undefined in that bounded graph.
+[ -z "${managed_audio_device:-}" ] || \
+    printf 'audio_device = "%s"\n' "$managed_audio_device" >>"$append_config"
 retroarch_pid=
 cleanup() {
     [ -z "$append_config" ] || $BB rm -f "$append_config"

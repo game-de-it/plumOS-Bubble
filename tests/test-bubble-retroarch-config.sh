@@ -27,6 +27,7 @@ test "$unique_count" -eq 3376
 grep -qx 'video_driver = "drm"' "$factory"
 grep -qx 'video_context_driver = ""' "$factory"
 grep -qx 'video_rotation = "0"' "$factory"
+grep -qx 'video_aspect_ratio_auto = "true"' "$factory"
 grep -qx 'video_threaded = "true"' "$factory"
 grep -qx 'audio_device = "hw:0,0"' "$factory"
 grep -qx 'audio_latency = "64"' "$factory"
@@ -126,7 +127,7 @@ printf '%s\n' '0a10e596d378325e9449fa8374f3f62d9c198461b3db4a69f61634824ddc638a'
     >"$legacy_root/state/retroarch/factory-config.sha256"
 PLUMOS_ROOT=$legacy_root PLUMOS_BUSYBOX=/bin/busybox \
     "$legacy_root/bin/plumos-retroarch-config-merge" >"$tmp/legacy.log"
-grep -q '^retroarch_config=result-migrated-pre-v90s added=121 ' \
+grep -q '^retroarch_config=result-migrated-pre-v90s added=120 ' \
     "$tmp/legacy.log"
 legacy_active=$legacy_root/config/retroarch/retroarch-bubble.cfg
 grep -qx 'rgui_menu_color_theme = "23"' "$legacy_active"
@@ -173,5 +174,28 @@ printf '%s\n' '23878b2e84b5145f43925f15aae1a424be75748e84b5ba209fbe7b4231de9635'
 PLUMOS_ROOT=$function_root PLUMOS_BUSYBOX=/bin/busybox \
     "$function_root/bin/plumos-retroarch-config-merge" >"$tmp/function1-user.log"
 grep -qx 'input_menu_toggle_btn = "9"' "$function_active"
+
+# Migrate the accidental fixed-4:3 Bubble default only when both the marker
+# and the active value identify the old managed generation.
+aspect_root=$tmp/aspect/plumos
+mkdir -p "$aspect_root/bin" "$aspect_root/factory-defaults/retroarch" \
+    "$aspect_root/config/retroarch" "$aspect_root/state/retroarch"
+cp "$helper" "$aspect_root/bin/plumos-retroarch-config-merge"
+cp "$factory" "$aspect_root/factory-defaults/retroarch/retroarch-bubble.cfg"
+cp "$legacy_defaults" \
+    "$aspect_root/factory-defaults/retroarch/retroarch-bubble-pre-v90s.cfg"
+chmod 0755 "$aspect_root/bin/plumos-retroarch-config-merge"
+cp "$factory" "$aspect_root/config/retroarch/retroarch-bubble.cfg"
+sed -i 's/^video_aspect_ratio_auto = "true"$/video_aspect_ratio_auto = "false"/' \
+    "$aspect_root/config/retroarch/retroarch-bubble.cfg"
+printf '%s\n' '04bf95ccb13544c17fe03dabe70024be8ed17e8a40f2ae9e3f313a09f5b82348' \
+    >"$aspect_root/state/retroarch/factory-config.sha256"
+PLUMOS_ROOT=$aspect_root PLUMOS_BUSYBOX=/bin/busybox \
+    "$aspect_root/bin/plumos-retroarch-config-merge" >"$tmp/aspect.log"
+grep -q '^retroarch_config=result-migrated-core-aspect added=1 ' \
+    "$tmp/aspect.log"
+grep -qx 'video_aspect_ratio_auto = "true"' \
+    "$aspect_root/config/retroarch/retroarch-bubble.cfg"
+test -s "$aspect_root/state/retroarch/pre-core-aspect-active.cfg"
 
 printf 'bubble_retroarch_config_test=result-ok keys=%s duplicates=0\n' "$key_count"
