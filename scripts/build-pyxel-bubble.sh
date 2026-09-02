@@ -289,6 +289,7 @@ PYXEL_ROOT="${PLUMOS_BUBBLE_PYXEL_ROOT:-$PLUMOS_ROOT/apps/pyxel}"
 USER_SITE="${PLUMOS_PYXEL_USER_SITE:-$PLUMOS_ROOT/state/pyxel-site}"
 BASE_SITE="$PYXEL_ROOT/site"
 FIT_LIBRARY="${PLUMOS_PYXEL_FIT_LIBRARY:-$PYXEL_ROOT/lib/plumos-pyxel-fit.so}"
+MALI_LIBRARY="${PLUMOS_PYXEL_MALI_LIBRARY:-$PLUMOS_ROOT/emulator/lib/libmali.so.1}"
 LOG_DIR="${PLUMOS_PYXEL_LOG_DIR:-$PLUMOS_ROOT/logs/pyxel}"
 [ -x "$BB" ] || BB=/bin/busybox
 mkdir -p "$LOG_DIR" 2>/dev/null || true
@@ -322,12 +323,25 @@ export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-alsa}"
 [ ! -d "$PLUMOS_ROOT/lib/alsa-lib" ] ||
   export ALSA_PLUGIN_DIR="${ALSA_PLUGIN_DIR:-$PLUMOS_ROOT/lib/alsa-lib}"
 export SDL_VIDEO_KMSDRM_DEVICE_INDEX="${SDL_VIDEO_KMSDRM_DEVICE_INDEX:-0}"
-export SDL_VIDEO_EGL_DRIVER="${SDL_VIDEO_EGL_DRIVER:-$PYXEL_ROOT/lib/libEGL.so.1}"
-export SDL_VIDEO_GL_DRIVER="${SDL_VIDEO_GL_DRIVER:-$PYXEL_ROOT/lib/libGLESv2.so.2}"
-export LIBGL_DRIVERS_PATH="${LIBGL_DRIVERS_PATH:-$PYXEL_ROOT/dri}"
-export __EGL_VENDOR_LIBRARY_FILENAMES="${__EGL_VENDOR_LIBRARY_FILENAMES:-$PYXEL_ROOT/egl_vendor.d/50_mesa.json}"
-export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
-export MESA_LOADER_DRIVER_OVERRIDE="${MESA_LOADER_DRIVER_OVERRIDE:-kms_swrast}"
+if [ -r "$MALI_LIBRARY" ]; then
+  # RK3566's stock driver is one stateful mega-DSO. Loading copied EGL and
+  # GLES aliases as different files creates two driver states: SDL reports a
+  # context, but glGetString(GL_VERSION) returns NULL. Use the exact same DSO
+  # for EGL, GLES and the fit adapter's symbol lookup.
+  export PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib${PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH:+:$PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH}"
+  export SDL_VIDEO_EGL_DRIVER="${SDL_VIDEO_EGL_DRIVER:-$MALI_LIBRARY}"
+  export SDL_VIDEO_GL_DRIVER="${SDL_VIDEO_GL_DRIVER:-$MALI_LIBRARY}"
+  export PLUMOS_PYXEL_GLES_LIBRARY="${PLUMOS_PYXEL_GLES_LIBRARY:-$MALI_LIBRARY}"
+  unset LIBGL_ALWAYS_SOFTWARE MESA_LOADER_DRIVER_OVERRIDE \
+    __EGL_VENDOR_LIBRARY_FILENAMES
+else
+  export SDL_VIDEO_EGL_DRIVER="${SDL_VIDEO_EGL_DRIVER:-$PYXEL_ROOT/lib/libEGL.so.1}"
+  export SDL_VIDEO_GL_DRIVER="${SDL_VIDEO_GL_DRIVER:-$PYXEL_ROOT/lib/libGLESv2.so.2}"
+  export LIBGL_DRIVERS_PATH="${LIBGL_DRIVERS_PATH:-$PYXEL_ROOT/dri}"
+  export __EGL_VENDOR_LIBRARY_FILENAMES="${__EGL_VENDOR_LIBRARY_FILENAMES:-$PYXEL_ROOT/egl_vendor.d/50_mesa.json}"
+  export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
+  export MESA_LOADER_DRIVER_OVERRIDE="${MESA_LOADER_DRIVER_OVERRIDE:-kms_swrast}"
+fi
 export MESA_SHADER_CACHE_DISABLE="${MESA_SHADER_CACHE_DISABLE:-true}"
 export SDL_GAMECONTROLLERCONFIG="${SDL_GAMECONTROLLERCONFIG:-190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b17,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,}"
 if [ -r "$FIT_LIBRARY" ] && [ "${PLUMOS_PYXEL_FIT:-1}" != "0" ]; then

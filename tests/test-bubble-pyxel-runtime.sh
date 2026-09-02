@@ -12,6 +12,9 @@ grep -Fq 'install -m 0644 "$compat_path" "$PYXEL_LIB/libdl.so.2"' "$builder"
 grep -Fq 'test -f "$PYXEL_LIB/libdl.so.2"' "$builder"
 grep -Fq '"source_ref": "$source_ref"' "$builder"
 grep -Fq 'PLUMOS_BUBBLE_PYTHON_LD_PRELOAD' "$builder"
+grep -Fq 'PLUMOS_PYXEL_MALI_LIBRARY' "$builder"
+grep -Fq 'PLUMOS_PYXEL_GLES_LIBRARY' "$builder"
+grep -Fq 'Use the exact same DSO' "$builder"
 if grep -Fq 'export LD_LIBRARY_PATH="$PYXEL_ROOT/lib:$PYTHON_ROOT/lib:/usr/lib"' "$builder"; then
     printf 'Bubble Pyxel launcher must not expose the glibc runtime to stock BusyBox\n' >&2
     exit 1
