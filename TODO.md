@@ -166,7 +166,8 @@
   - CPU DRM、runtime connector/mode discovery、Bubble物理A/B mappingをhost build済み。
     `S39..E81`、input trace、frame statsを次のphysical gateへ組み込み済み。
   - SD2をROM rootにした際もmanaged app-layerのprimary/CJK fallback fontを優先し、
-    日本語glyphをbuild時に検査するよう修正。実機の日本語ファイル名表示確認を残す。
+    日本語glyphをbuild時に検査するよう修正。日本語ファイル名が`???`にならず表示されることを
+    利用者が実機確認済み。P5-01全体はDRM/page-flip gateが残るためopenを維持する。
 - [ ] `BUB-P5-02` FEのinput、audio、brightness/volume、power menu ownershipをBubble helperへ接続する。
 - [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
   - RetroArch v1.22.2とQuickNES `058d665`をAArch64 containerからbuildし、

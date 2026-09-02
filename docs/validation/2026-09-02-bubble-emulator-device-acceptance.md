@@ -97,4 +97,6 @@ the kernel FAT errors as `dirty`, and changed later boots to preserve the comple
 index instead of rescanning known-dirty media. Post-switch verification passed
 4978/4978 managed entries, one frontend process, no scanner/game process, and
 unchanged active configuration hashes. Physical confirmation that Japanese
-glyphs are visible rather than `???` remains the final font acceptance step.
+glyphs are visible rather than `???` subsequently passed on the device. The
+Japanese filename display defect is closed; this does not close the independent
+display matrix for emulator content.
