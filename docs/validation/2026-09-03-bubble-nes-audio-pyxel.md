@@ -316,3 +316,21 @@ The preceding managed set is preserved at
 `state/update-rollback/afd8801-audio-resume.tar`, SHA-256
 `6e9ec0b8ad00f4644a170aaf51c84ba84dea9d5647c672d9775eadfcbd205ef4`.
 Frontend PID 994 remained alive and mutable user data was not replaced.
+
+## Physical acceptance of Patch 018
+
+The user repeatedly opened and closed RGUI from an FCEUmm NES game and
+confirmed that content resumed every time without a hang. Game audio and
+scrolling were both normal after resume. The persistent runtime log contains
+repeated alternating `PCM dropped for menu pause` and `PCM prepared after
+menu` events, confirming that the new lifecycle path ran across the menu
+transitions rather than only at initial startup.
+
+A read-only PCM sample taken while RGUI was open showed `SETUP`, zero delay and
+fixed pointers. That is the expected menu-paused state after `snd_pcm_drop()`,
+not playback evidence and not a regression. The physical resumed-content check
+is the acceptance evidence for audio and scrolling.
+
+This closes the RGUI resume regression for the tested FCEUmm/NES route only.
+It does not mark other systems, cores, display classes or audio routes as
+accepted; those remain tracked under `BUB-P6-10`.

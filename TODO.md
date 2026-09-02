@@ -110,11 +110,10 @@
 - [ ] `BUB-P4-D02` CPU-rendered DRM dumb-buffer double buffering と page-flip completion を実装する。
   - MFの共通rendererとRetroArch DRM修正をBubbleへ移植し、FEとRetroArch RGUIの実パネル表示、
     DRM handoff、FEへの再取得まで確認した。page-flip継続計測を残す。
-  - RGUIからcontentへ戻る際のhangを再現。014のpage ownership修正後もmain threadが
-    `poll(2)`で停止し、Bubble stock DRMが同期menu commit後のflip eventを返さないことを
-    特定。015でmenuはeventを要求しないblocking commitへ変更し、game側timeout logへ
-    layer/target FB/scanout FB/待機時間を追加した。source `35d7172`をdeployしapp 4978/4978
-    合格。複数回のmenu往復による物理acceptanceを残す。
+  - RGUIからcontentへ戻る際のhangは、初期のkernel stackでは`poll(2)`しか見えなかったが、
+    追加したmenu/game barrier logは全て完了した。symbol付きgdb backtraceで実停止箇所を
+    ALSAの`snd_pcm_wait`と確定し、DRM transition起因ではないことを確認した。DRMの
+    page-flip継続計測自体は本項目に残す。
 - [ ] `BUB-P4-D03` 640x480 panel の実 refresh、scroll pacing、input-to-visible response を測定する。
 - [ ] `BUB-P4-D04` fbdev/DRM handoff、FE/game/menu、終了後のscanout ownershipを物理確認する。
 - [ ] `BUB-P4-D05` vendor `libmali` のlicense、redistribution、DDK/kernel ABIを監査し、採用・隔離・不採用を決定する。
@@ -262,7 +261,9 @@
     `audio_driver_flush -> alsa_write -> snd_pcm_wait`と確定した。PCMは`RUNNING`表示のまま
     1秒以上hw/appl pointerが不変であり、vendor 4.19 RK817のpause解除後DMA停止を特定。
     menu開始をPCM drop、復帰をprepareへ変更したsource `afd8801`をRetroArch 110/110、
-    app-layer 4978/4978でlive deploy済み。menu往復、DMA pointer進行、音声を実機再確認する。
+    app-layer 4978/4978でlive deploy済み。利用者がFCEUmm/NESで複数回menuを開閉し、hangせず、
+    復帰後のゲーム音声とスクロールも正常であることを物理確認した。このresume regressionは
+    合格とし、他core/runtimeへの一般化は`BUB-P6-10`で行わない。
   - PicoArch QuickNESのA/B、両Function menu、menu A決定/B戻る、FE復帰は物理合格。
   - standalone各機種固有layout、全runtimeの物理操作、menu/exit、system-owned volume/powerを残す。
 - [ ] `BUB-P6-10` 全system/coreをdisplay分類し、向き・content/menu rotation・aspect・audioを実機確認する。
