@@ -5,9 +5,21 @@ PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
 RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 LOG=$PLUMOS_ROOT/logs/frontend.log
+VALIDATION_HOLD=${PLUMOS_FRONTEND_VALIDATION_HOLD:-$RUNTIME_ROOT/validation/frontend-hold}
 SCAN_TIMEOUT=${PLUMOS_LIBRARY_SCAN_TIMEOUT:-180}
 case "$SCAN_TIMEOUT" in *[!0-9]*|'') SCAN_TIMEOUT=180 ;; esac
 export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT"
+# A root-only, tmpfs-backed hold gives device validation exclusive DRM/input
+# ownership without replacing this managed launcher or fighting PID 1's normal
+# frontend restart loop.  Removing the marker returns to the ordinary boot path.
+if [ -e "$VALIDATION_HOLD" ]; then
+    printf 'frontend_validation_hold=entered marker=%s\n' "$VALIDATION_HOLD" >>"$LOG"
+    while [ -e "$VALIDATION_HOLD" ]; do
+        "$BB" sleep 1
+    done
+    printf 'frontend_validation_hold=released marker=%s\n' "$VALIDATION_HOLD" >>"$LOG"
+    exit 0
+fi
 if [ -x "$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2" ]; then
     "$BB" sh "$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2" || true
 fi
