@@ -82,3 +82,19 @@ renderer classes remain independent acceptance gates.
 The currently retained SD image predates the live commits above. It remains a
 validation image and must be rebuilt before the next write or release-candidate
 gate; the live device is the newer validated state.
+
+## Japanese filename and dirty-media follow-up
+
+Live app-layer source `e976236` corrects a frontend ownership bug: ROM media may
+be `/run/media/sd2`, but fonts remain owned by `/storage/plumos/fonts`. After the
+update the frontend logged Noto Sans JP as its primary font and WenQuanYi Micro
+Hei as its fallback. A read-only SD2 rescan completed in 436 seconds with 599
+ROMs and retained Japanese UTF-8 names including `つっぱり大相撲.nes` and
+`スーパーマリオブラザーズ.nes`.
+
+The same pass restored `/dev/mmcblk3p1` after reboot as vfat read-only, recorded
+the kernel FAT errors as `dirty`, and changed later boots to preserve the complete
+index instead of rescanning known-dirty media. Post-switch verification passed
+4978/4978 managed entries, one frontend process, no scanner/game process, and
+unchanged active configuration hashes. Physical confirmation that Japanese
+glyphs are visible rather than `???` remains the final font acceptance step.
