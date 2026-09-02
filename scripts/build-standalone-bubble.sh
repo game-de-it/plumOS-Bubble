@@ -241,6 +241,11 @@ rsync -a \
     --exclude='SDL2-gfx-copyright' \
     "$OPENBOR_BUILD/" \
     "$PLUMOS_DIR/emulator/standalone/openbor/"
+# OpenBOR's generic Debian SDL2 can open KMSDRM, but its software renderer
+# cannot create the requested output surface on Bubble. Reuse the same minimal
+# KMSDRM/ALSA/GLES2 SDL2 build that is already validated by Pyxel and PCSX.
+install -m 0644 "$PCSX_SDL2_BUILD/stage/usr/lib/libSDL2-2.0.so.0" \
+    "$PLUMOS_DIR/emulator/standalone/openbor/lib/libSDL2-2.0.so.0"
 install -m 0644 "$OPENBOR_BUILD/LICENSE" \
     "$PLUMOS_DIR/licenses/openbor-LICENSE"
 install -m 0644 "$OPENBOR_BUILD/SDL2-gfx-copyright" \
@@ -313,7 +318,7 @@ cat >"$PLUMOS_DIR/components/standalone/manifest.json" <<EOF
       "binary": "emulator/standalone/openbor/bin/OpenBOR",
       "version": "v6391",
       "target_cpu": "cortex-a55",
-      "renderer": "stock-sdl2-kmsdrm-software",
+      "renderer": "bubble-sdl2-kmsdrm-gles2",
       "audio": "alsa-plumos-output",
       "input": "retrogame_joypad",
       "menu": "function-button"

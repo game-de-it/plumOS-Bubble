@@ -321,7 +321,7 @@ if [ "$emulator_id" = openbor ]; then
         "$BB" sh "$PLUMOS_ROOT/bin/plumos-volume-control" apply >>"$log" 2>&1 || true
     fi
 
-    printf 'openbor_start=renderer-stock-sdl2-kmsdrm content-%s\n' \
+    printf 'openbor_start=renderer-bubble-sdl2-kmsdrm-gles2 content-%s\n' \
         "$pak_name" >>"$log"
     set +e
     (
@@ -329,9 +329,11 @@ if [ "$emulator_id" = openbor ]; then
         HOME="$config_root" \
         XDG_CONFIG_HOME="$config_root" \
         XDG_DATA_HOME="$state_root" \
-        LD_LIBRARY_PATH="$runtime/lib:$PLUMOS_ROOT/emulator/lib:/usr/lib" \
+        LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib:$runtime/lib:/usr/lib" \
+        SDL_VIDEO_EGL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
+        SDL_VIDEO_GL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
         SDL_VIDEODRIVER=kmsdrm \
-        SDL_RENDER_DRIVER=software \
+        SDL_RENDER_DRIVER=opengles2 \
         SDL_AUDIODRIVER=alsa \
         AUDIODEV="$alsa_device" \
         SDL_VIDEO_KMSDRM_DEVICE_INDEX=0 \

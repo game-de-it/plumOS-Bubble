@@ -21,16 +21,25 @@ ROOT = "/storage/plumos"
 SD2 = "/run/media/sd2"
 VALIDATION_CONTENT = f"{ROOT}/state/device-matrix/content"
 VALIDATION_BIOS = f"{ROOT}/state/device-matrix/bios"
+INVALID_LIVE_CONTENT = {
+    "ngp": "sd2_archive_read_failed_and_no_clean_monochrome_ngp_content",
+    "pokemini": "no_valid_game_content_in_provided_mac_rom_set",
+}
 
 CONTENT_OVERRIDES = {
+    "sfc": f"{VALIDATION_CONTENT}/snes/Adventures of the Rocketeer.sfc",
+    "gb": f"{VALIDATION_CONTENT}/gb/Baseball.gb",
+    "gbc": f"{VALIDATION_CONTENT}/gbc/Cross Hunter - X Hunter Version.gbc",
+    "gba": f"{VALIDATION_CONTENT}/gba/Densetsu no Stafy (Japan).gba",
     "pcenginecd": f"{SD2}/pcenginecd/AkumajouDraculaX.pcdGAME/AkumajouDraculaX.cue",
     "psx": f"{SD2}/PSX/2/SCPS-10026.cue",
     "saturn": f"{SD2}/SATURN/VH.iso",
-    "msx": f"{SD2}/msx2/usas.rom",
+    "msx": f"{VALIDATION_CONTENT}/msx/usas.rom",
     "pico8": f"{SD2}/pico-8/51752.p8",
     "pyxel": f"{VALIDATION_CONTENT}/pyxel/finardry.pyxapp",
     "psp": f"{VALIDATION_CONTENT}/psp/probe.cso",
     "nds": f"{VALIDATION_CONTENT}/nds/probe.nds",
+    "n64": f"{VALIDATION_CONTENT}/n64/AeroGauge [V1.1].z64",
     "ngpc": f"{VALIDATION_CONTENT}/ngpc/probe.ngc",
     "fbneo": f"{VALIDATION_CONTENT}/fbneo/imgfight.zip",
     "mame2003plus": f"{VALIDATION_CONTENT}/mame2003plus/twinbee.zip",
@@ -96,6 +105,8 @@ def choose_content(system: dict, live: dict, device: Device) -> tuple[str | None
     override = CONTENT_OVERRIDES.get(sid)
     if override and remote_exists(device, override):
         return override, "explicit_validation_content" if override.startswith(ROOT) else "safe_live_override"
+    if sid in INVALID_LIVE_CONTENT:
+        return None, INVALID_LIVE_CONTENT[sid]
     live_system = next((s for s in live.get("systems", []) if s.get("id") == sid), None)
     if live_system:
         for rom in live_system.get("roms", []):
@@ -116,6 +127,9 @@ def route_command(system: dict, profile: str, content: str, bios_root: str) -> t
     prefix = " ".join(f"{key}={shlex.quote(value)}" for key, value in env.items())
     if profile.startswith("retroarch:"):
         core = profile.split(":", 1)[1]
+        if core == "bluemsx":
+            env["PLUMOS_BIOS_ROOT"] = f"{ROOT}/share/libretro-system/bluemsx"
+            prefix = " ".join(f"{key}={shlex.quote(value)}" for key, value in env.items())
         command = (
             f"{prefix} /bin/busybox sh {ROOT}/bin/plumos-retroarch-launch "
             f"--system {shlex.quote(sid)} --core {ROOT}/cores/{shlex.quote(core)}_libretro.so "
@@ -306,7 +320,7 @@ def main() -> int:
             command, log, seconds = route_command(system, profile, content or "", bios_root) if content else (None, None, 0)
             reason = None
             if not content:
-                reason = "no_compatible_content"
+                reason = content_source
             elif profile.startswith("external:"):
                 reason = "external_script_not_run_by_bounded_emulator_harness"
             elif system["id"] == "nds" and profile == "standalone:drastic":
@@ -352,17 +366,26 @@ def main() -> int:
             meta = parse_meta(output)
             runtime_delta = output.split("__RUNTIME_LOG__\n", 1)[-1].split("__WRAPPER_LOG__\n", 1)[0] if "__RUNTIME_LOG__" in output else ""
             wrapper_delta = output.split("__WRAPPER_LOG__\n", 1)[-1] if "__WRAPPER_LOG__\n" in output else ""
+            display_lines = re.findall(
+                r"(?:\[DRM\] )?Bubble (?:rotations|display-contract)[^\n]*|plumos-pyxel-(?:display|fit):[^\n]*",
+                runtime_delta,
+            )
             record.update({
                 "ssh_rc": result.returncode, "probe": meta,
                 "runtime_log_delta": runtime_delta[-16000:],
                 "wrapper_log_delta": wrapper_delta[-8000:],
+                "display_contract_lines": display_lines,
                 "elapsed_seconds": round(time.monotonic() - started, 2),
             })
             alive = meta.get("alive") == "yes"
             drm = meta.get("drm") not in {None, "", "none"}
             clean = meta.get("preexisting") in {None, "", "none"}
-            record["status"] = "started" if alive and drm and clean else "failed"
-            record["display_contract"] = "retroarch_drm" if "Bubble display-contract" in runtime_delta else "pyxel_fit" if "plumos-pyxel-fit:" in runtime_delta else "runtime_only"
+            # 137/143 are expected when the bounded harness stops a healthy
+            # route. A route that was alive at the early probe but then exits
+            # with its own failure code must not be reported as started.
+            bounded_exit = meta.get("rc") in {"0", "137", "143"}
+            record["status"] = "started" if alive and drm and clean and bounded_exit else "failed"
+            record["display_contract"] = "retroarch_drm" if any("Bubble display-contract" in line for line in display_lines) else "pyxel_fit" if any("plumos-pyxel-fit:" in line for line in display_lines) else "runtime_only"
             record["audio_contract"] = "pcm_running" if meta.get("pcm") == "RUNNING" else "not_observed"
             print(f"[{index:03d}/{len(planned):03d}] {record['system']} {record['profile']} status={record['status']} drm={meta.get('drm','?')} pcm={meta.get('pcm','?')}", flush=True)
             out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
