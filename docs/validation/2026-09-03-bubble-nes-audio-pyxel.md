@@ -195,8 +195,25 @@ verification: frontend 141/141, RetroArch 110/110, libretro core component
 The active cfg migration reported `result-migrated-pre-v90s added=123`; its
 pre-migration SHA-256 is preserved by the backup as
 `f3ffcb254b82028deed04217bccde5150e57c61dad7ce22e0ef91a113bb36407`.
-Frontend and system configuration hashes remained unchanged. The later Patch
-015/Function1 build is host-implementation work until its new managed bundle is
-deployed. Physical acceptance requires launching content, opening RGUI with
+Frontend and system configuration hashes remained unchanged.
+
+Patch 015 and the Function1 policy were subsequently built and deployed as app
+layer source `35d7172` (`retroarch` source `976d7d4`). The 27-file, 36.4 MB
+managed delta was verified before switching, then all affected device
+components passed: frontend 141/141, RetroArch 110/110, PicoArch 10/10,
+standalone 856/856, Pyxel 2210/2210 and PortMaster 226/226. The complete app
+layer passed 4978/4978.
+
+The live cfg now contains `input_menu_toggle_btn = "17"` and
+`input_screenshot_btn = "10"`; its factory marker is
+`04bf95ccb13544c17fe03dabe70024be8ed17e8a40f2ae9e3f313a09f5b82348`.
+The exact pre-migration cfg is preserved as
+`state/retroarch/pre-function1-menu-active.cfg` with SHA-256
+`c601c8185e37cca12c8f0122a951f15ba4639bd99c691cbab1e28debad44033f`.
+The complete managed rollback is
+`state/update-rollback/35d7172-function1-ra-resume.tar` with SHA-256
+`963f5da63f4962e3ad964fc5d83af5392f62ed304896ffe1d42ae0f311d6d38f`.
+
+Physical acceptance now requires launching content, opening RGUI with
 Function1, resuming repeatedly without a hang, checking the theme and Function2
 screenshot, and returning normally to the frontend.
