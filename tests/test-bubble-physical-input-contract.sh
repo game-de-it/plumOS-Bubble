@@ -52,6 +52,11 @@ grep -Fq 'bool synchronous_commit = menu_surface || plane_switch' "$resume_patch
 grep -Fq 'surface->plane_switch_pending = true' "$resume_patch"
 grep -Fq 'Completed synchronous plane-switch barrier' "$resume_patch"
 grep -Fq 'fflush(stderr)' "$resume_patch"
+mf_pacing_patch=patches/retroarch/017-bubble-drm-mf-blocking-game-commit.patch
+grep -Fq 'DRM_MODE_PAGE_FLIP_EVENT;' "$mf_pacing_patch"
+grep -Fq -- '-         (DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT);' \
+    "$mf_pacing_patch"
+grep -Fq 'same blocking atomic commit plus' "$mf_pacing_patch"
 ! grep -Fq 'ABS_Z/RZ triggers' scripts/build-picoarch-bubble.sh
 
 echo 'bubble_physical_input_contract=result-ok'

@@ -246,3 +246,23 @@ The previous five managed files remain at
 `caf48866f3860fee5198a38698a48a67e9d54e173033f75951f09c1e33831233`.
 The existing frontend process remained alive; no mutable configuration, ROM,
 BIOS, save, state, screenshot or PortMaster data was replaced.
+
+Physical retest of Patch 016 still hung after closing RGUI. The enhanced
+RetroArch log recorded all three synchronous barriers as completed: initial
+game layer (`target_fb=161`), RGUI layer (`target_fb=164`) and resumed game
+layer (`target_fb=159`). The main thread then slept in syscall 73 (`ppoll`),
+while both worker threads slept on futexes and ALSA remained `RUNNING`. This
+rejects a blocked transition commit and shows that Patch 016 did what it was
+designed to do.
+
+Comparison with the accepted RK3566 MF implementation exposed an unintended
+plumOS difference. MF Patch 013 uses a blocking atomic commit with
+`DRM_MODE_PAGE_FLIP_EVENT`; its focused regression test explicitly rejects
+`DRM_MODE_ATOMIC_NONBLOCK` because the flag raced Rockchip atomic cleanup on
+MF. Bubble inherited the same Patch 013, but Bubble-only Patch 014 subsequently
+added `DRM_MODE_ATOMIC_NONBLOCK` for game frames. Bubble also runs vendor Linux
+4.19.193 rather than MF's Linux 5.10.160, although both current panels are
+640x480. Patch 017 removes only that nonblocking game-commit deviation. It
+keeps Bubble's measured surface-page ownership and transition barriers while
+returning steady-state game presentation to MF's blocking-commit plus event
+contract.

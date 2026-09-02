@@ -1,0 +1,23 @@
+diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
+index a6b2dd27e4..bd882b0fc9 100644
+--- a/gfx/drivers/drm_gfx.c
++++ b/gfx/drivers/drm_gfx.c
+@@ -403,11 +403,15 @@ static bool drm_page_flip(struct drm_surface *surface)
+     * boundary.
+     *
+     * The first game flip after switching the shared plane back from RGUI can
+-    * lose its event too. Make that transition flip blocking, then retain
+-    * nonblocking event-paced presentation for steady-state game frames.
++    * lose its event too. Make that transition flip blocking without an event.
++    * Steady-state game frames use the same blocking atomic commit plus
++    * completion-event contract accepted on MF. In particular, do not restore
++    * DRM_MODE_ATOMIC_NONBLOCK here: MF testing found that it races Rockchip
++    * atomic cleanup, and Bubble's menu-resume trace stalls immediately after
++    * the synchronous transition barrier when that flag is present.
+     */
+    uint32_t commit_flags = synchronous_commit ? 0 :
+-         (DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT);
++         DRM_MODE_PAGE_FLIP_EVENT;
+ 
+    ret = drmModeAtomicCommit(drm.fd, req,
+          commit_flags, synchronous_commit ? NULL : &pending);
