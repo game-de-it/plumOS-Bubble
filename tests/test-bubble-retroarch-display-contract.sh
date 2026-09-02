@@ -12,6 +12,8 @@ grep -q 'Bubble display-contract' "$patch"
 grep -q 'logical_width' "$patch"
 grep -q 'logical_height' "$patch"
 grep -q 'new_aspect = 1.0f / new_aspect' "$patch"
+grep -q 'logical_width  = surface->viewport.height' "$patch"
+grep -q 'surface->src_width   = surface->viewport.width' "$patch"
 
 if [ -f "$repo_root/output/retroarch/bubble/plumos/bin/retroarch" ]; then
     strings "$repo_root/output/retroarch/bubble/plumos/bin/retroarch" |

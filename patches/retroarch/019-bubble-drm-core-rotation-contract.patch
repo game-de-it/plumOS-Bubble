@@ -40,8 +40,8 @@ diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
 -   vp->full_height = drm.current_mode->vdisplay;
 +   if (surface->rotation & 1)
 +   {
-+      vp->full_width  = drm.current_mode->vdisplay;
-+      vp->full_height = drm.current_mode->hdisplay;
++      vp->full_width  = drm.current_mode->hdisplay;
++      vp->full_height = drm.current_mode->vdisplay;
 +   }
 +   else
 +   {
@@ -66,18 +66,18 @@ diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
     drm_surface_update_viewport(surface);
 -   surface->src_width   = surface->viewport.width;
 -   surface->src_height  = surface->viewport.height;
-+   surface->logical_width  = surface->viewport.width;
-+   surface->logical_height = surface->viewport.height;
 +   if (surface->rotation & 1)
 +   {
-+      surface->src_width  = surface->logical_height;
-+      surface->src_height = surface->logical_width;
++      surface->logical_width  = surface->viewport.height;
++      surface->logical_height = surface->viewport.width;
 +   }
 +   else
 +   {
-+      surface->src_width  = surface->logical_width;
-+      surface->src_height = surface->logical_height;
++      surface->logical_width  = surface->viewport.width;
++      surface->logical_height = surface->viewport.height;
 +   }
++   surface->src_width   = surface->viewport.width;
++   surface->src_height  = surface->viewport.height;
     surface->pitch       = surface->src_width * bpp;
 +
 +   fprintf(stderr, "[DRM] Bubble display-contract layer=%d frame=%dx%d "
@@ -224,20 +224,20 @@ diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
 +   switch (surface->rotation & 3)
 +   {
 +      case 1:
-+         plane_x = (int32_t)drm.current_mode->hdisplay -
-+            (vp->y + (int32_t)vp->height);
-+         plane_y = vp->x;
++         plane_x = vp->x;
++         plane_y = vp->y;
++         (void)drm;
 +         break;
 +      case 2:
-+         plane_x = (int32_t)drm.current_mode->hdisplay -
-+            (vp->x + (int32_t)vp->width);
-+         plane_y = (int32_t)drm.current_mode->vdisplay -
-+            (vp->y + (int32_t)vp->height);
++         plane_x = vp->x;
++         plane_y = vp->y;
++         (void)drm;
++         (void)surface;
 +         break;
 +      case 3:
-+         plane_x = vp->y;
-+         plane_y = (int32_t)drm.current_mode->vdisplay -
-+            (vp->x + (int32_t)vp->width);
++         plane_x = vp->x;
++         plane_y = vp->y;
++         (void)drm;
 +         break;
 +      default:
 +         plane_x = vp->x;
