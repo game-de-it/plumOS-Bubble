@@ -204,6 +204,8 @@
   - 実機代表contentはNES/GBA/PS1/Dreamcast/Saturnのprocess・PCM進行に合格。
     N64はParaLLEl/Mupen64Plus-NextともPCMが`PREPARED`のままで未合格。
     PSP/NDSはROM SDにcontentがなく未試験。物理LCD/aspect/speaker確認を残す。
+  - boot supervisorがSD2 pathをexportしない場合もfrontend launcherがread-only
+    `/run/media/sd2`を自動選択するよう修正。SD2へdirectoryを作らず、実機再走査を検証する。
 - [ ] `BUB-P6-09` Bubble全物理入力を実機captureから固定し、全runtimeへ割り当てて物理確認する。
   - event0/1/2、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`から、D-pad、ABXY、
     Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。
