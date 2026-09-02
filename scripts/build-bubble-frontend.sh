@@ -46,6 +46,8 @@ gcc "${common[@]}" $png_cflags $ft_cflags $drm_cflags \
 for name in plumos_library_scan plumos_text_ui plumos_frontend; do
     gcc "${common[@]}" "src/frontend/${name}.c" -o "$bin/${name//_/-}"
 done
+install -m 0755 /usr/bin/amixer "$bin/plumos-amixer"
+install -m 0755 /usr/bin/aplay "$bin/plumos-aplay"
 strip "$bin"/plumos-* 2>/dev/null || true
 chmod 0755 "$bin"/plumos-*
 
@@ -63,7 +65,8 @@ stage_libraries() {
     done
 }
 stage_libraries "$bin/plumos-controller-ui-fbdev" "$bin/plumos-library-scan" \
-    "$bin/plumos-text-ui" "$bin/plumos-frontend"
+    "$bin/plumos-text-ui" "$bin/plumos-frontend" "$bin/plumos-amixer" \
+    "$bin/plumos-aplay"
 
 cat >"$component/manifest.json" <<EOF
 {

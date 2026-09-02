@@ -1,0 +1,115 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+SYSTEM_SETTINGS=${PLUMOS_SYSTEM_SETTINGS_JSON:-$PLUMOS_ROOT/config/system/settings.json}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+RUNTIME_STATE=${PLUMOS_VOLUME_RUNTIME_STATE:-$RUNTIME_ROOT/volume/current}
+LOG=${PLUMOS_VOLUME_LOG:-$RUNTIME_ROOT/volume/last-apply.log}
+SOFTVOL_NAME='Soft Volume Master'
+AMIXER=${PLUMOS_AMIXER:-$PLUMOS_ROOT/bin/plumos-amixer}
+APLAY=${PLUMOS_APLAY:-$PLUMOS_ROOT/bin/plumos-aplay}
+AUDIO_OUTPUT=${PLUMOS_AUDIO_OUTPUT:-$PLUMOS_ROOT/bin/plumos-audio-output}
+ALSA_CONFIG_PATH=${ALSA_CONFIG_PATH:-$RUNTIME_ROOT/audio/asound.conf}
+export ALSA_CONFIG_PATH
+export LD_LIBRARY_PATH="$PLUMOS_ROOT/frontend/lib:$PLUMOS_ROOT/emulator/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+mkdir -p "${LOG%/*}" "${RUNTIME_STATE%/*}" 2>/dev/null || true
+
+normalize() {
+    value=${1:-}
+    case $value in ''|*[!0-9]*) return 1 ;; esac
+    value=$(printf '%s' "$value" | sed 's/^0*//')
+    [ -n "$value" ] || value=0
+    [ "$value" -le 20 ] || value=20
+    printf '%s\n' "$value"
+}
+
+signed_integer() {
+    value=${1:-}
+    case $value in -*) value=${value#-} ;; esac
+    case $value in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac
+}
+
+read_persisted() {
+    value=$(sed -n 's/.*"volume"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' \
+        "$SYSTEM_SETTINGS" 2>/dev/null | head -n 1)
+    normalize "${value:-8}" || printf '8\n'
+}
+
+read_runtime() {
+    value=$(sed -n '1s/^\([0-9][0-9]*\).*$/\1/p' "$RUNTIME_STATE" 2>/dev/null | head -n 1)
+    normalize "${value:-$(read_persisted)}"
+}
+
+write_runtime() {
+    value=$(normalize "$1") || return 2
+    tmp=$RUNTIME_STATE.tmp.$$
+    printf '%s\n' "$value" >"$tmp" && mv -f "$tmp" "$RUNTIME_STATE"
+}
+
+write_persisted() {
+    value=$(normalize "$1") || return 2
+    mkdir -p "${SYSTEM_SETTINGS%/*}" "$PLUMOS_ROOT/backups/system"
+    backup=$PLUMOS_ROOT/backups/system/settings.json.before-bubble-softvol
+    [ -e "$backup" ] || cp -p "$SYSTEM_SETTINGS" "$backup" 2>/dev/null || true
+    tmp=$SYSTEM_SETTINGS.tmp.$$
+    if [ -r "$SYSTEM_SETTINGS" ] && grep -q '"volume"[[:space:]]*:' "$SYSTEM_SETTINGS"; then
+        sed 's/"volume"[[:space:]]*:[[:space:]]*[0-9][0-9]*/"volume": '"$value"'/' \
+            "$SYSTEM_SETTINGS" >"$tmp"
+    else
+        printf '{\n  "version": 1,\n  "volume": %s\n}\n' "$value" >"$tmp"
+    fi
+    mv -f "$tmp" "$SYSTEM_SETTINGS"
+    sync
+}
+
+softvol_exists() {
+    [ -x "$AMIXER" ] && "$AMIXER" cget iface=MIXER,name="$SOFTVOL_NAME" >/dev/null 2>&1
+}
+
+initialize() {
+    [ -x "$AUDIO_OUTPUT" ] && [ -x "$AMIXER" ] && [ -x "$APLAY" ] || {
+        printf 'required Bubble audio helper is missing\n' >"$LOG"
+        return 1
+    }
+    "$AUDIO_OUTPUT" prepare >>"$LOG" 2>&1 || return 1
+    softvol_exists && return 0
+    silence=$RUNTIME_ROOT/volume/silence.raw
+    dd if=/dev/zero of="$silence" bs=3840 count=1 >/dev/null 2>&1 || return 1
+    "$APLAY" -q -D default -f S16_LE -r 48000 -c 2 "$silence" >>"$LOG" 2>&1 || true
+    softvol_exists
+}
+
+apply() {
+    value=$(normalize "${1:-$(read_runtime)}") || return 2
+    initialize || return 1
+    raw=$(( (value * 255 + 10) / 20 ))
+    "$AMIXER" cset iface=MIXER,name="$SOFTVOL_NAME" "$raw" >"$LOG" 2>&1 || return 1
+    write_runtime "$value"
+    printf 'volume=%s raw=%s\n' "$value" "$raw" >>"$LOG"
+}
+
+change() {
+    current=$(read_persisted)
+    next=$((current + $1))
+    [ "$next" -ge 0 ] || next=0
+    [ "$next" -le 20 ] || next=20
+    write_persisted "$next" && apply "$next"
+    printf 'volume=%s\n' "$next"
+}
+
+case ${1:-status} in
+    init) initialize ;;
+    apply|set) shift; apply "${1:-$(read_runtime)}" ;;
+    up) change 1 ;;
+    down) change -1 ;;
+    step) [ "$#" -eq 2 ] && signed_integer "$2" || exit 2; change "$2" ;;
+    runtime-up) value=$(( $(read_runtime) + 1 )); [ "$value" -le 20 ] || value=20; apply "$value" ;;
+    runtime-down) value=$(( $(read_runtime) - 1 )); [ "$value" -ge 0 ] || value=0; apply "$value" ;;
+    runtime-step) [ "$#" -eq 2 ] && signed_integer "$2" || exit 2; value=$(( $(read_runtime) + $2 )); [ "$value" -ge 0 ] || value=0; [ "$value" -le 20 ] || value=20; apply "$value" ;;
+    persist-runtime) value=$(read_runtime); write_persisted "$value"; apply "$value" ;;
+    get) read_persisted ;;
+    status) initialize && "$AMIXER" cget iface=MIXER,name="$SOFTVOL_NAME" ;;
+    *) printf 'usage: plumos-volume-control init|apply [0..20]|up|down|step N|get|status|runtime-up|runtime-down|runtime-step N|persist-runtime\n' >&2; exit 2 ;;
+esac

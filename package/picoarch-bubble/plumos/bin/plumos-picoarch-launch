@@ -40,6 +40,14 @@ esac
 
 $BB mkdir -p "$PLUMOS_ROOT/logs" "$PLUMOS_ROOT/state/picoarch/$SYSTEM_ID" \
     "$PLUMOS_ROOT/saves/$SYSTEM_ID" "$RUNTIME_ROOT/picoarch"
+if [ -x "$PLUMOS_ROOT/bin/plumos-audio-output" ]; then
+    "$BB" sh "$PLUMOS_ROOT/bin/plumos-audio-output" prepare >>"$LOG" 2>&1
+    ALSA_CONFIG="$RUNTIME_ROOT/audio/asound.conf"
+    [ -x "$PLUMOS_ROOT/bin/plumos-volume-control" ] &&
+        "$BB" sh "$PLUMOS_ROOT/bin/plumos-volume-control" apply >>"$LOG" 2>&1 || true
+else
+    ALSA_CONFIG="$PLUMOS_ROOT/share/alsa/alsa.conf"
+fi
 RGB565_BYTESWAP=0
 case "$CORE_ID" in
     mednafen_ngp|mednafen_supergrafx|mednafen_supafaust) RGB565_BYTESWAP=1 ;;
@@ -77,7 +85,7 @@ PLUMOS_PICOARCH_RGB565_BYTESWAP="$RGB565_BYTESWAP" \
 SDL_VIDEODRIVER=dummy \
 SDL_AUDIODRIVER=alsa \
 PLUMOS_DRM_DEVICE=/dev/dri/card0 \
-ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf" \
+ALSA_CONFIG_PATH="$ALSA_CONFIG" \
 LD_LIBRARY_PATH="$PLUMOS_ROOT/picoarch/lib:$PLUMOS_ROOT/emulator/lib:/usr/lib" \
     "$PICOARCH" "$CORE" "$CONTENT" NONE >>"$LOG" 2>&1 &
 child=$!

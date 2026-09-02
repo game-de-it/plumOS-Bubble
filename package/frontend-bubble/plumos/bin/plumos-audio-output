@@ -1,0 +1,82 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+AUDIO_DIR=${PLUMOS_AUDIO_RUN_DIR:-$RUNTIME_ROOT/audio}
+CONFIG=${PLUMOS_ALSA_CONFIG_PATH:-$AUDIO_DIR/asound.conf}
+STATUS=${PLUMOS_AUDIO_STATUS_FILE:-$AUDIO_DIR/output.status}
+
+fail() {
+    printf 'plumos-audio-output: %s\n' "$*" >&2
+    exit 1
+}
+
+prepare() {
+    [ -c /dev/snd/pcmC0D0p ] || fail 'RK817 playback PCM is unavailable'
+    mkdir -p "$AUDIO_DIR"
+    tmp=$CONFIG.tmp.$$
+    trap 'rm -f "$tmp" "$STATUS.tmp.$$"' EXIT HUP INT TERM
+    cat >"$tmp" <<'EOF'
+ctl.!default {
+    type hw
+    card 0
+}
+
+pcm.plumos_hw {
+    type hw
+    card 0
+    device 0
+}
+
+pcm.plumos_softvol {
+    type softvol
+    slave.pcm "plumos_hw"
+    control {
+        name "Soft Volume Master"
+        card 0
+    }
+    min_dB -90.0
+    max_dB 0.0
+    resolution 256
+}
+
+pcm.plumos_output {
+    type plug
+    slave.pcm "plumos_softvol"
+}
+
+pcm.plumos_pyxel {
+    type plug
+    slave.pcm "plumos_softvol"
+}
+
+pcm.!default {
+    type plug
+    slave.pcm "plumos_softvol"
+}
+EOF
+    chmod 0644 "$tmp"
+    mv -f "$tmp" "$CONFIG"
+    {
+        printf 'mode=internal_stereo\n'
+        printf 'router=alsa_softvol\n'
+        printf 'card=0\n'
+        printf 'card_id=rockchiprk817co\n'
+        printf 'physical_pcm=hw:0,0\n'
+        printf 'pcm=plumos_output\n'
+        printf 'alsa_config_path=%s\n' "$CONFIG"
+    } >"$STATUS.tmp.$$"
+    chmod 0644 "$STATUS.tmp.$$"
+    mv -f "$STATUS.tmp.$$" "$STATUS"
+    trap - EXIT HUP INT TERM
+    cat "$STATUS"
+}
+
+case ${1:-prepare} in
+    prepare) prepare ;;
+    status) [ -r "$STATUS" ] || fail 'audio output has not been prepared'; cat "$STATUS" ;;
+    stop) rm -f "$STATUS" ;;
+    config-path) printf '%s\n' "$CONFIG" ;;
+    *) fail 'usage: plumos-audio-output [prepare|status|stop|config-path]' ;;
+esac

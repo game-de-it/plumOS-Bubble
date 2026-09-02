@@ -17,8 +17,17 @@ elif [ ! -s "$config" ]; then
     $BB mv "$config.next" "$config"
     $BB sync
 fi
-export LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib"
-export ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf"
+export LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib:$PLUMOS_ROOT/frontend/lib"
+if [ -x "$PLUMOS_ROOT/bin/plumos-audio-output" ]; then
+    "$BB" sh "$PLUMOS_ROOT/bin/plumos-audio-output" prepare \
+        >>"$PLUMOS_ROOT/logs/retroarch-menu.log" 2>&1
+    export ALSA_CONFIG_PATH="${PLUMOS_RUNTIME_ROOT:-/run/plumos}/audio/asound.conf"
+    [ -x "$PLUMOS_ROOT/bin/plumos-volume-control" ] &&
+        "$BB" sh "$PLUMOS_ROOT/bin/plumos-volume-control" apply \
+        >>"$PLUMOS_ROOT/logs/retroarch-menu.log" 2>&1 || true
+else
+    export ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf"
+fi
 export XDG_CONFIG_HOME="$PLUMOS_ROOT/config"
 printf 'retroarch_menu=stage-S60 begin\n' >>"$PLUMOS_ROOT/logs/session.log"
 set +e
