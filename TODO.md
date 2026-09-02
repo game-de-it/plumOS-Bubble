@@ -206,6 +206,9 @@
     PSP/NDSはROM SDにcontentがなく未試験。物理LCD/aspect/speaker確認を残す。
   - boot supervisorがSD2 pathをexportしない場合もfrontend launcherがread-only
     `/run/media/sd2`を自動選択するよう修正。SD2へdirectoryを作らず、実機再走査を検証する。
+  - direct-root走査でROM SDのFATから`invalid start cluster`、`corrupted directory`を実機検出。
+    自動fsckは行わず、scanを180秒で打ち切って既存indexを保全しFEを起動する。
+    SDの退避・ホストfsck・再走査は利用者と媒体変更境界を確定してから行う。
 - [ ] `BUB-P6-09` Bubble全物理入力を実機captureから固定し、全runtimeへ割り当てて物理確認する。
   - event0/1/2、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`から、D-pad、ABXY、
     Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。

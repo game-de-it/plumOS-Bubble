@@ -10,6 +10,8 @@ grep -q "grep -qs ' /run/media/sd2 ' /proc/mounts" "$launcher"
 grep -q 'PLUMOS_ROM_ROOT=$PLUMOS_SDCARD_ROOT' "$launcher"
 grep -q 'case "$PLUMOS_ROM_ROOT" in /storage/\*)' "$launcher"
 grep -q 'frontend_media=sdcard_root=' "$launcher"
+grep -q 'timeout -s TERM -k 5 "$SCAN_TIMEOUT"' "$launcher"
+grep -q 'frontend_scan=bounded_failure.*index=preserved' "$launcher"
 
 grep -q "grep -qs ' /run/media/sd2 ' /proc/mounts" "$controller"
 grep -q 'PLUMOS_ROM_ROOT=$PLUMOS_SDCARD_ROOT' "$controller"

@@ -5,6 +5,8 @@ PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
 RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 LOG=$PLUMOS_ROOT/logs/frontend.log
+SCAN_TIMEOUT=${PLUMOS_LIBRARY_SCAN_TIMEOUT:-180}
+case "$SCAN_TIMEOUT" in *[!0-9]*|'') SCAN_TIMEOUT=180 ;; esac
 export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT"
 if [ -z "${PLUMOS_SDCARD_ROOT:-}" ]; then
     if $BB grep -qs ' /run/media/sd2 ' /proc/mounts; then
@@ -53,7 +55,14 @@ seed_default "$PLUMOS_ROOT/config/system/settings.json" \
     "$PLUMOS_ROOT/factory-defaults/system/settings.json"
 
 printf 'frontend_scan=stage-S41\n' >>"$LOG"
-PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
-    "$PLUMOS_ROOT/bin/plumos-library-scan" --defer-thumbnails >>"$LOG" 2>&1
+if PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+    "$BB" timeout -s TERM -k 5 "$SCAN_TIMEOUT" \
+    "$PLUMOS_ROOT/bin/plumos-library-scan" --defer-thumbnails >>"$LOG" 2>&1; then
+    printf 'frontend_scan=complete timeout=%s\n' "$SCAN_TIMEOUT" >>"$LOG"
+else
+    scan_rc=$?
+    printf 'frontend_scan=bounded_failure rc=%s timeout=%s index=preserved\n' \
+        "$scan_rc" "$SCAN_TIMEOUT" >>"$LOG"
+fi
 printf 'frontend_exec=stage-S42\n' >>"$LOG"
 exec "$BB" sh "$PLUMOS_ROOT/bin/plumos-controller-ui-bubble" "$@" >>"$LOG" 2>&1
