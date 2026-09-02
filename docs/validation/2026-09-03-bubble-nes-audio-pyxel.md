@@ -266,3 +266,13 @@ added `DRM_MODE_ATOMIC_NONBLOCK` for game frames. Bubble also runs vendor Linux
 keeps Bubble's measured surface-page ownership and transition barriers while
 returning steady-state game presentation to MF's blocking-commit plus event
 contract.
+
+The MF-aligned AArch64 build and full app-layer assembly passed at source
+`6526d4c`. The five managed files were staged and matched host hashes before
+switching. Device verification then passed RetroArch 110/110 and app layer
+4978/4978; the existing frontend PID 994 remained alive. The deployed binary
+SHA-256 is `ffe17cbf62413e24d65501c43ad047e0523149815a6547c419799b9d95666d5c`.
+The preceding five files are preserved at
+`state/update-rollback/6526d4c-mf-pacing.tar`, SHA-256
+`03a6eb7cfe1481a115da76739bbd0f9d97570144b702e2d7511527801d3dd83f`.
+Physical RGUI open/resume repetition and NES audio acceptance remain required.

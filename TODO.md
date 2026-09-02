@@ -257,7 +257,8 @@
     RetroArch 110/110、app-layer 4978/4978でlive deployしたが、物理再試験では再発。
     barrierはmenu/gameとも完了後、main threadが`ppoll`で停止した。MF Patch 013が禁止する
     `DRM_MODE_ATOMIC_NONBLOCK`をBubble Patch 014で追加していた差分を特定し、MF同様の
-    blocking atomic commit + completion eventへ戻して再確認する。
+    blocking atomic commit + completion eventへ戻したsource `6526d4c`を、RetroArch 110/110、
+    app-layer 4978/4978でlive deploy済み。menu往復とNES audioの物理再確認を残す。
   - PicoArch QuickNESのA/B、両Function menu、menu A決定/B戻る、FE復帰は物理合格。
   - standalone各機種固有layout、全runtimeの物理操作、menu/exit、system-owned volume/powerを残す。
 - [ ] `BUB-P6-10` 全system/coreをdisplay分類し、向き・content/menu rotation・aspect・audioを実機確認する。
