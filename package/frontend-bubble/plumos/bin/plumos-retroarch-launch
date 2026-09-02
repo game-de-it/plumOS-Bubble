@@ -85,6 +85,19 @@ esac
 # own BIOS on SD2. Resolve that active media root per launch without rewriting
 # the user's persistent RetroArch configuration.
 printf 'system_directory = "%s"\n' "$PLUMOS_BIOS_ROOT" >>"$append_config"
+# Keep each bounded route's verbose log in its route-specific file.  The
+# shared plumOS cfg otherwise redirects every core into one retroarch.log,
+# which makes mechanical per-core failure and geometry attribution ambiguous.
+printf '%s\n' 'log_to_file = "false"' >>"$append_config"
+# SD2 is intentionally mounted read-only after FAT corruption was detected.
+# Keep save/state ownership in plumOS even though the shared cfg supports
+# writable-media devices that place them beside content.
+{
+    printf '%s\n' 'savefiles_in_content_dir = "false"'
+    printf '%s\n' 'savestates_in_content_dir = "false"'
+    printf 'savefile_directory = "%s"\n' "$PLUMOS_ROOT/saves"
+    printf 'savestate_directory = "%s"\n' "$PLUMOS_ROOT/states"
+} >>"$append_config"
 # The generated Bubble ALSA graph intentionally exposes only the managed
 # softvol PCM.  Do not inherit the shared hw:0,0 setting, which both bypasses
 # the zero-volume validation guard and is undefined in that bounded graph.
