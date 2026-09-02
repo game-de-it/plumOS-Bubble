@@ -234,3 +234,15 @@ existing nonblocking event-paced path, preserving the NES audio pacing that
 already passed. RGUI remains blocking as in Patch 015. Barrier completions,
 commit errors and one-second event-timeout diagnostics explicitly flush stderr,
 so the redirected runtime log records the failing stage before process exit.
+
+The Patch 016 AArch64 build and complete app-layer assembly passed at source
+`4e9e9fd`. The five-file managed delta (RetroArch binary, RetroArch component
+manifest/checksums, and root manifest/checksums) was staged and independently
+hashed on the device before switching. Post-switch verification passed
+RetroArch 110/110 and the complete app layer 4978/4978. The deployed binary
+SHA-256 is `c85be5e4bdbc5b6e8a4cb726e87b32aa31ef9da6e6ea409aa666cef4281455fa`.
+The previous five managed files remain at
+`state/update-rollback/4e9e9fd-ra-resume.tar`, SHA-256
+`caf48866f3860fee5198a38698a48a67e9d54e173033f75951f09c1e33831233`.
+The existing frontend process remained alive; no mutable configuration, ROM,
+BIOS, save, state, screenshot or PortMaster data was replaced.
