@@ -24,7 +24,7 @@ V90S_BUILD_SCRIPT="$VENDOR_ROOT/docker/plumos-v90s-toolchain/scripts/build-picoa
 BUBBLE_AUDIO_STATUS_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bubble-audio-buffer-status.patch"
 BUBBLE_RGB565_BYTESWAP_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bubble-rgb565-byteswap.patch"
 BUBBLE_VFS_SEEK_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bubble-vfs-seek-status.patch"
-BUBBLE_TRIGGER_AXES_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bubble-trigger-axes.patch"
+BUBBLE_PHYSICAL_INPUT_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bubble-physical-input.patch"
 BUBBLE_EVDEV_HOTPLUG_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bubble-evdev-hotplug.patch"
 BUBBLE_FBDEV_STAGED_COPY_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bubble-fbdev-staged-copy.patch"
 BUBBLE_FBDEV_RENDERER_HEADER="$ROOT_DIR/src/frontend/plumos_fbdev_renderer.h"
@@ -46,8 +46,8 @@ export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}"
     printf 'error: missing Bubble PicoArch patch: %s\n' "$BUBBLE_VFS_SEEK_PATCH" >&2
     exit 1
 }
-[ -f "$BUBBLE_TRIGGER_AXES_PATCH" ] || {
-    printf 'error: missing Bubble PicoArch patch: %s\n' "$BUBBLE_TRIGGER_AXES_PATCH" >&2
+[ -f "$BUBBLE_PHYSICAL_INPUT_PATCH" ] || {
+    printf 'error: missing Bubble PicoArch patch: %s\n' "$BUBBLE_PHYSICAL_INPUT_PATCH" >&2
     exit 1
 }
 [ -f "$BUBBLE_EVDEV_HOTPLUG_PATCH" ] || {
@@ -65,14 +65,14 @@ export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}"
 export PLUMOS_BUBBLE_PICOARCH_AUDIO_STATUS_PATCH="$BUBBLE_AUDIO_STATUS_PATCH"
 export PLUMOS_BUBBLE_PICOARCH_RGB565_BYTESWAP_PATCH="$BUBBLE_RGB565_BYTESWAP_PATCH"
 export PLUMOS_BUBBLE_PICOARCH_VFS_SEEK_PATCH="$BUBBLE_VFS_SEEK_PATCH"
-export PLUMOS_BUBBLE_PICOARCH_TRIGGER_AXES_PATCH="$BUBBLE_TRIGGER_AXES_PATCH"
+export PLUMOS_BUBBLE_PICOARCH_PHYSICAL_INPUT_PATCH="$BUBBLE_PHYSICAL_INPUT_PATCH"
 export PLUMOS_BUBBLE_PICOARCH_EVDEV_HOTPLUG_PATCH="$BUBBLE_EVDEV_HOTPLUG_PATCH"
 export PLUMOS_BUBBLE_PICOARCH_FBDEV_STAGED_COPY_PATCH="$BUBBLE_FBDEV_STAGED_COPY_PATCH"
 export PLUMOS_BUBBLE_FBDEV_RENDERER_HEADER="$BUBBLE_FBDEV_RENDERER_HEADER"
 BUBBLE_AUDIO_STATUS_PATCH_SHA256="$(sha256sum "$BUBBLE_AUDIO_STATUS_PATCH" | awk '{print $1}')"
 BUBBLE_RGB565_BYTESWAP_PATCH_SHA256="$(sha256sum "$BUBBLE_RGB565_BYTESWAP_PATCH" | awk '{print $1}')"
 BUBBLE_VFS_SEEK_PATCH_SHA256="$(sha256sum "$BUBBLE_VFS_SEEK_PATCH" | awk '{print $1}')"
-BUBBLE_TRIGGER_AXES_PATCH_SHA256="$(sha256sum "$BUBBLE_TRIGGER_AXES_PATCH" | awk '{print $1}')"
+BUBBLE_PHYSICAL_INPUT_PATCH_SHA256="$(sha256sum "$BUBBLE_PHYSICAL_INPUT_PATCH" | awk '{print $1}')"
 BUBBLE_EVDEV_HOTPLUG_PATCH_SHA256="$(sha256sum "$BUBBLE_EVDEV_HOTPLUG_PATCH" | awk '{print $1}')"
 BUBBLE_FBDEV_STAGED_COPY_PATCH_SHA256="$(sha256sum "$BUBBLE_FBDEV_STAGED_COPY_PATCH" | awk '{print $1}')"
 
@@ -117,9 +117,9 @@ perl -0pi -e '
   s/(\t\{ KEY_RIGHT,\s+PBTN_RIGHT \},\n)/$1\t{ BTN_DPAD_RIGHT, PBTN_RIGHT },\n/;
 ' "$SRC/plat_linux.c"
 
-# Bubble publishes L2/R2 as ABS_Z/ABS_RZ trigger axes. Expose them through the
-# existing BTN_TL2/BTN_TR2 bind slots for both gameplay and binding capture.
-git -C "$SRC" apply "$PLUMOS_BUBBLE_PICOARCH_TRIGGER_AXES_PATCH"
+# Apply the physical-label contract captured from Bubble event2. L2/R2 are
+# digital BTN_TL2/BTN_TR2 keys; both sticks expose normal X/Y and RX/RY axes.
+git -C "$SRC" apply "$PLUMOS_BUBBLE_PICOARCH_PHYSICAL_INPUT_PATCH"
 
 # A removable USB DAC may expose a Consumer Control evdev node. If it is
 # unplugged during gameplay, retire that node once instead of polling ENODEV
@@ -228,9 +228,9 @@ cat >"$PLUMOS_DIR/components/picoarch/manifest.json" <<EOF
 {
   "name": "plumOS Bubble PicoArch",
   "device": "bubble",
-  "source_ref": "picoarch:802047c276a5a931b0bf837c4ea4b8e238bdeabe v90s-build:$V90S_REF sdl2:$SDL_VERSION:$SDL_SHA256 bubble-audio-status:$BUBBLE_AUDIO_STATUS_PATCH_SHA256 bubble-rgb565-byteswap:$BUBBLE_RGB565_BYTESWAP_PATCH_SHA256 bubble-vfs-seek:$BUBBLE_VFS_SEEK_PATCH_SHA256 bubble-trigger-axes:$BUBBLE_TRIGGER_AXES_PATCH_SHA256 bubble-evdev-hotplug:$BUBBLE_EVDEV_HOTPLUG_PATCH_SHA256 bubble-fbdev-staged-copy:$BUBBLE_FBDEV_STAGED_COPY_PATCH_SHA256",
+  "source_ref": "picoarch:802047c276a5a931b0bf837c4ea4b8e238bdeabe v90s-build:$V90S_REF sdl2:$SDL_VERSION:$SDL_SHA256 bubble-audio-status:$BUBBLE_AUDIO_STATUS_PATCH_SHA256 bubble-rgb565-byteswap:$BUBBLE_RGB565_BYTESWAP_PATCH_SHA256 bubble-vfs-seek:$BUBBLE_VFS_SEEK_PATCH_SHA256 bubble-physical-input:$BUBBLE_PHYSICAL_INPUT_PATCH_SHA256 bubble-evdev-hotplug:$BUBBLE_EVDEV_HOTPLUG_PATCH_SHA256 bubble-fbdev-staged-copy:$BUBBLE_FBDEV_STAGED_COPY_PATCH_SHA256",
   "render_contract": "cpu-drm-pageflip-rgb565-to-bgra8888 with staged-fbdev fallback",
-  "input_contract": "plumOS Bubble Controller evdev BTN_DPAD, ABS_Z/RZ triggers and full gamepad",
+  "input_contract": "plumOS Bubble Controller physical labels, digital L2/R2, dual analog, L3/R3 and F1/F2 menu",
   "core_route": "cores/*_libretro.so"
 }
 EOF

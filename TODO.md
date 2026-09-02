@@ -204,6 +204,15 @@
   - 実機代表contentはNES/GBA/PS1/Dreamcast/Saturnのprocess・PCM進行に合格。
     N64はParaLLEl/Mupen64Plus-NextともPCMが`PREPARED`のままで未合格。
     PSP/NDSはROM SDにcontentがなく未試験。物理LCD/aspect/speaker確認を残す。
+- [ ] `BUB-P6-09` Bubble全物理入力を実機captureから固定し、全runtimeへ割り当てて物理確認する。
+  - event0/1/2、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`から、D-pad、ABXY、
+    Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。
+  - PicoArchのA/B逆転、L3/R3欠落、Function1欠落と、誤ったABS_Z/RZ trigger前提を修正した。
+    RetroArchはFunction2=menu、Function1=screenshot、PicoArchは両Function=menu fallbackとした。
+  - standalone各機種固有layout、全runtimeの物理操作、menu/exit、system-owned volume/powerを残す。
+- [ ] `BUB-P6-10` 全system/coreをdisplay分類し、向き・content/menu rotation・aspect・audioを実機確認する。
+  - horizontal、vertical arcade、rotated handheld、square、wide、dual-screen、GLES経路を分離し、
+    QuickNES一件の合格を他coreへ一般化しない。未試験導線はFEから消さず理由付きで維持する。
 
 ## P7: update, lifecycle and release
 

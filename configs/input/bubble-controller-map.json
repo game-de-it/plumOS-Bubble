@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "device": {
+    "name": "retrogame_joypad",
+    "event_node": "/dev/input/event2",
+    "joystick_node": "/dev/input/js0",
+    "vendor_id": 18507,
+    "product_id": 4353,
+    "axis_count": 4,
+    "button_count": 18
+  },
+  "axes": [
+    {"physical": "left_x", "evdev_code": 0, "evdev_name": "ABS_X", "js_axis": 0, "role": "left_analog_x"},
+    {"physical": "left_y", "evdev_code": 1, "evdev_name": "ABS_Y", "js_axis": 1, "role": "left_analog_y"},
+    {"physical": "right_x", "evdev_code": 3, "evdev_name": "ABS_RX", "js_axis": 2, "role": "right_analog_x"},
+    {"physical": "right_y", "evdev_code": 4, "evdev_name": "ABS_RY", "js_axis": 3, "role": "right_analog_y"}
+  ],
+  "buttons": [
+    {"physical": "B", "evdev_code": 304, "evdev_name": "BTN_SOUTH", "js_button": 0, "retropad": "B", "role": "game_b/menu_back"},
+    {"physical": "A", "evdev_code": 305, "evdev_name": "BTN_EAST", "js_button": 1, "retropad": "A", "role": "game_a/menu_confirm"},
+    {"physical": "X", "evdev_code": 307, "evdev_name": "BTN_NORTH", "js_button": 2, "retropad": "X", "role": "game_x"},
+    {"physical": "Y", "evdev_code": 308, "evdev_name": "BTN_WEST", "js_button": 3, "retropad": "Y", "role": "game_y"},
+    {"physical": "L", "evdev_code": 310, "evdev_name": "BTN_TL", "js_button": 4, "retropad": "L", "role": "game_l"},
+    {"physical": "R", "evdev_code": 311, "evdev_name": "BTN_TR", "js_button": 5, "retropad": "R", "role": "game_r"},
+    {"physical": "L2", "evdev_code": 312, "evdev_name": "BTN_TL2", "js_button": 6, "retropad": "L2", "role": "game_l2"},
+    {"physical": "R2", "evdev_code": 313, "evdev_name": "BTN_TR2", "js_button": 7, "retropad": "R2", "role": "game_r2"},
+    {"physical": "Select", "evdev_code": 314, "evdev_name": "BTN_SELECT", "js_button": 8, "retropad": "Select", "role": "game_select/retroarch_hotkey_enable"},
+    {"physical": "Start", "evdev_code": 315, "evdev_name": "BTN_START", "js_button": 9, "retropad": "Start", "role": "game_start/retroarch_exit_with_select"},
+    {"physical": "Function2", "evdev_code": 316, "evdev_name": "BTN_MODE", "js_button": 10, "retropad": null, "role": "emulator_menu"},
+    {"physical": "L3", "evdev_code": 317, "evdev_name": "BTN_THUMBL", "js_button": 11, "retropad": "L3", "role": "game_l3"},
+    {"physical": "R3", "evdev_code": 318, "evdev_name": "BTN_THUMBR", "js_button": 12, "retropad": "R3", "role": "game_r3"},
+    {"physical": "DPadUp", "evdev_code": 544, "evdev_name": "BTN_DPAD_UP", "js_button": 13, "retropad": "Up", "role": "game_up/menu_up"},
+    {"physical": "DPadDown", "evdev_code": 545, "evdev_name": "BTN_DPAD_DOWN", "js_button": 14, "retropad": "Down", "role": "game_down/menu_down"},
+    {"physical": "DPadLeft", "evdev_code": 546, "evdev_name": "BTN_DPAD_LEFT", "js_button": 15, "retropad": "Left", "role": "game_left/menu_left"},
+    {"physical": "DPadRight", "evdev_code": 547, "evdev_name": "BTN_DPAD_RIGHT", "js_button": 16, "retropad": "Right", "role": "game_right/menu_right"},
+    {"physical": "Function1", "evdev_code": 704, "evdev_name": "BTN_TRIGGER_HAPPY1", "js_button": 17, "retropad": null, "role": "retroarch_screenshot/picoarch_menu_fallback"}
+  ],
+  "system_keys": [
+    {"physical": "VolumeDown", "event_node": "/dev/input/event1", "evdev_code": 114, "evdev_name": "KEY_VOLUMEDOWN", "role": "system_volume_down"},
+    {"physical": "VolumeUp", "event_node": "/dev/input/event1", "evdev_code": 115, "evdev_name": "KEY_VOLUMEUP", "role": "system_volume_up"},
+    {"physical": "Power", "event_node": "/dev/input/event0", "evdev_code": 116, "evdev_name": "KEY_POWER", "role": "system_power_policy"}
+  ],
+  "policy": {
+    "face_button_rule": "physical labels map to the same logical RetroPad labels",
+    "frontend_function_rule": "both function keys enter the frontend function action",
+    "picoarch_function_rule": "both function keys open the emulator menu",
+    "retroarch_function_rule": "Function2 opens RGUI; Function1 takes a screenshot",
+    "power_volume_rule": "system-owned keys are never passed to game input"
+  }
+}

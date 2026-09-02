@@ -234,6 +234,9 @@ struct input_event {
 #ifndef BTN_MODE
 #define BTN_MODE 316
 #endif
+#ifndef BTN_TRIGGER_HAPPY1
+#define BTN_TRIGGER_HAPPY1 704
+#endif
 #ifndef BTN_DPAD_UP
 #define BTN_DPAD_UP 544
 #endif
@@ -14924,6 +14927,7 @@ static enum ui_action action_from_key_code(unsigned int code) {
   case 10:
     return ACTION_START;
   case BTN_MODE:
+  case BTN_TRIGGER_HAPPY1:
     return ACTION_FUNCTION;
   case KEY_RIGHTCTRL:
   case KEY_SELECT:
