@@ -39,7 +39,7 @@ replace physical confirmation of orientation and aspect ratio.
 | System / route | Content | Process / renderer | PCM evidence | Result |
 | --- | --- | --- | --- | --- |
 | NES / RetroArch QuickNES | `Super Mario Bros..nes` | ran | RUNNING, pointers advanced | runtime pass; physical picture/speaker still pending |
-| NES / PicoArch QuickNES | same | ran with component-scoped SDL2 | RUNNING, pointers advanced | runtime and cleanup pass; physical picture/speaker still pending |
+| NES / PicoArch QuickNES | same | ran with component-scoped SDL2 | RUNNING, pointers advanced | runtime, cleanup, physical picture/aspect/speaker, A/B and menu/exit pass |
 | GBA / RetroArch gpSP | `Mario Kart Advance (Japan).gba` | ran | RUNNING, pointers advanced | runtime pass; physical picture/speaker still pending |
 | PS1 / RetroArch PCSX-ReARMed | `SCPS-10026.cue` | ran | RUNNING, pointers advanced | runtime pass; physical picture/speaker still pending |
 | N64 / RetroArch ParaLLEl N64 | `Mario Kart 64 [V1.0].z64` | Mali g13p0 initialized and `Gfx RomOpen` completed | PREPARED, `hw_ptr=0` through 40 seconds | fail/open: no audio progression |
@@ -73,6 +73,11 @@ buffers. That readback is intentionally not counted as visual acceptance.
 Correct orientation, non-stretched aspect ratio, and audible sound must be
 confirmed on the physical LCD/speaker for each representative renderer class:
 software RetroArch, GLES RetroArch, PicoArch, and GLES standalone.
+
+After this table was first recorded, the user physically confirmed the tested
+PicoArch QuickNES picture orientation, aspect ratio, game sound, A/B behavior,
+both Function-key menu paths, confirm/back, and frontend return. Other rows and
+renderer classes remain independent acceptance gates.
 
 The currently retained SD image predates the live commits above. It remains a
 validation image and must be rebuilt before the next write or release-candidate

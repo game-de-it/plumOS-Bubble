@@ -66,8 +66,13 @@ the emulator input contract.
 
 Raw identity, evdev codes, joystick indices, axes, and the A/B cause are
 physically confirmed. Configuration/build tests prove the intended frontend,
-RetroArch, and PicoArch mappings. Actual game behavior remains a separate
-per-runtime physical gate, including both sticks, L3/R3, both Function keys,
-menu confirm/back, and normal exit. Standalone emulator mappings also require
-system-specific checks because six-button Saturn and PlayStation layouts must
-not be inferred from the generic RetroPad labels.
+RetroArch, and PicoArch mappings. The user subsequently confirmed the requested
+PicoArch QuickNES operation sequence on the physical unit: physical A/B act as
+the label-correct game buttons, both Function-key menu paths respond, A confirms,
+B returns, and normal exit returns to the frontend. This closes the reported A/B
+reversal for that route without generalizing it to every emulator.
+
+Actual game behavior remains a separate per-runtime physical gate for X/Y,
+shoulders, both sticks, L3/R3, and system-owned volume/power. Standalone emulator
+mappings also require system-specific checks because six-button Saturn and
+PlayStation layouts must not be inferred from the generic RetroPad labels.

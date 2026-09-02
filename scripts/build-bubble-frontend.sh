@@ -90,4 +90,9 @@ printf '%s\n' "$version" >"$root/VERSION"
 ) >"$component/checksums.sha256"
 (cd "$root" && sha256sum -c components/frontend/checksums.sha256)
 readelf -h "$bin/plumos-controller-ui-fbdev" | grep -q 'Machine:.*AArch64'
+gcc -std=gnu99 -Os -Wall -Wextra \
+    "$repo_root/scripts/probe-font-glyphs.c" \
+    -o /tmp/probe-font-glyphs $(pkg-config --cflags --libs freetype2)
+/tmp/probe-font-glyphs "$root/fonts/default.otf" 304c 30a2 65e5 9b42
+/tmp/probe-font-glyphs "$root/fonts/cjk-fallback.ttc" 304c 30a2 65e5 9b42
 echo "bubble_frontend=result-ok root=$root"

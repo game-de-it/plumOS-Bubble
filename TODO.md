@@ -122,6 +122,8 @@
 - [ ] `BUB-P4-I04` hotkey、volume、brightness、menu、exit の競合しない ownership policy を決める。
 - [ ] `BUB-P4-I05` normalized Bubble controller を公開し、FE/RetroArch/standaloneで1入力1反応を確認する。
   - FEとRetroArch RGUIでD-pad/A/B、SELECT+START終了を物理確認した。standaloneと全buttonを残す。
+  - PicoArch QuickNESで物理A/B、Function1/2 menu、menu A決定/B戻る、FE復帰を利用者確認済み。
+    X/Y、shoulder、両stick/L3/R3、standalone固有layout、volume/powerは引き続き別gateとする。
 
 ### Audio/power
 
@@ -147,12 +149,17 @@
 - [ ] `BUB-P4-N03` USB host/device/charging controller と同時利用制約を調査し、product policy を決める。
 - [ ] `BUB-P4-S01` OS SD と ROM SD を UUID/label/partition identity で安全に解決する。
 - [ ] `BUB-P4-S02` dirty ROM SD を自動修復せず、警告・read-only・退避手順を定義する。
+  - startup時のkernel filesystem errorをmanaged stateへ記録し、System Settingsへ表示する
+    `plumos-storage-health observe`を追加した。手動checkはread-write mountを拒否し、
+    FAT checkerがある場合も`-n`と120秒timeoutだけを使用する。実機表示確認を残す。
 
 ## P5: frontend and minimum game-path baseline
 
 - [ ] `BUB-P5-01` Bubble 640x480 frontend profile と runtime DRM discovery を実装する。
   - CPU DRM、runtime connector/mode discovery、Bubble物理A/B mappingをhost build済み。
     `S39..E81`、input trace、frame statsを次のphysical gateへ組み込み済み。
+  - SD2をROM rootにした際もmanaged app-layerのprimary/CJK fallback fontを優先し、
+    日本語glyphをbuild時に検査するよう修正。実機の日本語ファイル名表示確認を残す。
 - [ ] `BUB-P5-02` FEのinput、audio、brightness/volume、power menu ownershipをBubble helperへ接続する。
 - [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
   - RetroArch v1.22.2とQuickNES `058d665`をAArch64 containerからbuildし、
@@ -160,7 +167,8 @@
 - [ ] `BUB-P5-04` 利用者提供の小さな既知正常NES content 1本だけをGit外からtest deploymentする。
 - [ ] `BUB-P5-05` FE -> QuickNES -> FE のdisplay/input/audio lifecycleを実機確認する。
   - RetroArchとPicoArchのQuickNESはcontent起動、ALSA pointer進行、停止後FE 1 process、
-    audio owner解放まで合格。LCDの向き/aspectとspeaker実聴は未確認。
+    audio owner解放まで合格。PicoArch QuickNESはLCD向き/aspect、speaker実聴、A/B、
+    両Function menuとFE復帰を物理合格。RetroArch側の同等物理確認は別gateとして残す。
 - [ ] `BUB-P5-06` menu/exit、save/state、reboot後の保持を確認する。
 - [ ] `BUB-P5-07` game終了後にfrontendが1 processだけで、DRM/input/audio owner残留がないことを確認する。
 
@@ -214,6 +222,7 @@
     Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。
   - PicoArchのA/B逆転、L3/R3欠落、Function1欠落と、誤ったABS_Z/RZ trigger前提を修正した。
     RetroArchはFunction2=menu、Function1=screenshot、PicoArchは両Function=menu fallbackとした。
+  - PicoArch QuickNESのA/B、両Function menu、menu A決定/B戻る、FE復帰は物理合格。
   - standalone各機種固有layout、全runtimeの物理操作、menu/exit、system-owned volume/powerを残す。
 - [ ] `BUB-P6-10` 全system/coreをdisplay分類し、向き・content/menu rotation・aspect・audioを実機確認する。
   - horizontal、vertical arcade、rotated handheld、square、wide、dual-screen、GLES経路を分離し、

@@ -1,0 +1,90 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+MEDIA_ROOT=${PLUMOS_SDCARD_ROOT:-/run/media/sd2}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+ACTION=${1:-status}
+STATE_DIR=$PLUMOS_ROOT/state/storage-health
+STATUS=$STATE_DIR/status
+LOG=$PLUMOS_ROOT/logs/storage-health.log
+
+case "$ACTION" in
+    status)
+        [ -r "$STATUS" ] && "$BB" cat "$STATUS"
+        exit 0
+        ;;
+    observe|check) ;;
+    *)
+        printf 'usage: %s {status|observe|check}\n' "$0" >&2
+        exit 2
+        ;;
+esac
+
+"$BB" mkdir -p "$STATE_DIR" "$PLUMOS_ROOT/logs"
+tmp=$STATUS.new.$$
+trap '"$BB" rm -f "$tmp"' EXIT HUP INT TERM
+
+mount_line=$($BB awk -v path="$MEDIA_ROOT" '$2 == path { print $1 "\t" $3 "\t" $4; exit }' /proc/mounts)
+device=$(printf '%s\n' "$mount_line" | "$BB" awk -F '\t' '{print $1}')
+fstype=$(printf '%s\n' "$mount_line" | "$BB" awk -F '\t' '{print $2}')
+options=$(printf '%s\n' "$mount_line" | "$BB" awk -F '\t' '{print $3}')
+last_check=$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown)
+result=not_mounted
+evidence='media root is not mounted'
+
+if [ -n "$device" ]; then
+    kernel_name=${device##*/}
+    if dmesg 2>/dev/null | "$BB" grep -E "(FAT-fs|exFAT-fs) \($kernel_name\).*(error|corrupt|invalid)" >/dev/null 2>&1; then
+        result=dirty
+        evidence='kernel reported filesystem corruption; no repair attempted'
+    elif [ "$ACTION" = observe ]; then
+        result=observed
+        evidence='no filesystem error found in current boot log'
+    elif ! printf ',%s,' "$options" | "$BB" grep -q ',ro,'; then
+        result=check_refused
+        evidence='read-only check refused because media is mounted read-write'
+    else
+        checker=
+        for candidate in fsck.fat fsck.vfat dosfsck; do
+            if command -v "$candidate" >/dev/null 2>&1; then
+                checker=$candidate
+                break
+            fi
+        done
+        if [ -z "$checker" ]; then
+            result=unavailable
+            evidence='read-only FAT checker is not installed'
+        else
+            check_log=$STATE_DIR/fsck-read-only.log
+            set +e
+            timeout 120 "$checker" -n "$device" >"$check_log.new.$$" 2>&1
+            check_rc=$?
+            set -e
+            "$BB" mv "$check_log.new.$$" "$check_log"
+            case "$check_rc" in
+                0) result=clean; evidence='read-only FAT check completed clean' ;;
+                124|137) result=timeout; evidence='read-only FAT check timed out' ;;
+                *) result=dirty; evidence="read-only FAT check reported rc=$check_rc; no repair attempted" ;;
+            esac
+        fi
+    fi
+fi
+
+{
+    printf 'result=%s\n' "$result"
+    printf 'last_check=%s\n' "$last_check"
+    printf 'mount_path=%s\n' "$MEDIA_ROOT"
+    printf 'device=%s\n' "${device:-unknown}"
+    printf 'filesystem=%s\n' "${fstype:-unknown}"
+    printf 'mount_options=%s\n' "${options:-unknown}"
+    printf 'evidence=%s\n' "$evidence"
+} >"$tmp"
+"$BB" sync
+"$BB" mv "$tmp" "$STATUS"
+"$BB" sync
+trap - EXIT HUP INT TERM
+printf 'storage_health=action=%s result=%s media=%s device=%s evidence=%s\n' \
+    "$ACTION" "$result" "$MEDIA_ROOT" "${device:-unknown}" "$evidence" >>"$LOG"
+printf 'storage_health=result-%s action=%s media=%s\n' "$result" "$ACTION" "$MEDIA_ROOT"
+
