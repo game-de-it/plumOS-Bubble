@@ -1,0 +1,78 @@
+--- a/audio/drivers/alsa.c
++++ b/audio/drivers/alsa.c
+@@ -376,23 +376,27 @@
+ static bool alsa_start(void *data, bool is_shutdown)
+ {
+    alsa_t *alsa = (alsa_t*)data;
++   int ret;
++
++   (void)is_shutdown;
+    if (!alsa->is_paused)
+       return true;
+ 
+-   if (     alsa->stream_info.can_pause
+-         && alsa->is_paused)
++   /* Bubble's vendor 4.19 RK817 driver reports RUNNING after pause release,
++    * but its DMA pointer remains frozen and snd_pcm_wait() never returns.
++    * Re-prepare the stream dropped by alsa_stop(); the next write starts it. */
++   ret = snd_pcm_prepare(alsa->pcm);
++   if (ret < 0)
+    {
+-      int ret = snd_pcm_pause(alsa->pcm, 0);
+-
+-      if (ret < 0)
+-      {
+-         RARCH_ERR("[ALSA] Failed to unpause: %s.\n",
+-               snd_strerror(ret));
+-         return false;
+-      }
+-
+-      alsa->is_paused = false;
++      RARCH_ERR("[ALSA] Failed to prepare Bubble PCM after menu: %s.\n",
++            snd_strerror(ret));
++      fflush(stderr);
++      return false;
+    }
++
++   alsa->is_paused = false;
++   RARCH_LOG("[ALSA] Bubble PCM prepared after menu; next write will restart DMA.\n");
++   fflush(stderr);
+    return true;
+ }
+ 
+@@ -490,20 +494,26 @@
+ static bool alsa_stop(void *data)
+ {
+    alsa_t *alsa = (alsa_t*)data;
++   int ret;
++
+    if (alsa->is_paused)
+-	  return true;
++      return true;
+ 
+-   if (alsa->stream_info.can_pause
+-         && !alsa->is_paused)
++   /* Do not use snd_pcm_pause() on Bubble's vendor 4.19 RK817 driver.
++    * pause release changes the reported state to RUNNING without restarting
++    * the hardware pointer, permanently blocking the first resumed write. */
++   ret = snd_pcm_drop(alsa->pcm);
++   if (ret < 0)
+    {
+-      int ret = snd_pcm_pause(alsa->pcm, 1);
+-
+-      if (ret < 0)
+-         return false;
+-
+-      alsa->is_paused = true;
++      RARCH_ERR("[ALSA] Failed to drop Bubble PCM for menu: %s.\n",
++            snd_strerror(ret));
++      fflush(stderr);
++      return false;
+    }
+ 
++   alsa->is_paused = true;
++   RARCH_LOG("[ALSA] Bubble PCM dropped for menu pause.\n");
++   fflush(stderr);
+    return true;
+ }
+ 

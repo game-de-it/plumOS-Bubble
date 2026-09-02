@@ -276,3 +276,33 @@ The preceding five files are preserved at
 `state/update-rollback/6526d4c-mf-pacing.tar`, SHA-256
 `03a6eb7cfe1481a115da76739bbd0f9d97570144b702e2d7511527801d3dd83f`.
 Physical RGUI open/resume repetition and NES audio acceptance remain required.
+
+Physical retest of the MF-aligned build still hung. A temporary gdbserver was
+placed only in the device's `/tmp`, attached to the preserved process and
+removed after capture. The symbolized backtrace corrected the diagnosis:
+
+```text
+runloop_iterate
+  -> FCEUmm retro_run
+  -> audio_driver_sample_batch
+  -> audio_driver_flush
+  -> alsa_write
+  -> snd_pcm_wait
+  -> poll
+```
+
+The video thread was idle on its condition variable, not blocked in the DRM
+driver. The PCM reported `RUNNING`, but five samples at 250 ms intervals were
+identical: `hw_ptr=60472`, `appl_ptr=63269`, `delay=2797`, `avail=275`.
+Bubble's vendor Linux 4.19 RK817 driver therefore accepts `snd_pcm_pause(0)`
+and changes its reported state without restarting DMA. The following blocking
+write waits forever for space. This differs from MF's Linux 5.10 behavior and
+explains why copying its otherwise correct RetroArch cfg and DRM pacing did not
+fix Bubble.
+
+Patch 018 replaces the Bubble RetroArch menu audio lifecycle only:
+`alsa_stop()` uses `snd_pcm_drop()` and `alsa_start()` uses
+`snd_pcm_prepare()`. The first resumed write then starts a clean prepared PCM
+instead of relying on the broken pause-release path. Both transitions emit
+immediately flushed stage logs. This is a device-driver compatibility fix, not
+a CPU governor, latency or other performance workaround.
