@@ -6,6 +6,7 @@ patch=$repo_root/patches/retroarch/019-bubble-drm-core-rotation-contract.patch
 
 grep -q 'drm_set_rotation,' "$patch"
 grep -q 'retroarch_get_core_requested_rotation' "$patch"
+grep -q 'core_rotation = rotation & 3' "$patch"
 grep -q 'layer == 2' "$patch"
 grep -q 'Bubble display-contract' "$patch"
 grep -q 'logical_width' "$patch"

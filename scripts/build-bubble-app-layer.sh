@@ -10,8 +10,8 @@ if [[ ${1:-} != --inside ]]; then
         "$repo_root/scripts/build-libretro-core-catalog-bubble.sh" \
             --filter all --concurrency "${PLUMOS_BUBBLE_CORE_CONCURRENCY:-2}"
         "$repo_root/scripts/build-picoarch-bubble.sh"
-        "$repo_root/scripts/build-standalone-bubble.sh"
         "$repo_root/scripts/build-pyxel-bubble.sh"
+        "$repo_root/scripts/build-standalone-bubble.sh"
         "$repo_root/scripts/build-portmaster-bubble.sh"
     fi
     for required in \

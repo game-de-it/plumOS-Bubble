@@ -32,8 +32,8 @@ CONTENT_OVERRIDES = {
     "psp": f"{VALIDATION_CONTENT}/psp/probe.cso",
     "nds": f"{VALIDATION_CONTENT}/nds/probe.nds",
     "ngpc": f"{VALIDATION_CONTENT}/ngpc/probe.ngc",
-    "fbneo": f"{VALIDATION_CONTENT}/fbneo/probe.zip",
-    "mame2003plus": f"{VALIDATION_CONTENT}/mame2003plus/probe-1942a.zip",
+    "fbneo": f"{VALIDATION_CONTENT}/fbneo/imgfight.zip",
+    "mame2003plus": f"{VALIDATION_CONTENT}/mame2003plus/twinbee.zip",
     "dos": f"{VALIDATION_CONTENT}/dos/probe.zip",
     "openbor": f"{VALIDATION_CONTENT}/openbor/probe.pak",
     "pc88": f"{VALIDATION_CONTENT}/pc88/probe.d88",
@@ -309,10 +309,16 @@ def main() -> int:
                 reason = "no_compatible_content"
             elif profile.startswith("external:"):
                 reason = "external_script_not_run_by_bounded_emulator_harness"
+            elif system["id"] == "nds" and profile == "standalone:drastic":
+                reason = "visible_unsupported_missing_miyooio_input_bridge"
             records.append({
                 "system": system["id"], "profile": profile, "content": content,
                 "content_source": content_source, "command": command, "runtime_log": log,
-                "seconds": seconds, "status": "planned" if command and not reason else "not_run",
+                "seconds": seconds,
+                "status": (
+                    "unsupported" if reason and reason.startswith("visible_unsupported_")
+                    else "planned" if command and not reason else "not_run"
+                ),
                 "reason": reason,
             })
     report = {
@@ -345,9 +351,11 @@ def main() -> int:
             output = result.stdout + ("\n" + result.stderr if result.stderr else "")
             meta = parse_meta(output)
             runtime_delta = output.split("__RUNTIME_LOG__\n", 1)[-1].split("__WRAPPER_LOG__\n", 1)[0] if "__RUNTIME_LOG__" in output else ""
+            wrapper_delta = output.split("__WRAPPER_LOG__\n", 1)[-1] if "__WRAPPER_LOG__\n" in output else ""
             record.update({
                 "ssh_rc": result.returncode, "probe": meta,
                 "runtime_log_delta": runtime_delta[-16000:],
+                "wrapper_log_delta": wrapper_delta[-8000:],
                 "elapsed_seconds": round(time.monotonic() - started, 2),
             })
             alive = meta.get("alive") == "yes"
@@ -355,6 +363,7 @@ def main() -> int:
             clean = meta.get("preexisting") in {None, "", "none"}
             record["status"] = "started" if alive and drm and clean else "failed"
             record["display_contract"] = "retroarch_drm" if "Bubble display-contract" in runtime_delta else "pyxel_fit" if "plumos-pyxel-fit:" in runtime_delta else "runtime_only"
+            record["audio_contract"] = "pcm_running" if meta.get("pcm") == "RUNNING" else "not_observed"
             print(f"[{index:03d}/{len(planned):03d}] {record['system']} {record['profile']} status={record['status']} drm={meta.get('drm','?')} pcm={meta.get('pcm','?')}", flush=True)
             out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     finally:
@@ -362,7 +371,7 @@ def main() -> int:
     report["completed_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
     report["summary"] = {
         key: sum(r["status"] == key for r in records)
-        for key in ("started", "failed", "not_run")
+        for key in ("started", "failed", "unsupported", "not_run")
     }
     out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps(report["summary"], sort_keys=True), flush=True)

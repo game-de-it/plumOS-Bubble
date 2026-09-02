@@ -284,13 +284,13 @@ diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
 +   unsigned core_rotation;
 +   unsigned next_rotation;
 +
-+   (void)rotation;
++   /* RetroArch passes the core-requested quarter-turn here. */
 +   if (!_drmvars)
 +      return;
 +
 +   next_panel_rotation = settings
 +      ? (settings->uints.video_rotation & 3) : 0;
-+   core_rotation = retroarch_get_core_requested_rotation() & 3;
++   core_rotation = rotation & 3;
 +   next_rotation = (next_panel_rotation + 4 - core_rotation) & 3;
 +   if (_drmvars->rotation == next_rotation &&
 +       _drmvars->panel_rotation == next_panel_rotation)

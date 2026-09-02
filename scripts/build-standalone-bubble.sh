@@ -8,6 +8,7 @@ PACKAGE_ROOT="$ROOT_DIR/package/standalone-bubble/plumos"
 PCSX_SOURCE="$ROOT_DIR/build/pcsx-rearmed-bubble-probe"
 PCSX_BUILD="$ROOT_DIR/build/pcsx-rearmed-bubble-kmsdrm"
 SDL12_BUILD="$ROOT_DIR/build/pcsx-sdl12-compat-bubble-probe/install-bubble/lib"
+PCSX_SDL2_BUILD="$ROOT_DIR/build/pyxel-bubble-sdl2"
 YABASANSHIRO_BUILD="$ROOT_DIR/${PLUMOS_BUBBLE_YABASANSHIRO_OUT:-output/yabasanshiro/bubble}"
 DRASTIC_BUILD="$ROOT_DIR/${PLUMOS_BUBBLE_DRASTIC_OUT:-output/drastic/bubble}"
 PPSSPP_BUILD="$ROOT_DIR/${PLUMOS_BUBBLE_PPSSPP_OUT:-output/ppsspp/bubble}"
@@ -43,7 +44,8 @@ for path in \
     "$PCSX_BUILD/frontend/pandora/skin/background.png" \
     "$PCSX_BUILD/frontend/pandora/skin/skin.txt" \
     "$SDL12_BUILD/libSDL-1.2.so.0" \
-    "$YABASANSHIRO_BUILD/lib/libSDL2-2.0.so.0" \
+    "$PCSX_SDL2_BUILD/stage/usr/lib/libSDL2-2.0.so.0" \
+    "$PCSX_SDL2_BUILD/source/LICENSE.txt" \
     "$YABASANSHIRO_BUILD/yabasanshiro" \
     "$YABASANSHIRO_BUILD/LICENSE" \
     "$DRASTIC_BUILD/drastic" \
@@ -179,10 +181,10 @@ install -m 0644 "$PCSX_BUILD/plugins/gpu-gles/gpu_gles.so" \
     "$PLUMOS_DIR/emulator/standalone/pcsx_rearmed/plugins/gpu_gles.so"
 install -m 0644 "$SDL12_BUILD/libSDL-1.2.so.0" \
     "$PLUMOS_DIR/emulator/standalone/pcsx_rearmed/lib/libSDL-1.2.so.0"
-# sdl12-compat loads SDL2 by SONAME at runtime.  Keep the matching AArch64
-# KMSDRM SDL2 in the same component directory instead of relying on another
-# standalone emulator's private library directory.
-install -m 0644 "$YABASANSHIRO_BUILD/lib/libSDL2-2.0.so.0" \
+# sdl12-compat loads SDL2 by SONAME at runtime. Keep the Bubble KMSDRM/ALSA
+# build in the same component directory; the generic Debian SDL2 also links
+# PulseAudio DSOs that are intentionally absent from the minimal System.
+install -m 0644 "$PCSX_SDL2_BUILD/stage/usr/lib/libSDL2-2.0.so.0" \
     "$PLUMOS_DIR/emulator/standalone/pcsx_rearmed/lib/libSDL2-2.0.so.0"
 install -m 0644 "$PCSX_BUILD/frontend/pandora/skin/font.png" \
     "$PLUMOS_DIR/emulator/standalone/pcsx_rearmed/skin/fontx2.png"
@@ -196,6 +198,8 @@ install -m 0644 "$PCSX_BUILD/COPYING" \
     "$PLUMOS_DIR/licenses/pcsx-rearmed-standalone-COPYING"
 install -m 0644 "$ROOT_DIR/build/pcsx-sdl12-compat-bubble-probe/LICENSE.txt" \
     "$PLUMOS_DIR/licenses/sdl12-compat-LICENSE"
+install -m 0644 "$PCSX_SDL2_BUILD/source/LICENSE.txt" \
+    "$PLUMOS_DIR/licenses/pcsx-sdl2-LICENSE.txt"
 install -m 0755 "$YABASANSHIRO_BUILD/yabasanshiro" \
     "$PLUMOS_DIR/emulator/standalone/yabasanshiro/yabasanshiro"
 rsync -a "$YABASANSHIRO_BUILD/lib/" \
@@ -246,7 +250,7 @@ cat >"$PLUMOS_DIR/components/standalone/manifest.json" <<EOF
 {
   "name": "plumOS Bubble standalone emulators",
   "device": "bubble",
-  "source_ref": "pcsx-rearmed:$PCSX_REF sdl12-compat:$SDL12_REF yabasanshiro:$YABASANSHIRO_REF steward-fu-nds:$DRASTIC_REF ppsspp:$PPSSPP_REF openbor:$OPENBOR_REF",
+  "source_ref": "pcsx-rearmed:$PCSX_REF sdl12-compat:$SDL12_REF sdl2:2.32.0 yabasanshiro:$YABASANSHIRO_REF steward-fu-nds:$DRASTIC_REF ppsspp:$PPSSPP_REF openbor:$OPENBOR_REF",
   "patches": {
     "pcsx-rearmed-bubble-kmsdrm": "$PCSX_PATCH_SHA256",
     "pcsx-rearmed-bubble-gles-ordered-batch": "$PCSX_BATCH_PATCH_SHA256",
@@ -327,6 +331,7 @@ EOF
         factory-defaults/standalone \
         licenses/pcsx-rearmed-standalone-COPYING \
         licenses/sdl12-compat-LICENSE \
+        licenses/pcsx-sdl2-LICENSE.txt \
         licenses/yabasanshiro-LICENSE \
         licenses/steward-fu-nds-LGPL-2.1 \
         licenses/drastic-upstream-release-readme.txt \
