@@ -6,5 +6,5 @@ RUN apt-get update \
         dosfstools dropbear-bin e2fsprogs fdisk git jq libasound2-dev libdrm-dev \
         libegl1-mesa-dev libfreetype6-dev libgbm-dev libgles2-mesa-dev \
         libpng-dev libudev-dev libxkbcommon-dev mtools parted \
-        pkg-config python3 squashfs-tools wpasupplicant xz-utils \
+        pkg-config python3 python3-pip squashfs-tools wpasupplicant xz-utils \
     && rm -rf /var/lib/apt/lists/*

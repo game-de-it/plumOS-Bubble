@@ -215,6 +215,12 @@ for library in \
     install -m 0644 "$source" "$PYXEL_LIB/$library"
     copy_dependency_tree "$source" "$PYXEL_LIB"
 done
+# Pyxel's manylinux binding still declares the pre-glibc-2.34 libdl
+# compatibility DSO. Bubble's minimal System intentionally does not provide
+# that stub, so keep it component-scoped beside the binding.
+compat_path="$(find_target_lib libdl.so.2 || true)"
+[ -n "$compat_path" ] || fail "Pyxel glibc compatibility library is missing: libdl.so.2"
+install -m 0644 "$compat_path" "$PYXEL_LIB/libdl.so.2"
 "$CC" -O2 -fPIC -Wall -Wextra -Werror -shared \
     -Wl,-soname,plumos-pyxel-fit.so \
     -o "$PYXEL_LIB/plumos-pyxel-fit.so" "$FIT_SOURCE" -ldl
@@ -460,6 +466,7 @@ for distribution, module in (
     import_module(module)
     print(f"{distribution}={metadata.version(distribution)}")
 PY
+test -f "$PYXEL_LIB/libdl.so.2"
 find "$PYTHON_ROOT" "$PYXEL_ROOT" -type d -name __pycache__ -prune \
     -exec rm -rf {} +
 

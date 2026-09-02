@@ -1,0 +1,95 @@
+#!/bin/sh
+set -eu
+
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+config=${PLUMOS_RETROARCH_CONFIG:-$PLUMOS_ROOT/config/retroarch/retroarch-bubble.cfg}
+factory=${PLUMOS_RETROARCH_FACTORY_CONFIG:-$PLUMOS_ROOT/factory-defaults/retroarch/retroarch-bubble.cfg}
+state_dir=${PLUMOS_RETROARCH_CONFIG_STATE:-$PLUMOS_ROOT/state/retroarch}
+marker=$state_dir/factory-config.sha256
+# Initial Bubble factory shipped before the V90S configuration surface was
+# ported. It is safe to replace only when the active file is byte-identical.
+legacy_bubble_sha256=9e0cee764c7840a904403ba8fcde7c1cc4729d1b759aabbe4563e43f4112627b
+
+[ -s "$factory" ] || {
+    printf 'retroarch_config=result-error reason=factory-missing path=%s\n' "$factory" >&2
+    exit 1
+}
+$BB mkdir -p "${config%/*}" "$state_dir"
+set -- $($BB sha256sum "$factory")
+factory_sha256=$1
+
+atomic_copy() {
+    source=$1
+    target=$2
+    temporary=${target}.next.$$
+    $BB cp "$source" "$temporary"
+    $BB sync
+    $BB mv "$temporary" "$target"
+    $BB sync
+}
+
+merge_missing_keys() {
+    merge_next=${config}.next.$$
+    merge_count=$state_dir/merge-count.$$
+    $BB cp "$config" "$merge_next"
+    printf '\n' >>"$merge_next"
+    $BB awk '
+        NR == FNR {
+            if ($0 ~ /^[A-Za-z0-9_.-]+[[:space:]]*=/) {
+                key=$0
+                sub(/[[:space:]]*=.*/, "", key)
+                present[key]=1
+            }
+            next
+        }
+        $0 ~ /^[A-Za-z0-9_.-]+[[:space:]]*=/ {
+            key=$0
+            sub(/[[:space:]]*=.*/, "", key)
+            if (!present[key]) {
+                print
+                added++
+            }
+        }
+        END { print added + 0 > count_file }
+    ' count_file="$merge_count" "$config" "$factory" >>"$merge_next"
+    added=$($BB sed -n '1p' "$merge_count" 2>/dev/null || printf '0')
+    $BB rm -f "$merge_count"
+    if [ "$added" -gt 0 ]; then
+        $BB sync
+        $BB mv "$merge_next" "$config"
+        $BB sync
+        result=merged
+    else
+        $BB rm -f "$merge_next"
+        result=unchanged
+    fi
+}
+
+result=unchanged
+added=0
+if [ ! -s "$config" ]; then
+    atomic_copy "$factory" "$config"
+    result=installed
+    added=3376
+else
+    set -- $($BB sha256sum "$config")
+    config_sha256=$1
+    if [ "$config_sha256" = "$legacy_bubble_sha256" ]; then
+        atomic_copy "$factory" "$config"
+        result=replaced-legacy
+        added=3315
+    elif [ ! -r "$marker" ] ||
+         [ "$($BB sed -n '1p' "$marker")" != "$factory_sha256" ]; then
+        # User values always win. Only keys absent from the active config are
+        # appended from the shared plumOS factory surface.
+        merge_missing_keys
+    fi
+fi
+
+printf '%s\n' "$factory_sha256" >"$marker.next"
+$BB sync
+$BB mv "$marker.next" "$marker"
+$BB sync
+printf 'retroarch_config=result-%s added=%s sha256=%s\n' \
+    "$result" "$added" "$factory_sha256"

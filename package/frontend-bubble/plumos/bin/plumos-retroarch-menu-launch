@@ -6,8 +6,12 @@ RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 config=$PLUMOS_ROOT/config/retroarch/retroarch-bubble.cfg
 factory=$PLUMOS_ROOT/factory-defaults/retroarch/retroarch-bubble.cfg
-$BB mkdir -p "$PLUMOS_ROOT/config/retroarch" "$PLUMOS_ROOT/logs" "$RUNTIME_ROOT/retroarch"
-if [ ! -s "$config" ]; then
+$BB mkdir -p "$PLUMOS_ROOT/config/retroarch" "$PLUMOS_ROOT/logs" \
+    "$PLUMOS_ROOT/state/retroarch" "$RUNTIME_ROOT/retroarch"
+if [ -x "$PLUMOS_ROOT/bin/plumos-retroarch-config-merge" ]; then
+    "$PLUMOS_ROOT/bin/plumos-retroarch-config-merge" \
+        >>"$PLUMOS_ROOT/logs/retroarch-config.log" 2>&1
+elif [ ! -s "$config" ]; then
     $BB cp "$factory" "$config.next"
     $BB sync
     $BB mv "$config.next" "$config"

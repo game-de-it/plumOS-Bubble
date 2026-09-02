@@ -33,8 +33,12 @@ esac
 config=$PLUMOS_ROOT/config/retroarch/retroarch-bubble.cfg
 factory=$PLUMOS_ROOT/factory-defaults/retroarch/retroarch-bubble.cfg
 $BB mkdir -p "$PLUMOS_ROOT/config/retroarch" "$PLUMOS_ROOT/logs" \
-    "$PLUMOS_ROOT/saves" "$PLUMOS_ROOT/states" "$RUNTIME_ROOT/retroarch"
-if [ ! -s "$config" ]; then
+    "$PLUMOS_ROOT/saves" "$PLUMOS_ROOT/states" \
+    "$PLUMOS_ROOT/state/retroarch" "$RUNTIME_ROOT/retroarch"
+if [ -x "$PLUMOS_ROOT/bin/plumos-retroarch-config-merge" ]; then
+    "$PLUMOS_ROOT/bin/plumos-retroarch-config-merge" \
+        >>"$PLUMOS_ROOT/logs/retroarch-config.log" 2>&1
+elif [ ! -s "$config" ]; then
     $BB cp "$factory" "$config.next"
     $BB sync
     $BB mv "$config.next" "$config"
@@ -45,17 +49,24 @@ export ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf"
 export XDG_CONFIG_HOME="$PLUMOS_ROOT/config"
 core_id=${core##*/}
 core_id=${core_id%_libretro.so}
-append_config=
+append_config="$RUNTIME_ROOT/retroarch/launch.$$.cfg"
 case "$core_id" in
     flycast|flycast_xtreme|km_duckswanstation_xtreme_amped|\
     mupen64plus_next|parallel_n64|yabasanshiro)
-        append_config="$RUNTIME_ROOT/retroarch/launch.$$.cfg"
         {
             printf '%s\n' 'video_driver = "gl"'
             printf '%s\n' 'video_context_driver = "kms"'
-            # Hardware routing is launch-scoped.  Do not let RetroArch merge
-            # these append-only overrides into the user's active config.
-            printf '%s\n' 'config_save_on_exit = "false"'
+            printf '%s\n' 'video_threaded = "true"'
+        } >"$append_config"
+        ;;
+    *)
+        {
+            # The Bubble plain-DRM backend blocks until the atomic page-flip
+            # event arrives.  Run it on RetroArch's video thread so that wait
+            # cannot starve the core/audio producer and underrun ALSA.
+            printf '%s\n' 'video_driver = "drm"'
+            printf '%s\n' 'video_context_driver = ""'
+            printf '%s\n' 'video_threaded = "true"'
         } >"$append_config"
         ;;
 esac

@@ -130,6 +130,8 @@ cat >"$component/manifest.json" <<EOF
   "external_gpu_runtime": ["emulator/lib/libEGL.so.1", "emulator/lib/libGLESv2.so.2", "emulator/lib/libgbm.so.1", "emulator/lib/libmali.so.1", "/dev/mali0"],
   "audio_driver": "alsa",
   "input_driver": "udev",
+  "factory_config_baseline": "V90S-derived-Pixel2",
+  "factory_config_keys": 3376,
   "library_scope": "emulator/lib"
 }
 EOF

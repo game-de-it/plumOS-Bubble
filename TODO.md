@@ -134,6 +134,10 @@
   - QuickNES/gpSP/PCSX-ReARMed/Flycast Xtreme/YabaSanshiroでALSA `RUNNING`と
     pointer進行を実機確認した。N64 2 coreは`PREPARED`/`hw_ptr=0`のため未解決。
     speaker実聴、XRUN、5分継続は未確認。
+  - RetroArch FCEUmmのNES実聴で音飛びを確認。CPU idle 82-87%でもPCMが
+    `RUNNING`から`PREPARED`へ戻るunderrunを採取したため、CPU性能設定ではなく
+    DRM page-flip待ちを`video_threaded=true`でproducerから分離した。通常の
+    `ondemand`で同一contentを再試験し、5分継続と実聴を満たすまでopen。
 - [ ] `BUB-P4-A03` headphone 接続/抜去、ゲーム終了、suspend/resume 後の route 復帰を確認する。
 - [ ] `BUB-P4-P01` backlight 0..255 の安全範囲、段階、persist policy を決める。
 - [ ] `BUB-P4-P02` battery/charger node、capacity、charging状態、volume/power keyをhelperへ閉じ込める。
@@ -203,6 +207,9 @@
     host build/checksum済み。DraSticは項目を維持し、`/dev/miyooio`非搭載理由付きで
     visible unsupported。各runtimeの実機検証を残す。
   - PicoArchの欠落SDL2をcomponent内へ追加し、QuickNES contentと停止時child回収を実機確認。
+  - PyxelはBubble Systemに無い`libdl.so.2`でimport前に失敗していた。互換DSOを
+    component-scopedで同梱し、Pyxel 2.9.3 host importまで合格。実機FEからの
+    `.pyxapp`表示・入力・音声・終了復帰は未確認。
     standalone YabaSanshiroもSaturn content、GLES、ALSA、正常終了に合格した。
 - [ ] `BUB-P6-04` package済みcoreからFE導線、FE導線からlauncher/coreを双方向検証し、
   実行不能な導線も`未実装`/`未対応`理由付きで表示する。QuickNES-only app-layerはreleaseを拒否する。
