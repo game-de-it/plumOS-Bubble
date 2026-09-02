@@ -122,10 +122,10 @@ rsync -a \
 # normalized controller exposes FUNCTION as SDL button 8, encoded by DraStic
 # as 1024 + 8. Keep this as the packaged factory value.
 sed \
-    's/^controls_b\[CONTROL_INDEX_MENU\] = 1154$/controls_b[CONTROL_INDEX_MENU] = 1034/' \
+    's/^controls_b\[CONTROL_INDEX_MENU\] = 1154$/controls_b[CONTROL_INDEX_MENU] = 1041/' \
     "$OUT_ROOT/config/drastic.cfg" >"$OUT_ROOT/config/drastic.cfg.next"
 mv "$OUT_ROOT/config/drastic.cfg.next" "$OUT_ROOT/config/drastic.cfg"
-grep -Fqx 'controls_b[CONTROL_INDEX_MENU] = 1034' \
+grep -Fqx 'controls_b[CONTROL_INDEX_MENU] = 1041' \
     "$OUT_ROOT/config/drastic.cfg" || {
     printf 'error: DraStic FUNCTION menu factory mapping was not applied\n' >&2
     exit 1

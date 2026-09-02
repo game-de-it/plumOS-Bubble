@@ -177,7 +177,7 @@ prepare() {
     "${ADAPTER_DIR}/lib/aarch64/libpixman-1.so.0"
 
   cat > "${RUN_ROOT}/gamecontrollerdb.txt" <<'EOF'
-190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b10,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,
+190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b17,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,
 EOF
   cp -f "${ADAPTER_DIR}/control.txt" "${PM_DIR}/control.txt"
   cp -f "${ADAPTER_DIR}/mod_plumOS.txt" "${PM_DIR}/mod_plumOS.txt"

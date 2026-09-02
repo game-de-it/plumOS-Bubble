@@ -21,8 +21,8 @@ test "$(jq -r '.axes | sort_by(.js_axis) | map(.evdev_code) | join(" ")' "$contr
 grep -Fq 'case BTN_TRIGGER_HAPPY1:' src/frontend/plumos_controller_ui.c
 grep -Fq 'input_b_btn = "0"' configs/retroarch/autoconfig/udev/gkd-bubble-retrogame-joypad.cfg
 grep -Fq 'input_a_btn = "1"' configs/retroarch/autoconfig/udev/gkd-bubble-retrogame-joypad.cfg
-grep -Fq 'input_menu_toggle_btn = "10"' configs/retroarch/autoconfig/udev/gkd-bubble-retrogame-joypad.cfg
-grep -Fq 'input_screenshot_btn = "17"' configs/retroarch/autoconfig/udev/gkd-bubble-retrogame-joypad.cfg
+grep -Fq 'input_menu_toggle_btn = "17"' configs/retroarch/autoconfig/udev/gkd-bubble-retrogame-joypad.cfg
+grep -Fq 'input_screenshot_btn = "10"' configs/retroarch/autoconfig/udev/gkd-bubble-retrogame-joypad.cfg
 
 pico_patch=package/picoarch-bubble/patches/picoarch-bubble-physical-input.patch
 grep -Fq '{ BTN_EAST,   IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_A }' "$pico_patch"
@@ -30,6 +30,23 @@ grep -Fq '{ BTN_SOUTH,  IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_B }' "$pico
 grep -Fq '{ BTN_THUMBL, IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_L3 }' "$pico_patch"
 grep -Fq '{ BTN_THUMBR, IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_R3 }' "$pico_patch"
 grep -Fq '{ BTN_TRIGGER_HAPPY1, IN_BINDTYPE_EMU, EACTION_MENU }' "$pico_patch"
+! grep -Fq '{ BTN_MODE,   IN_BINDTYPE_EMU, EACTION_MENU }' "$pico_patch"
+! grep -Fq '{ BTN_MODE,   PBTN_MENU }' "$pico_patch"
+grep -Fq 'SDLK_WORLD_17, IN_BINDTYPE_EMU, SACTION_ENTER_MENU' \
+    package/standalone-bubble/patches/pcsx-rearmed-bubble-kmsdrm.patch
+! grep -Fq 'SDLK_WORLD_10, IN_BINDTYPE_EMU, SACTION_ENTER_MENU' \
+    package/standalone-bubble/patches/pcsx-rearmed-bubble-kmsdrm.patch
+grep -Fq 'mapInput("select", Input(joyId, TYPE_BUTTON, 17' \
+    package/standalone-bubble/patches/yabasanshiro/yabasanshiro-2.10.4-bubble-input.patch
+grep -Fq '"select": {"type": "button", "id": 17' \
+    package/standalone-bubble/plumos/factory-defaults/standalone/yabasanshiro/keymapv2.json
+grep -Fq 'controls_b[CONTROL_INDEX_MENU] = 1041' scripts/build-drastic-bubble.sh
+! grep -Fq 'guide:b10' package/standalone-bubble/plumos/bin/plumos-standalone-launch
+grep -Fq 'guide:b17' package/standalone-bubble/plumos/bin/plumos-standalone-launch
+drm_patch=patches/retroarch/015-bubble-drm-rgui-blocking-commit.patch
+grep -Fq 'uint32_t commit_flags = menu_surface ? 0' "$drm_patch"
+grep -Fq 'commit_flags, menu_surface ? NULL : &pending' "$drm_patch"
+grep -Fq 'scanout_fb=%u waited_ms=%u' "$drm_patch"
 ! grep -Fq 'ABS_Z/RZ triggers' scripts/build-picoarch-bubble.sh
 
 echo 'bubble_physical_input_contract=result-ok'

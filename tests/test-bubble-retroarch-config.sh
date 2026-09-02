@@ -30,8 +30,8 @@ grep -qx 'video_rotation = "0"' "$factory"
 grep -qx 'video_threaded = "true"' "$factory"
 grep -qx 'audio_device = "hw:0,0"' "$factory"
 grep -qx 'audio_latency = "64"' "$factory"
-grep -qx 'input_menu_toggle_btn = "10"' "$factory"
-grep -qx 'input_screenshot_btn = "17"' "$factory"
+grep -qx 'input_menu_toggle_btn = "17"' "$factory"
+grep -qx 'input_screenshot_btn = "10"' "$factory"
 grep -qx 'input_hold_fast_forward_btn = "nul"' "$factory"
 grep -qx 'input_rewind_btn = "nul"' "$factory"
 grep -qx 'input_state_slot_increase_btn = "16"' "$factory"
@@ -132,11 +132,46 @@ legacy_active=$legacy_root/config/retroarch/retroarch-bubble.cfg
 grep -qx 'rgui_menu_color_theme = "23"' "$legacy_active"
 grep -qx 'audio_resampler = "user-resampler"' "$legacy_active"
 grep -qx 'assets_directory = "/storage/plumos/retroarch/assets"' "$legacy_active"
-grep -qx 'input_screenshot_btn = "17"' "$legacy_active"
+grep -qx 'input_screenshot_btn = "10"' "$legacy_active"
 grep -qx 'input_player1_up_btn = "13"' "$legacy_active"
 grep -qx 'input_player1_r_y_plus_axis = "+3"' "$legacy_active"
 grep -qx 'input_hold_fast_forward_btn = "nul"' "$legacy_active"
 grep -qx 'input_rewind_btn = "nul"' "$legacy_active"
 test -s "$legacy_root/state/retroarch/pre-v90s-active.cfg"
+
+# Migrate only the exact previously managed Function2-menu pair. This must not
+# overwrite an independently changed user binding.
+function_root=$tmp/function1/plumos
+mkdir -p "$function_root/bin" "$function_root/factory-defaults/retroarch" \
+    "$function_root/config/retroarch" "$function_root/state/retroarch"
+cp "$helper" "$function_root/bin/plumos-retroarch-config-merge"
+cp "$factory" "$function_root/factory-defaults/retroarch/retroarch-bubble.cfg"
+cp "$legacy_defaults" \
+    "$function_root/factory-defaults/retroarch/retroarch-bubble-pre-v90s.cfg"
+chmod 0755 "$function_root/bin/plumos-retroarch-config-merge"
+cp "$factory" "$function_root/config/retroarch/retroarch-bubble.cfg"
+sed -i \
+    -e 's/^input_menu_toggle_btn = "17"$/input_menu_toggle_btn = "10"/' \
+    -e 's/^input_screenshot_btn = "10"$/input_screenshot_btn = "17"/' \
+    "$function_root/config/retroarch/retroarch-bubble.cfg"
+printf '%s\n' '23878b8ce1e45f1418335dad9bbb8bc75b34d28f7aeec17afe81fb7cd7a17ed8' \
+    >"$function_root/state/retroarch/factory-config.sha256"
+PLUMOS_ROOT=$function_root PLUMOS_BUSYBOX=/bin/busybox \
+    "$function_root/bin/plumos-retroarch-config-merge" >"$tmp/function1.log"
+grep -q '^retroarch_config=result-migrated-function1-menu added=2 ' \
+    "$tmp/function1.log"
+function_active=$function_root/config/retroarch/retroarch-bubble.cfg
+grep -qx 'input_menu_toggle_btn = "17"' "$function_active"
+grep -qx 'input_screenshot_btn = "10"' "$function_active"
+grep -qx 'input_menu_toggle_btn = "10"' \
+    "$function_root/state/retroarch/pre-function1-menu-active.cfg"
+
+sed -i 's/^input_menu_toggle_btn = "17"$/input_menu_toggle_btn = "9"/' \
+    "$function_active"
+printf '%s\n' '23878b8ce1e45f1418335dad9bbb8bc75b34d28f7aeec17afe81fb7cd7a17ed8' \
+    >"$function_root/state/retroarch/factory-config.sha256"
+PLUMOS_ROOT=$function_root PLUMOS_BUSYBOX=/bin/busybox \
+    "$function_root/bin/plumos-retroarch-config-merge" >"$tmp/function1-user.log"
+grep -qx 'input_menu_toggle_btn = "9"' "$function_active"
 
 printf 'bubble_retroarch_config_test=result-ok keys=%s duplicates=0\n' "$key_count"

@@ -169,7 +169,7 @@ if [ "$emulator_id" = ppsspp ]; then
         export SDL_AUDIODRIVER=alsa
         export AUDIODEV="$alsa_device"
         export SDL_VIDEO_KMSDRM_DEVICE_INDEX=0
-        export SDL_GAMECONTROLLERCONFIG='190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b10,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,'
+        export SDL_GAMECONTROLLERCONFIG='190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b17,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,'
         exec "$ppsspp" --fullscreen --graphics=gles2.0 \
             --pause-menu-exit "$content"
     ) >>"$log" 2>&1 &
@@ -335,7 +335,7 @@ if [ "$emulator_id" = openbor ]; then
         SDL_AUDIODRIVER=alsa \
         AUDIODEV="$alsa_device" \
         SDL_VIDEO_KMSDRM_DEVICE_INDEX=0 \
-        SDL_GAMECONTROLLERCONFIG='190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b10,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,' \
+        SDL_GAMECONTROLLERCONFIG='190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b17,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,' \
             "$openbor"
     ) >>"$log" 2>&1
     rc=$?
@@ -414,9 +414,13 @@ if [ "$emulator_id" = drastic ]; then
     done
     drastic_config="$work/config/drastic.cfg"
     if "$BB" grep -qF \
-        'controls_b[CONTROL_INDEX_MENU] = 1154' "$drastic_config"; then
+        -e 'controls_b[CONTROL_INDEX_MENU] = 1154' \
+        -e 'controls_b[CONTROL_INDEX_MENU] = 1034' "$drastic_config"; then
+        drastic_backup="$work/config/drastic.cfg.pre-function1"
+        [ -s "$drastic_backup" ] || "$BB" cp -p "$drastic_config" "$drastic_backup"
         "$BB" sed \
-            's/^controls_b\[CONTROL_INDEX_MENU\] = 1154$/controls_b[CONTROL_INDEX_MENU] = 1034/' \
+            -e 's/^controls_b\[CONTROL_INDEX_MENU\] = 1154$/controls_b[CONTROL_INDEX_MENU] = 1041/' \
+            -e 's/^controls_b\[CONTROL_INDEX_MENU\] = 1034$/controls_b[CONTROL_INDEX_MENU] = 1041/' \
             "$drastic_config" >"$drastic_config.next"
         "$BB" sync
         "$BB" mv "$drastic_config.next" "$drastic_config"
@@ -574,7 +578,7 @@ if [ "$emulator_id" = yabasanshiro ]; then
     AUDIODEV="$alsa_device" \
     PLUMOS_AUDIO_POLL_PROXY=0 \
     SDL_VIDEO_KMSDRM_DEVICE_INDEX=0 \
-    SDL_GAMECONTROLLERCONFIG='190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b10,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,' \
+    SDL_GAMECONTROLLERCONFIG='190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b17,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,' \
         "$yabasanshiro" "$@" >>"$log" 2>&1
     rc=$?
     set -e
@@ -680,7 +684,7 @@ PLUMOS_PCSX_REQUIRE_ALSA=1 \
 PLUMOS_PCSX_GLES_BATCH="${PLUMOS_PCSX_GLES_BATCH:-1}" \
 SDL_VIDEO_KMSDRM_DEVICE_INDEX=0 \
 PICOFE_SDL_GL_CONTEXT="$picofe_gl_context" \
-SDL_GAMECONTROLLERCONFIG='190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b10,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,' \
+SDL_GAMECONTROLLERCONFIG='190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b17,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,' \
     "$pcsx" -cdfile "$content" >>"$log" 2>&1
 rc=$?
 set -e

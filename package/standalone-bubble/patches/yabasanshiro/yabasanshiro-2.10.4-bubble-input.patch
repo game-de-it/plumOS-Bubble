@@ -63,7 +63,7 @@ diff --git a/yabause/src/retro_arena/InputManager.cpp b/yabause/src/retro_arena/
 +    cfg->mapInput("a", Input(joyId, TYPE_BUTTON, 0, 1, true));
 +    cfg->mapInput("b", Input(joyId, TYPE_BUTTON, 1, 1, true));
 +    cfg->mapInput("start", Input(joyId, TYPE_BUTTON, 9, 1, true));
-+    cfg->mapInput("select", Input(joyId, TYPE_BUTTON, 10, 1, true));
++    cfg->mapInput("select", Input(joyId, TYPE_BUTTON, 17, 1, true));
 +    cout << "Added Bubble menu mapping for retrogame_joypad (instance ID: " << joyId << ")." << endl;
 +  }else if(!loadInputConfig(mInputConfigs[joyId])){
      cout << "Added unconfigured joystick " << SDL_JoystickName(joy) << " (GUID: " << guid << ", instance ID: " << joyId << ", device index: " << id << ")." << endl;

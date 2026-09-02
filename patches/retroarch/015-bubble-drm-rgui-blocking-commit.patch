@@ -1,0 +1,83 @@
+--- a/gfx/drivers/drm_gfx.c
++++ b/gfx/drivers/drm_gfx.c
+@@ -358,6 +358,9 @@ static bool drm_page_flip(struct drm_surface *surface)
+    drmEventContext event_context;
+    struct pollfd pfd;
+    bool pending = true;
++   bool menu_surface = surface && surface->layer == 2;
++   uint32_t target_fb_id = surface->pages[surface->flip_page].buf.fb_id;
++   unsigned timeout_count = 0;
+    int ret;
+ 
+    req = drmModeAtomicAlloc();
+@@ -373,7 +376,7 @@ static bool drm_page_flip(struct drm_surface *surface)
+    if (drmModeAtomicAddProperty(req,
+          drm.plane_id,
+          drm.plane_fb_prop_id,
+-         surface->pages[surface->flip_page].buf.fb_id) < 0)
++         target_fb_id) < 0)
+    {
+       RARCH_ERR("[DRM] Failed to add atomic property for pageflip.\n");
+       drmModeAtomicFree(req);
+@@ -385,17 +388,19 @@ static bool drm_page_flip(struct drm_surface *surface)
+     * A successful atomic submission is not proof that the new framebuffer
+     * has reached scanout, so request a flip event and wait for it before
+     * making another dumb buffer writable. This mirrors the MF frontend and
+-    * PicoArch presenters while retaining RetroArch's threaded video path.
++    * PicoArch presenters while retaining RetroArch's threaded video path.
++    *
++    * Bubble's stock RK3566 DRM driver sometimes completes a synchronous RGUI
++    * atomic commit without emitting the requested page-flip event. Waiting
++    * for that event deadlocks the frontend thread when returning to content.
++    * For the menu surface, the blocking commit itself is the completion
++    * boundary. Game frames retain nonblocking event-paced presentation.
+     */
+-   uint32_t commit_flags = DRM_MODE_PAGE_FLIP_EVENT;
++   uint32_t commit_flags = menu_surface ? 0 :
++         (DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT);
+ 
+-   /* Game frames are produced on RetroArch's video thread. Submit those
+-    * atomically without blocking the caller, then wait for their event below.
+-    * RGUI redraws on the frontend thread, so keep its layer synchronous. */
+-   if (!surface || surface->layer != 2)
+-      commit_flags |= DRM_MODE_ATOMIC_NONBLOCK;
+    ret = drmModeAtomicCommit(drm.fd, req,
+-         commit_flags, &pending);
++         commit_flags, menu_surface ? NULL : &pending);
+    drmModeAtomicFree(req);
+    if (ret < 0)
+    {
+@@ -405,6 +409,9 @@ static bool drm_page_flip(struct drm_surface *surface)
+       return false;
+    }
+ 
++   if (menu_surface)
++      goto pageflip_complete;
++
+    memset(&event_context, 0, sizeof(event_context));
+    event_context.version           = DRM_EVENT_CONTEXT_VERSION;
+    event_context.page_flip_handler = drm_page_flip_handler;
+@@ -424,6 +431,14 @@ static bool drm_page_flip(struct drm_surface *surface)
+       }
+       if (ret == 0)
+       {
+-         RARCH_WARN("[DRM] Pageflip event has not arrived after 1000 ms; still waiting.\n");
++         drmModePlanePtr plane = drmModeGetPlane(drm.fd, drm.plane_id);
++         uint32_t scanout_fb_id = plane ? plane->fb_id : 0;
++         timeout_count++;
++         RARCH_WARN("[DRM] Pageflip event timeout: layer=%u target_fb=%u "
++               "scanout_fb=%u waited_ms=%u; still waiting.\n",
++               surface->layer, target_fb_id, scanout_fb_id,
++               timeout_count * 1000);
++         if (plane)
++            drmModeFreePlane(plane);
+          continue;
+       }
+@@ -443,6 +458,7 @@ static bool drm_page_flip(struct drm_surface *surface)
+       }
+    }
+ 
++pageflip_complete:
+    surface->current_page = &surface->pages[surface->flip_page];
+    surface->flip_page = (surface->flip_page + 1) % surface->numpages;
+    return true;

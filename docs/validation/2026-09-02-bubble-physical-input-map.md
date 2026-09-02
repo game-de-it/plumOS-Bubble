@@ -39,17 +39,19 @@ axes and eighteen buttons.
 | L3 | 317 | 11 | logical L3 |
 | right stick | `ABS_RX/ABS_RY` | axes 2/3 | right analog |
 | R3 | 318 | 12 | logical R3 |
-| Function1 | 704 `BTN_TRIGGER_HAPPY1` | 17 | RetroArch screenshot; PicoArch menu fallback |
-| Function2 | 316 `BTN_MODE` | 10 | emulator menu |
+| Function1 | 704 `BTN_TRIGGER_HAPPY1` | 17 | emulator menu across supported runtimes |
+| Function2 | 316 `BTN_MODE` | 10 | RetroArch screenshot; secondary function elsewhere |
 
 The important face-button rule is physical-label preservation. In particular,
 Bubble's physical A is `BTN_EAST`, so mapping `BTN_SOUTH` to logical A reverses
 A/B. PicoArch carried that V90S assumption and was corrected here. Physical X
 and Y were already label-correct.
 
-PicoArch has no screenshot action. It therefore treats Function1 as a second
-menu path, while Function2 remains the normal menu button. This is an explicit
-runtime fallback, not evidence that the two raw buttons are identical.
+The cross-runtime policy assigns the emulator menu to Function1. RetroArch uses
+Function2 for screenshots so the existing feature remains reachable. PicoArch,
+PCSX-ReARMed, YabaSanshiro, DraStic and SDL-controller standalone routes assign
+their menu/guide input to Function1; Function2 is not retained as a second menu
+shortcut merely because a runtime has no screenshot action.
 
 ## System-owned keys
 
@@ -66,11 +68,13 @@ the emulator input contract.
 
 Raw identity, evdev codes, joystick indices, axes, and the A/B cause are
 physically confirmed. Configuration/build tests prove the intended frontend,
-RetroArch, and PicoArch mappings. The user subsequently confirmed the requested
-PicoArch QuickNES operation sequence on the physical unit: physical A/B act as
-the label-correct game buttons, both Function-key menu paths respond, A confirms,
-B returns, and normal exit returns to the frontend. This closes the reported A/B
-reversal for that route without generalizing it to every emulator.
+RetroArch, and PicoArch mappings. The user previously confirmed the PicoArch
+QuickNES operation sequence on the physical unit: physical A/B acted as the
+label-correct game buttons, both former Function-key menu paths responded, A
+confirmed, B returned, and normal exit returned to the frontend. This closes
+the reported A/B reversal for that route without generalizing it to every
+emulator. The newer Function1-only menu policy still requires physical
+acceptance after deployment.
 
 Actual game behavior remains a separate per-runtime physical gate for X/Y,
 shoulders, both sticks, L3/R3, and system-owned volume/power. Standalone emulator

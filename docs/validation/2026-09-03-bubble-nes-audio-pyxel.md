@@ -156,17 +156,33 @@ the captured pre-port default and the new V90S-derived factory has a different
 value. Explicit user changes continue to win. Before switching the active file,
 it stores the original at `state/retroarch/pre-v90s-active.cfg`. The factory
 mapping was also corrected to the measured Bubble layout: D-pad buttons 13-16,
-L3/R3 buttons 11/12, right-stick axes 2/3, Function2 menu and Function1
-screenshot. Conflicting L2 hold-fast-forward and R2 rewind bindings were
-removed.
+L3/R3 buttons 11/12 and right-stick axes 2/3. The initial corrected generation
+still assigned Function2 to the menu and Function1 to screenshots; that mapping
+is retained in the pre-migration backup described below. Conflicting L2
+hold-fast-forward and R2 rewind bindings were removed.
 
-The RGUI hang was independent of the cfg migration. The plain DRM driver set up
-a new menu surface on the page that the producer was also about to reuse. A
-commit of an already-scanned framebuffer may not generate the expected page
-flip event, leaving the resume path waiting indefinitely. Patch 014 records the
-surface role, gives RGUI three pages, advances the producer away from initial
-scanout, and keeps the RGUI commit synchronous while game frames retain the
-threaded non-blocking submission path.
+The RGUI hang was independent of the cfg migration. Patch 014 prevented a new
+menu surface from reusing its scanout page, but physical retest still hung when
+RGUI was closed to resume content. The live process remained alive with its
+main thread blocked in `poll(2)` inside `drm_page_flip`; DRM, input and PCM file
+descriptors remained open and ALSA remained `RUNNING`. This narrows the failure
+to Bubble's stock DRM driver completing the synchronous RGUI atomic commit
+without delivering the requested page-flip event.
+
+Patch 015 therefore uses a blocking atomic commit without an event request for
+the RGUI layer; the return from that commit is its completion boundary. Game
+surfaces retain non-blocking, event-paced presentation. Game-event timeout logs
+now include the surface layer, target framebuffer, current plane framebuffer
+and cumulative wait time, so any later presentation stall identifies its stage
+instead of producing only a generic warning.
+
+The input policy is also normalized across runtimes: Function1/js17 opens each
+emulator menu. RetroArch moves screenshots to Function2/js10, preserving that
+feature. PicoArch, PCSX-ReARMed, YabaSanshiro, DraStic and SDL-controller
+standalone mappings now use Function1. The RetroArch merger migrates only the
+exact former `menu=10` and `screenshot=17` managed pair and saves
+`state/retroarch/pre-function1-menu-active.cfg`; arbitrary user remaps are not
+overwritten.
 
 Host verification passed the 3376-key migration fixture, clean patch
 application, AArch64 RetroArch build, 114/114 core catalog, and complete
@@ -179,7 +195,8 @@ verification: frontend 141/141, RetroArch 110/110, libretro core component
 The active cfg migration reported `result-migrated-pre-v90s added=123`; its
 pre-migration SHA-256 is preserved by the backup as
 `f3ffcb254b82028deed04217bccde5150e57c61dad7ce22e0ef91a113bb36407`.
-Frontend and system configuration hashes remained unchanged. Physical
-acceptance still requires launching content with the new binary, opening RGUI
-with Function2, resuming repeatedly without a hang, checking the theme and
-Function1 screenshot, and returning normally to the frontend.
+Frontend and system configuration hashes remained unchanged. The later Patch
+015/Function1 build is host-implementation work until its new managed bundle is
+deployed. Physical acceptance requires launching content, opening RGUI with
+Function1, resuming repeatedly without a hang, checking the theme and Function2
+screenshot, and returning normally to the frontend.

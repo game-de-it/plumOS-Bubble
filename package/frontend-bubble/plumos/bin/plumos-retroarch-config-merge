@@ -14,6 +14,10 @@ legacy_bubble_sha256=9e0cee764c7840a904403ba8fcde7c1cc4729d1b759aabbe4563e43f411
 # First full V90S-derived Bubble factory. Its missing-key-only migration left
 # RetroArch's serialized pre-port defaults in every existing setting slot.
 pre_v90s_full_factory_sha256=0a10e596d378325e9449fa8374f3f62d9c198461b3db4a69f61634824ddc638a
+# Bubble factory generation that assigned Function2 to RGUI and Function1 to
+# screenshots. The physical acceptance policy now assigns every emulator menu
+# to Function1. Only migrate the exact managed pair; user remaps still win.
+function2_menu_factory_sha256=23878b8ce1e45f1418335dad9bbb8bc75b34d28f7aeec17afe81fb7cd7a17ed8
 
 [ -s "$factory" ] || {
     printf 'retroarch_config=result-error reason=factory-missing path=%s\n' "$factory" >&2
@@ -120,6 +124,24 @@ migrate_pre_v90s_defaults() {
     fi
 }
 
+migrate_function1_menu_defaults() {
+    menu_changed=0
+    if $BB grep -qx 'input_menu_toggle_btn = "10"' "$config" &&
+       $BB grep -qx 'input_screenshot_btn = "17"' "$config"; then
+        menu_backup=$state_dir/pre-function1-menu-active.cfg
+        [ -s "$menu_backup" ] || atomic_copy "$config" "$menu_backup"
+        menu_next=${config}.next.$$
+        $BB sed \
+            -e 's/^input_menu_toggle_btn = "10"$/input_menu_toggle_btn = "17"/' \
+            -e 's/^input_screenshot_btn = "17"$/input_screenshot_btn = "10"/' \
+            "$config" >"$menu_next"
+        $BB sync
+        $BB mv "$menu_next" "$config"
+        $BB sync
+        menu_changed=2
+    fi
+}
+
 result=unchanged
 added=0
 if [ ! -s "$config" ]; then
@@ -133,6 +155,12 @@ else
         atomic_copy "$factory" "$config"
         result=replaced-legacy
         added=3315
+    elif [ -r "$marker" ] &&
+         [ "$($BB sed -n '1p' "$marker")" = "$function2_menu_factory_sha256" ]; then
+        migrate_function1_menu_defaults
+        merge_missing_keys
+        result=migrated-function1-menu
+        added=$((menu_changed + added))
     elif [ -s "$legacy_defaults" ] && [ -r "$marker" ] &&
          [ "$($BB sed -n '1p' "$marker")" = "$pre_v90s_full_factory_sha256" ]; then
         # Three-way migration: update only values that still exactly match the

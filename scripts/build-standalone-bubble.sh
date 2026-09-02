@@ -209,10 +209,10 @@ for loader_name in \
 done
 drastic_packaged_config="$PLUMOS_DIR/emulator/standalone/drastic/config/drastic.cfg"
 sed \
-    's/^controls_b\[CONTROL_INDEX_MENU\] = [0-9][0-9]*$/controls_b[CONTROL_INDEX_MENU] = 1034/' \
+    's/^controls_b\[CONTROL_INDEX_MENU\] = [0-9][0-9]*$/controls_b[CONTROL_INDEX_MENU] = 1041/' \
     "$drastic_packaged_config" >"$drastic_packaged_config.next"
 mv "$drastic_packaged_config.next" "$drastic_packaged_config"
-grep -Fqx 'controls_b[CONTROL_INDEX_MENU] = 1034' \
+grep -Fqx 'controls_b[CONTROL_INDEX_MENU] = 1041' \
     "$drastic_packaged_config" || {
     printf 'error: DraStic packaged FUNCTION menu mapping is missing\n' >&2
     exit 1

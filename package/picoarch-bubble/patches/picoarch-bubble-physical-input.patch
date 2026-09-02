@@ -1,7 +1,7 @@
 diff --git a/plat_linux.c b/plat_linux.c
 --- a/plat_linux.c
 +++ b/plat_linux.c
-@@ -82,15 +82,19 @@ static const struct in_default_bind in_v90s_evdev_defbinds[] = {
+@@ -82,15 +82,18 @@ static const struct in_default_bind in_v90s_evdev_defbinds[] = {
  	{ KEY_RIGHT,  IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_RIGHT },
  	{ BTN_DPAD_RIGHT, IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_RIGHT },
 -	{ BTN_SOUTH,  IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_A },
@@ -19,11 +19,11 @@ diff --git a/plat_linux.c b/plat_linux.c
  	{ BTN_START,  IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_START },
 +	{ BTN_THUMBL, IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_L3 },
 +	{ BTN_THUMBR, IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_R3 },
- 	{ BTN_MODE,   IN_BINDTYPE_EMU, EACTION_MENU },
+-	{ BTN_MODE,   IN_BINDTYPE_EMU, EACTION_MENU },
 +	{ BTN_TRIGGER_HAPPY1, IN_BINDTYPE_EMU, EACTION_MENU },
  	{ 0, 0, 0 }
  };
-@@ -105,10 +109,11 @@ static const struct menu_keymap in_v90s_evdev_key_map[] = {
+@@ -105,10 +108,10 @@ static const struct menu_keymap in_v90s_evdev_key_map[] = {
  	{ KEY_RIGHT,  PBTN_RIGHT },
  	{ BTN_DPAD_RIGHT, PBTN_RIGHT },
 -	{ BTN_SOUTH,  PBTN_MOK },
@@ -34,6 +34,6 @@ diff --git a/plat_linux.c b/plat_linux.c
  	{ BTN_NORTH,  PBTN_MA3 },
  	{ BTN_TL,     PBTN_L },
  	{ BTN_TR,     PBTN_R },
- 	{ BTN_MODE,   PBTN_MENU },
+-	{ BTN_MODE,   PBTN_MENU },
 +	{ BTN_TRIGGER_HAPPY1, PBTN_MENU },
  };

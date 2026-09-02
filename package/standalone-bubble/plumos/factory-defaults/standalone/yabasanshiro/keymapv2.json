@@ -18,7 +18,7 @@
     "z": {"type": "button", "id": 5, "value": 1},
     "l": {"type": "button", "id": 6, "value": 1},
     "r": {"type": "button", "id": 7, "value": 1},
-    "select": {"type": "button", "id": 10, "value": 1},
+    "select": {"type": "button", "id": 17, "value": 1},
     "start": {"type": "button", "id": 9, "value": 1}
   }
 }

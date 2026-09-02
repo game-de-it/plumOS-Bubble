@@ -110,9 +110,10 @@
 - [ ] `BUB-P4-D02` CPU-rendered DRM dumb-buffer double buffering と page-flip completion を実装する。
   - MFの共通rendererとRetroArch DRM修正をBubbleへ移植し、FEとRetroArch RGUIの実パネル表示、
     DRM handoff、FEへの再取得まで確認した。page-flip継続計測を残す。
-  - RGUIからcontentへ戻る際のhangを実機で確認。menu surfaceがscanout中のpageを再利用し、
-    発生しないflip eventを待つ経路を修正した。game/menuのsurface roleを分離し、menuを
-    triple buffer化したAArch64 buildを実機deploy済み。複数回のmenu往復を物理確認する。
+  - RGUIからcontentへ戻る際のhangを再現。014のpage ownership修正後もmain threadが
+    `poll(2)`で停止し、Bubble stock DRMが同期menu commit後のflip eventを返さないことを
+    特定。015でmenuはeventを要求しないblocking commitへ変更し、game側timeout logへ
+    layer/target FB/scanout FB/待機時間を追加した。新buildのdeployと複数回往復を残す。
 - [ ] `BUB-P4-D03` 640x480 panel の実 refresh、scroll pacing、input-to-visible response を測定する。
 - [ ] `BUB-P4-D04` fbdev/DRM handoff、FE/game/menu、終了後のscanout ownershipを物理確認する。
 - [ ] `BUB-P4-D05` vendor `libmali` のlicense、redistribution、DDK/kernel ABIを監査し、採用・隔離・不採用を決定する。
@@ -124,8 +125,9 @@
 - [ ] `BUB-P4-I03` `gpio-keys`、power key、G-sensor、rumble の物理対応と必要性を確定する。
 - [ ] `BUB-P4-I04` hotkey、volume、brightness、menu、exit の競合しない ownership policy を決める。
   - V90S由来cfgの不足key追加だけでは旧RA defaultが残る問題を修正。変更されていない旧default
-    だけを三者比較で移行し、利用者変更値と旧cfg backupを保持する。Function2=RA menu、
-    Function1=screenshotを実機cfgへ反映済み。物理hotkey確認を残す。
+    だけを三者比較で移行し、利用者変更値と旧cfg backupを保持する。全エミュmenuを
+    Function1へ統一し、RA screenshotはFunction2へ移動。旧managed pairだけをbackup付きで
+    移行するhost実装済み。新bundle deploy後の物理hotkey確認を残す。
 - [ ] `BUB-P4-I05` normalized Bubble controller を公開し、FE/RetroArch/standaloneで1入力1反応を確認する。
   - FEとRetroArch RGUIでD-pad/A/B、SELECT+START終了を物理確認した。standaloneと全buttonを残す。
   - PicoArch QuickNESで物理A/B、Function1/2 menu、menu A決定/B戻る、FE復帰を利用者確認済み。
@@ -245,7 +247,8 @@
   - event0/1/2、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`から、D-pad、ABXY、
     Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。
   - PicoArchのA/B逆転、L3/R3欠落、Function1欠落と、誤ったABS_Z/RZ trigger前提を修正した。
-    RetroArchはFunction2=menu、Function1=screenshot、PicoArchは両Function=menu fallbackとした。
+    全runtimeのmenuをFunction1/js17へ統一。RA screenshotはFunction2/js10へ移し、既存機能を
+    保持。PicoArch/PCSX/YabaSanshiro/DraStic/SDL standaloneのhost mappingを更新済み。
   - RetroArch factory/active cfgもD-pad button 13..16、L3/R3 11/12、right stick axes 2/3へ
     修正し、競合していたL2 hold-fast-forwardとR2 rewindを解除した。実機の全button確認を残す。
   - PicoArch QuickNESのA/B、両Function menu、menu A決定/B戻る、FE復帰は物理合格。
