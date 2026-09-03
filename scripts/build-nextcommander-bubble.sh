@@ -30,7 +30,7 @@ copy_deps() {
     readelf -d "$elf" 2>/dev/null | awk -F'[][]' '/NEEDED/ {print $2}' |
         while IFS= read -r dependency; do
             case $dependency in
-                ld-linux-aarch64.so.1|libc.so.6|libm.so.6|libpthread.so.0|libdl.so.2|librt.so.1|libgcc_s.so.1|libstdc++.so.6) continue ;;
+                ld-linux-aarch64.so.1) continue ;;
             esac
             [[ -e $destination/$dependency ]] && continue
             source=$(find_target_lib "$dependency" || true)
@@ -63,6 +63,8 @@ for library in libstdc++.so.6 libgcc_s.so.1; do
     install -m 0644 "$source" "$app/lib/$library"
     copy_deps "$source" "$app/lib"
 done
+loader=$(find_target_lib ld-linux-aarch64.so.1)
+install -m 0755 "$loader" "$app/lib/ld-linux-aarch64.so.1"
 
 cat >"$root/bin/plumos-nextcommander-launch" <<'EOF'
 #!/bin/sh
@@ -92,9 +94,10 @@ mv -f "$config.next" "$config"
 export HOME=$STATE_DIR XDG_CACHE_HOME=$STATE_DIR/.cache XDG_CONFIG_HOME=$STATE_DIR/.config
 export SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_NOMOUSE=1
 export PLUMOS_DRM_DEVICE=${PLUMOS_DRM_DEVICE:-/dev/dri/card0}
-export LD_LIBRARY_PATH=$APP_ROOT/lib
 cd "$APP_ROOT" || exit 1
-exec "$APP_ROOT/bin/NextCommander" --config "$config" --res-dir "$APP_ROOT/res" >>"$LOG_DIR/nextcommander.log" 2>&1
+exec "$APP_ROOT/lib/ld-linux-aarch64.so.1" \
+  --library-path "$APP_ROOT/lib" \
+  "$APP_ROOT/bin/NextCommander" --config "$config" --res-dir "$APP_ROOT/res" >>"$LOG_DIR/nextcommander.log" 2>&1
 EOF
 chmod 0755 "$root/bin/plumos-nextcommander-launch"
 

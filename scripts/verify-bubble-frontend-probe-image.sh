@@ -192,6 +192,12 @@ for helper in plumos-display-control plumos-network-control \
 done
 test -x "$app/apps/nextcommander/bin/NextCommander"
 test -x "$app/apps/music-player/bin/plumos-music-player.bin"
+for packaged_app in nextcommander music-player; do
+    test -x "$app/apps/$packaged_app/lib/ld-linux-aarch64.so.1"
+    test -f "$app/apps/$packaged_app/lib/libc.so.6"
+done
+grep -q -- '--library-path' "$app/bin/plumos-nextcommander-launch"
+grep -q -- '--library-path' "$app/bin/plumos-music-player-launch"
 jq -e 'all(.start_entries[]; .status == "implemented") and
     all(.apps_entries[]; .status == "implemented")' \
     "$app/config/frontend/start-menu-coverage.json" >/dev/null

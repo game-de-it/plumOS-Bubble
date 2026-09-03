@@ -37,7 +37,7 @@ copy_deps() {
     readelf -d "$elf" 2>/dev/null | awk -F'[][]' '/NEEDED/ {print $2}' |
         while IFS= read -r dependency; do
             case $dependency in
-                ld-linux-aarch64.so.1|libc.so.6|libm.so.6|libpthread.so.0|libdl.so.2|librt.so.1|libgcc_s.so.1) continue ;;
+                ld-linux-aarch64.so.1) continue ;;
             esac
             [[ -e $destination/$dependency ]] && continue
             source=$(find_target_lib "$dependency" || true)
@@ -71,6 +71,8 @@ gcc -std=c11 -O2 -pipe -DPLUMOS_FBDEV_ENABLE_FREETYPE=1 \
     -lasound -ldl -lfreetype -lpng -ljpeg -lz -ldrm -lm -lpthread
 strip "$app/bin/plumos-music-player.bin" 2>/dev/null || true
 copy_deps "$app/bin/plumos-music-player.bin" "$app/lib"
+loader=$(find_target_lib ld-linux-aarch64.so.1)
+install -m 0755 "$loader" "$app/lib/ld-linux-aarch64.so.1"
 
 cat >"$root/bin/plumos-music-player-launch" <<'EOF'
 #!/bin/sh
@@ -91,9 +93,10 @@ export ALSA_CONFIG_PATH=${ALSA_CONFIG_PATH:-/run/plumos/audio/asound.conf}
 export ALSA_PLUGIN_DIR=${ALSA_PLUGIN_DIR:-$PLUMOS_ROOT/lib/alsa-lib}
 export PLUMOS_MUSIC_ALSA_DEVICE=${PLUMOS_MUSIC_ALSA_DEVICE:-plumos_output}
 export PLUMOS_MUSIC_IGNORE_ANALOG=1 PLUMOS_DRM_DEVICE=${PLUMOS_DRM_DEVICE:-/dev/dri/card0}
-export LD_LIBRARY_PATH=$APP_ROOT/lib
 cd "$APP_ROOT" || exit 1
-exec "$APP_ROOT/bin/plumos-music-player.bin" >>"$LOG_DIR/music-player.log" 2>&1
+exec "$APP_ROOT/lib/ld-linux-aarch64.so.1" \
+  --library-path "$APP_ROOT/lib" \
+  "$APP_ROOT/bin/plumos-music-player.bin" >>"$LOG_DIR/music-player.log" 2>&1
 EOF
 chmod 0755 "$root/bin/plumos-music-player-launch"
 
