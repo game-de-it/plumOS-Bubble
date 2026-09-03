@@ -114,6 +114,9 @@
     追加したmenu/game barrier logは全て完了した。symbol付きgdb backtraceで実停止箇所を
     ALSAの`snd_pcm_wait`と確定し、DRM transition起因ではないことを確認した。DRMの
     page-flip継続計測自体は本項目に残す。
+  - Core Provided/整数scale変更でviewport-sized bufferを再生成していなかった問題を修正。
+    gameはCore Provided `640x480`から整数scale `576x432+32+24`へ変化し、RGUIは
+    整数scaleから独立して常にpanel `640x480`となることを実機logで確認。物理LCD確認を残す。
 - [ ] `BUB-P4-D03` 640x480 panel の実 refresh、scroll pacing、input-to-visible response を測定する。
 - [ ] `BUB-P4-D04` fbdev/DRM handoff、FE/game/menu、終了後のscanout ownershipを物理確認する。
 - [ ] `BUB-P4-D05` vendor `libmali` のlicense、redistribution、DDK/kernel ABIを監査し、採用・隔離・不採用を決定する。
@@ -187,6 +190,9 @@
 - [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
   - RetroArch v1.22.2とQuickNES `058d665`をAArch64 containerからbuildし、
     software DRM/RGUI/ALSA/udev、GPU runtime非依存、component checksumをhost検証済み。
+  - RGUIに加えてXMB/Ozoneをbuildし、pinned公式assetと日本語fontを同梱。既定RGUIは
+    plain DRM、XMB/Ozone選択時はKMS/EGL/GLESを使用し、3 driverの実機初期化まで合格。
+    XMB/Ozoneの物理LCD表示と操作確認を残す。
 - [ ] `BUB-P5-04` 利用者提供の小さな既知正常NES content 1本だけをGit外からtest deploymentする。
 - [ ] `BUB-P5-05` FE -> QuickNES -> FE のdisplay/input/audio lifecycleを実機確認する。
   - RetroArchとPicoArchのQuickNESはcontent起動、ALSA pointer進行、停止後FE 1 process、
