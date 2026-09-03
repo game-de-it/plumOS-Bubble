@@ -201,6 +201,11 @@
     Ed25519署名、2回のapply/rollback、health確定、managed delete、設定保全をhost fixtureで確認。
     source `bdb7916`を実機へ反映し、署名packageの実機inspect/scan、全12,373 managed file hash、
     設定/SSH key不変、FE renderer-ready復帰を確認した。実packageのapply/rollbackはrelease候補で残す。
+    NW情報がBusyBoxを解決できず全serviceを`Status Error`にしていたため、Bubble launcherから
+    `/bin/busybox`を明示し、FEにも同pathのfallbackを追加した。source `6a72940`を実機へ反映し、
+    SSH=スタート、FTP/SFTP/Samba=ストップ、ADB=利用不可、およびFTP起動時のスタートへの
+    動的切替をtext rendererで確認した。表示とNW Serviceトグルは自動起動設定ではなく実processを
+    基準にする。全12,373 managed file hashと既存service/system/frontend設定hashは不変・合格。
     boot/kernel/DTB/System matching-setは正式A/B slot完成までfull-image更新として分離する。
     host contract/buildは合格。実LCDでの各画面、設定反映、reboot/shutdown後のclean mountを残す。
 - [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。

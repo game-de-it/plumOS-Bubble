@@ -105,6 +105,26 @@ state, hardware-blocked reason/TODO, and empty Bubble-only arrays.
   Player also held the expected PCM fds. Both were terminated by the bounded
   validation harness rather than crashing.
 
+## Network information status correction
+
+Source `6a72940` corrects the Network Information status path. The Bubble
+launcher now exports `/bin/busybox`, and the frontend has the same absolute
+fallback when neither the SD update BusyBox nor an app-layer BusyBox exists.
+Status and the NW Service toggle are derived from the live process state rather
+than the saved auto-start flag.
+
+The post-deployment Japanese text-renderer readback was SSH=`スタート`,
+FTP/SFTP/Samba=`ストップ`, and ADB=`利用不可`; no `Status Error` remained.
+Starting FTP changed its information value to `スタート`, and stopping it
+returned the helper state to `stopped`. The original disabled service policy was
+then restored byte-for-byte. The complete 12,373-file app-layer checksum passed,
+the 158-file frontend component checksum passed, and the pre-deployment hashes
+of `services.conf`, system settings, and frontend settings were unchanged. The
+normal frontend returned as one renderer-ready process with
+`PLUMOS_BUSYBOX=/bin/busybox`; volume remained 0. A scoped rollback snapshot and
+the verified deployment archive remain under
+`/storage/plumos/backups/deploy-bdb7916-before-6a72940`.
+
 Physical LCD navigation, PortMaster GUI, reboot/shutdown media cleanliness, and
 the two hardware-blocked routes remain separate acceptance items. No release or
 publication is authorized by this audit.
