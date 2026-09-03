@@ -4,10 +4,10 @@ Date: 2026-09-03
 
 ## Result
 
-Bubble-specific additions are zero in both START and Apps. The Apps catalog is
-an exact id/order match for plumOS-MF and plumOS-V90S v2. Bubble had one common
-START omission: Performance Settings. It has been restored between Network
-Settings and Apps.
+Bubble-specific visible additions are zero in both START and Apps. The visible
+Apps menu is an exact id/order match for plumOS-MF and plumOS-V90S v2. Bubble
+had one common START omission: Performance Settings. It has been restored
+between Network Settings and Apps.
 
 The resulting START order is:
 
@@ -20,11 +20,13 @@ The resulting START order is:
 7. Reboot
 8. Shutdown
 
-The Apps order is Scraping, File Manager, Music Player, RetroArch, Pyxel Setup,
-PortMaster, Update PortMaster, Thumbnail Plan, Fetch Thumbnails, and Thumbnail
-Results. A30 lacks the newer Pyxel/PortMaster entries, MMF has its hardware-only
-PWM test, and XU20 adds three no-content cores; none of those device-specific
-differences were copied into Bubble.
+The visible Apps order is Scraping, File Manager, Music Player, RetroArch,
+Pyxel Setup, PortMaster, and Update PortMaster. Thumbnail Plan, Fetch
+Thumbnails, and Thumbnail Results remain implemented catalog routes but are
+hidden, as they are in every checked plumOS release. A30 lacks the newer
+Pyxel/PortMaster entries, MMF has its hardware-only PWM test, and XU20 adds
+three no-content cores; none of those device-specific differences were copied
+into Bubble.
 
 ## Implementation status
 
@@ -57,8 +59,9 @@ differences were copied into Bubble.
 - Boot/kernel/DTB/System replacement remains a full-image operation until the
   matching-set and A/B slot work tracked under `BUB-P3-03`/`P3-05` is complete;
   the functional START route deliberately accepts Runtime packages only.
-- Scraping, Thumbnail Plan and Fetch Thumbnails use the common policy-aware
-  scraper with Bubble's 98-system catalog and SD2 media roots.
+- Scraping uses the common policy-aware scraper with Bubble's 98-system catalog
+  and SD2 media roots. Its lower-level Thumbnail Plan, Fetch and Results routes
+  stay packaged and testable but are not separate end-user Apps entries.
 - File Manager is a Bubble build of NextCommander with the recorded physical
   A/B and D-pad button numbers, 640x480 DRM output and mutable state isolation.
 - Music Player uses Bubble DRM, the managed ALSA route, physical-label input,
@@ -74,10 +77,12 @@ state, hardware-blocked reason/TODO, and empty Bubble-only arrays.
 - Signed Runtime update fixture: Ed25519 verification, two transactional applies,
   frontend health confirmation, two boot-before-health rollbacks, managed file
   deletion, and active-setting preservation passed.
-- START/Apps JSON order and Bubble-only assertion: passed.
+- START/visible-Apps JSON order, hidden catalog retention and Bubble-only
+  assertion: passed.
 - Factory reset and safe-power dry-run fixtures: passed.
 - AArch64 frontend build and component checksums: passed.
-- Text renderer: START reports 8 entries and Apps reports 10 implemented entries.
+- Text renderer: START reports 8 entries and Apps reports 7 visible implemented
+  entries.
 - Bubble DRM probe: active DSI connector has all four 0..100 properties.
 - New frontend device test: 40/60/70/80 was applied and read back for
   brightness/contrast/hue/saturation, then restored to 50/50/50/50.
@@ -128,3 +133,28 @@ the verified deployment archive remain under
 Physical LCD navigation, PortMaster GUI, reboot/shutdown media cleanliness, and
 the two hardware-blocked routes remain separate acceptance items. No release or
 publication is authorized by this audit.
+
+## Apps visibility audit correction
+
+The first audit compared every `menu=apps` catalog id without checking its
+`visible` flag. That incorrectly described the three thumbnail maintenance
+routes as normal Apps entries and allowed Bubble's visibility drift to pass the
+contract test.
+
+Current sources for A30, MF, MMF, V90S v2, XU20 and Pixel2 all retain Thumbnail
+Plan, Fetch Thumbnails and Thumbnail Results with `visible=false`. Across the
+39 tagged releases whose Apps catalog was available, no tag exposed any of the
+three. A direct 640x480 capture of the running MF Apps screen showed only the
+seven common entries; its PNG SHA-256 was
+`c89e613894cd6451730dda642af4238ef36a1675759264f1bd7fc3ecc5bbcc27`.
+
+Bubble source `3b0d5bd` copied the MF catalog ids but changed these three entries
+to `visible=true`. It also made the obsolete Apps-catalog `settings` and
+`network` start entries visible, although the current frontend does not load
+those legacy entries. All five flags are now restored to `false`; none of their
+implementations was deleted. The contract separately checks visible Apps order,
+full catalog order, hidden thumbnail order and hidden legacy order.
+
+A cross-series hardcoded-settings id audit found no Bubble-only settings row.
+Every Bubble START item is visible in at least one other plumOS series, so the
+working Performance route and the eight-entry common START contract remain.

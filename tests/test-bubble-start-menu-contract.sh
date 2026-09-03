@@ -8,15 +8,27 @@ apps="$package/config/frontend/apps.json"
 coverage="$package/config/frontend/start-menu-coverage.json"
 
 expected_start='["ui-settings","system-settings","network-settings","performance-settings","apps","help","reboot","shutdown"]'
-expected_apps='["scraping","file_manager","music_player","retroarch","pyxel_setup","portmaster","portmaster_update","thumbnail-plan","thumbnail-fetch","thumbnail-results"]'
+expected_apps='["scraping","file_manager","music_player","retroarch","pyxel_setup","portmaster","portmaster_update"]'
+expected_apps_catalog='["scraping","file_manager","music_player","retroarch","pyxel_setup","portmaster","portmaster_update","thumbnail-plan","thumbnail-fetch","thumbnail-results"]'
+expected_apps_hidden='["thumbnail-plan","thumbnail-fetch","thumbnail-results"]'
+expected_legacy_hidden='["settings","network"]'
 
 [[ $(jq -c '[.menus[] | select(.id == "start") | .entries[].id]' "$menus") == "$expected_start" ]]
-[[ $(jq -c '[.apps[] | select(.menu == "apps") | .id]' "$apps") == "$expected_apps" ]]
+[[ $(jq -c '[.apps[] | select(.menu == "apps" and .visible != false) | .id]' "$apps") == "$expected_apps" ]]
+[[ $(jq -c '[.apps[] | select(.menu == "apps") | .id]' "$apps") == "$expected_apps_catalog" ]]
+[[ $(jq -c '[.apps[] | select(.menu == "apps" and .visible == false) | .id]' "$apps") == "$expected_apps_hidden" ]]
+[[ $(jq -c '[.apps[] | select(.menu == "start" and .visible == false) | .id]' "$apps") == "$expected_legacy_hidden" ]]
 [[ $(jq -c '.start_order' "$coverage") == "$expected_start" ]]
 [[ $(jq -c '.apps_order' "$coverage") == "$expected_apps" ]]
+[[ $(jq -c '.apps_catalog_order' "$coverage") == "$expected_apps_catalog" ]]
+[[ $(jq -c '.apps_hidden_order' "$coverage") == "$expected_apps_hidden" ]]
+[[ $(jq -c '.legacy_hidden_order' "$coverage") == "$expected_legacy_hidden" ]]
 jq -e '.bubble_only_start_entries == [] and .bubble_only_apps_entries == []' "$coverage" >/dev/null
 jq -e 'all(.start_entries[]; .status == "implemented") and
-    all(.apps_entries[]; .status == "implemented")' "$coverage" >/dev/null
+    all(.apps_entries[]; .status == "implemented") and
+    ([.apps_entries[] | select(.visible == true) | .id] == .apps_order) and
+    ([.apps_entries[] | select(.visible == false) | .id] == .apps_hidden_order)' \
+    "$coverage" >/dev/null
 jq -e '[.implemented_subroutes[].path] == [
     "system/lumination",
     "system/display-color",
@@ -101,4 +113,4 @@ PLUMOS_ROOT="$tmp/root" PLUMOS_RUNTIME_ROOT="$tmp/run" \
     sh "$network_package/bin/plumos-network-services" status adb >"$tmp/adb.log" 2>&1 || true
 grep -q '^state=hardware_unavailable$' "$tmp/adb.log"
 
-printf 'bubble_start_menu_contract=result-ok start=8 apps=10 implemented=10 bubble_only=0\n'
+printf 'bubble_start_menu_contract=result-ok start=8 apps_visible=7 apps_hidden=3 implemented=10 bubble_only=0\n'

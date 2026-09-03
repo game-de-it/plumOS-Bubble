@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "device": "bubble",
   "reference_ports": [
     "plumOS-MF",
@@ -35,23 +35,42 @@
     "retroarch",
     "pyxel_setup",
     "portmaster",
+    "portmaster_update"
+  ],
+  "apps_catalog_order": [
+    "scraping",
+    "file_manager",
+    "music_player",
+    "retroarch",
+    "pyxel_setup",
+    "portmaster",
     "portmaster_update",
     "thumbnail-plan",
     "thumbnail-fetch",
     "thumbnail-results"
   ],
+  "apps_hidden_order": [
+    "thumbnail-plan",
+    "thumbnail-fetch",
+    "thumbnail-results"
+  ],
+  "legacy_hidden_order": [
+    "settings",
+    "network"
+  ],
   "apps_reference_match": ["plumOS-MF", "plumOS-V90S_v2-public"],
+  "apps_reference_match_scope": "visible entries and order",
   "apps_entries": [
-    {"id": "scraping", "status": "implemented"},
-    {"id": "file_manager", "status": "implemented"},
-    {"id": "music_player", "status": "implemented"},
-    {"id": "retroarch", "status": "implemented"},
-    {"id": "pyxel_setup", "status": "implemented"},
-    {"id": "portmaster", "status": "implemented"},
-    {"id": "portmaster_update", "status": "implemented"},
-    {"id": "thumbnail-plan", "status": "implemented"},
-    {"id": "thumbnail-fetch", "status": "implemented"},
-    {"id": "thumbnail-results", "status": "implemented"}
+    {"id": "scraping", "status": "implemented", "visible": true},
+    {"id": "file_manager", "status": "implemented", "visible": true},
+    {"id": "music_player", "status": "implemented", "visible": true},
+    {"id": "retroarch", "status": "implemented", "visible": true},
+    {"id": "pyxel_setup", "status": "implemented", "visible": true},
+    {"id": "portmaster", "status": "implemented", "visible": true},
+    {"id": "portmaster_update", "status": "implemented", "visible": true},
+    {"id": "thumbnail-plan", "status": "implemented", "visible": false},
+    {"id": "thumbnail-fetch", "status": "implemented", "visible": false},
+    {"id": "thumbnail-results", "status": "implemented", "visible": false}
   ],
   "bubble_only_start_entries": [],
   "bubble_only_apps_entries": [],

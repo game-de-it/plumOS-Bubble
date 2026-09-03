@@ -66,7 +66,7 @@
       "kind": "tool",
       "launch_profile": "shell:$PLUMOS_ROOT/bin/plumos-thumbnail-scraper --all --limit 50",
       "show_results": true,
-      "visible": true,
+      "visible": false,
       "menu": "apps"
     },
     {
@@ -75,7 +75,7 @@
       "kind": "tool",
       "launch_profile": "shell:$PLUMOS_ROOT/bin/plumos-thumbnail-scraper --fetch --all --limit 20",
       "show_results": true,
-      "visible": true,
+      "visible": false,
       "menu": "apps"
     },
     {
@@ -83,7 +83,7 @@
       "display_name": "Thumbnail Results",
       "kind": "info",
       "launch_profile": "internal:thumbnail-results",
-      "visible": true,
+      "visible": false,
       "menu": "apps"
     },
     {
@@ -91,7 +91,7 @@
       "display_name": "Settings",
       "kind": "settings",
       "launch_profile": "internal:settings",
-      "visible": true,
+      "visible": false,
       "menu": "start"
     },
     {
@@ -99,7 +99,7 @@
       "display_name": "Network",
       "kind": "settings",
       "launch_profile": "internal:network",
-      "visible": true,
+      "visible": false,
       "menu": "start"
     }
   ],
