@@ -82,7 +82,9 @@
     10秒を超えたFE初期化、初回partition作成、OS updateには共通logo上の可視進捗を表示し、
     通常bootには進捗用の追加処理を入れない。source `ae5501c`のSystem B/initramfsを
     incoming write、byte/SHA readback後にslot Bへ切替え、slot Aをrollbackとして保持した。
-    修復後のpanel handoffと通常boot計測を残す。
+    修復後cold bootでexternal init 1.16秒、System 3.38秒、FE開始5.43秒、Wi-Fi/SSH 8.87秒、
+    FE ready約11秒を確認。`completed-no-repair`、active B、全frontend component checksum、
+    設定hash不変、ext4/kernel errorなしに合格した。warm boot比較を残す。
 - [ ] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
 - [x] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
   - AArch64 static BusyBox、stock handoff互換entrypoint、FAT/ext4/console/kmsg stage、

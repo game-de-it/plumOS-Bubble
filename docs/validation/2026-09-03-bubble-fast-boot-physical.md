@@ -115,7 +115,7 @@ Host fixtures cover first provisioning, interrupted provisioning, normal
 repair/resume, clean fast-path geometry validation, marker creation and p4
 unmount ordering. Long first-provision/update work receives visible progress;
 normal boot remains the common plumOS logo followed directly by FE. Physical
-deployment and the next normal reboot are pending.
+deployment and the next normal reboot are recorded below.
 
 The first transition deployment exposed a boot-contract defect before external
 initramfs entry. The replacement initramfs was 4,034,371 bytes, 444 bytes larger
@@ -149,9 +149,8 @@ and 505,731 free inodes. The preserved configuration hashes remained:
 
 The latest `frontend-frame-stats.log` showed a successful initial render and
 the expected 5-second TOP status refresh cadence (`0.2 fps` while idle); it did
-not show a busy rendering loop. The next physical boot therefore remains the
-gate for panel handoff, the 10-second delayed progress notice, and normal-path
-timing after the ext4 repair.
+not show a busy rendering loop. This separated the normal idle refresh interval
+from the failed physical panel handoff that was retested after repair.
 
 Source `ae5501c` was then built and deployed offline with slot A retained as the
 rollback. Each payload was copied under an incoming name, byte-compared with
@@ -173,6 +172,37 @@ p3 again passed a forced read-only five-pass check. macOS did not grant the
 p1 raw device read permission for an additional offline FAT checker run, so p1
 acceptance here is limited to file readback plus a successful whole-disk
 unmount and eject; no FAT repair was attempted.
+
+## Repaired normal-boot acceptance
+
+The next cold boot displayed the frontend and connected at
+`192.168.10.101`. Kernel timestamps established this sequence:
+
+| Milestone | Time after kernel start |
+| --- | ---: |
+| external initramfs entry | 1.16 s |
+| completed storage validation returned without repair | 1.39 s |
+| switch to System | 3.19 s |
+| System entry | 3.38 s |
+| frontend supervisor ready | 5.37 s |
+| frontend launcher start | 5.43 s |
+| Wi-Fi association and recovery SSH complete | 8.87 s |
+| frontend ready marker | about 11 s |
+
+The external log recorded `mode=completed-no-repair`, skipped both p3 and p4
+filesystem checks, selected active slot B, and contained no `e2fsck`,
+`resize2fs`, or `fsck.fat` execution. The 10-second notice is measured from
+frontend launch; the frontend became ready before that deadline, so
+`S42_FRONTEND_SLOW` was correctly absent and the normal common-logo-to-FE route
+was preserved.
+
+System B, the external initramfs, and the frontend binary matched their
+installed SHA-256 values. Every frontend component checksum passed. The
+frontend, system, and Wi-Fi configuration hashes matched the values preserved
+before offline repair. `/flash` was read-only, p3 was mounted read-write, SD2
+remained read-only, and the current kernel log contained no ext4 or block I/O
+error. Because the prior shutdown was forced, p4 emitted the expected
+improper-unmount warning; the boot did not repair it automatically.
 
 ## Remaining metadata work
 
