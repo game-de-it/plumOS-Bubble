@@ -178,6 +178,10 @@
 - [ ] `BUB-P4-P01` backlight 0..255 の安全範囲、段階、persist policy を決める。
 - [ ] `BUB-P4-P02` battery/charger node、capacity、charging状態、volume/power keyをhelperへ閉じ込める。
 - [ ] `BUB-P4-P03` normal shutdown/reboot、charger接続前後、cold boot、suspend/resumeを実機確認する。
+  - source `d082d9c`で同一pending power requestを成功として再利用するよう修正し、FE Rebootを
+    実機確認した。操作logの`reboot requested`、SD2 unbind、p4 unmount、clean marker書込み、
+    PID 1への委譲、次bootの`previous_shutdown=clean automatic_repair=no`、FE初回復帰まで合格。
+    FE Shutdown、charger接続前後、suspend/resumeは未確認のためopenを維持する。
 - [ ] `BUB-P4-P04` power action後にFAT/ext4がcleanであることを次boot/read-only fs checkで確認する。
   - terminal shutdown/rebootでp3/p4 clean markerを書いてsyncし、p4を明示unmountしてから
     p3をread-only化する実装を追加。marker作成/unmount順はhost fixture合格。markerは
@@ -243,6 +247,11 @@
     renderer-ready FE 1 processが合格。
     boot/kernel/DTB/System matching-setは正式A/B slot完成までfull-image更新として分離する。
     host contract/buildは合格。実LCDでの各画面、設定反映、reboot/shutdown後のclean mountを残す。
+    source `d082d9c`でWi-Fi IPv4取得後にenabled serviceを一度だけ再同期し、SFTPをSSHと同じ
+    port 22へ統一、Samba/FTPを共通`/storage`へ揃えた。実機再起動後、SSH/FTP/SFTP/Sambaの
+    process状態、FTP/SFTPのSD2 ROM一覧、macOSからのSamba `SDCARD`直接mount、port 2222閉鎖を
+    確認した。frontend/network componentと全12,373 managed fileが合格し、Wi-Fi、service、
+    frontend、system設定は更新前後でbyte-for-byte不変だった。
 - [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
   - RetroArch v1.22.2とQuickNES `058d665`をAArch64 containerからbuildし、
     software DRM/RGUI/ALSA/udev、GPU runtime非依存、component checksumをhost検証済み。
