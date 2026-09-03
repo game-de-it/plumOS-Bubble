@@ -21,6 +21,7 @@ PYXEL_DISPLAY_RE = re.compile(r"source=(?P<fw>\d+)x(?P<fh>\d+)")
 PYXEL_FIT_RE = re.compile(
     r"output=(?P<vw>\d+)x(?P<vh>\d+).*offset=(?P<x>[0-9.]+),(?P<y>[0-9.]+)"
 )
+FRAME_RE = re.compile(r"^(?P<width>\d+)x(?P<height>\d+)$")
 
 
 def close_ratio(actual: float, expected: float) -> bool:
@@ -67,6 +68,29 @@ def validate_pyxel(lines: list[str]) -> tuple[bool, str]:
     return not failed, "ok" if not failed else ",".join(failed)
 
 
+def validate_geometry_contract(contract: dict) -> tuple[bool, str, bool]:
+    frame = FRAME_RE.match(str(contract.get("frame", "")))
+    viewport = contract.get("expected_viewport") or {}
+    try:
+        fw, fh = int(frame["width"]), int(frame["height"])
+        aspect = float(contract["effective_aspect"])
+        vw, vh = int(viewport["width"]), int(viewport["height"])
+        x, y = int(viewport["x"]), int(viewport["y"])
+    except (KeyError, TypeError, ValueError):
+        return False, "invalid_geometry_contract", False
+    checks = {
+        "positive": fw > 0 and fh > 0 and aspect > 0 and vw > 0 and vh > 0,
+        "bounded": x >= 0 and y >= 0 and x + vw <= PANEL_WIDTH and y + vh <= PANEL_HEIGHT,
+        "centered": abs((PANEL_WIDTH - vw) - 2 * x) <= 2
+        and abs((PANEL_HEIGHT - vh) - 2 * y) <= 2,
+        "aspect": close_ratio(vw / vh, aspect),
+        "orientation": contract.get("orientation")
+        == ("vertical" if aspect < 1.0 else "horizontal"),
+    }
+    failed = [name for name, passed in checks.items() if not passed]
+    return not failed, "ok" if not failed else ",".join(failed), aspect < 1.0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("reports", nargs="+", type=Path)
@@ -85,6 +109,11 @@ def main() -> int:
             elif any("plumos-pyxel-" in line for line in lines):
                 passed, reason = validate_pyxel(lines)
                 results.append((record["system"], record["profile"], "pyxel", passed, reason, False))
+            elif record.get("geometry_contract"):
+                passed, reason, vertical = validate_geometry_contract(record["geometry_contract"])
+                results.append(
+                    (record["system"], record["profile"], "expected_geometry", passed, reason, vertical)
+                )
     failed = [result for result in results if not result[3]]
     vertical = [result for result in results if result[5]]
     print(

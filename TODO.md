@@ -341,6 +341,14 @@
     clean contentの再試験を合算して89導線起動、BlueMSX 1導線失敗、DraStic 1導線visible
     unsupported、clean content不足またはexternal 105導線。未試験導線は削除していない。
     MSX標準は合格したfMSXへ変更し、BlueMSXも失敗理由付きで選択肢を維持する。
+  - 現在のSD2 libraryと利用者ROM2を併用して全196導線を再走査。後続retestを合算し、
+    168導線起動、失敗3、content不足24、DraStic visible unsupported 1となった。
+    SD2由来で失敗した40導線は同じcoreへROM2のSHA一致copyを与えると全て起動したため、
+    runtime不良と媒体読み出し不良を分離した。残る実行失敗はFBA2012 CPS2の要求CRC不足と、
+    MSX/ColecoVisionのBlueMSX signal 11。詳細は
+    `docs/validation/2026-09-04-bubble-rom2-emulator-matrix.md`へ記録した。
+  - 未実行24のうち2048はcontent不足ではなく、ROM不要coreに必要な`--no-content`をBubble
+    launcherが拒否する導線未実装と確認。残る23導線はROM2全体の再探索でも対応contentなし。
 - [ ] `BUB-P6-09` Bubble全物理入力を実機captureから固定し、全runtimeへ割り当てて物理確認する。
   - event0/1/2、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`から、D-pad、ABXY、
     Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。
@@ -368,9 +376,17 @@
   - horizontal、vertical arcade、rotated handheld、square、wide、dual-screen、GLES経路を分離し、
     QuickNES一件の合格を他coreへ一般化しない。未試験導線はFEから消さず理由付きで維持する。
   - runtime logのframe/aspect/rotation/viewport/scanoutとPyxel fitを機械検査するverifierを追加。
-    62 observed contractは全て640x480内・中央・回転後aspect一致。縦FBNeoはrotation 3、
-    360x480+140+0で3:4を維持した。geometryを公開しないPicoArch/hardware core/standalone、
-    dual-screen、clean content不足routeのLCD実見とspeaker実聴は未完了。
+  - 起動168導線のrendererを再監査し、Mali 128、GL非使用CPU framebuffer 40、意図しない
+    llvmpipe/softpipe/swrast mapping 0。geometryを出す123導線はhorizontal 112、vertical 11。
+    VarthでArcade/CPS1 9導線を再試験し全起動、geometry出力8導線は3:4・360x480中央配置。
+    MAME2003 Plusを含むgeometry非出力45導線とPPSSPP shader warningは物理LCD確認を残す。
+  - PCM pointerは起動168導線中163で進行。Atari800、FreeChaF、SquirrelJME、Numero、
+    VeMUlatorはbounded probe内で進行せず、音量0のため全導線の実聴と併せて物理確認を残す。
+    最新aggregateのgeometry 123件とPyxel fit 1件は全て640x480内・中央・aspect一致。
+    geometryを公開しない45導線、dual-screen、content不足routeのLCD実見とspeaker実聴は未完了。
+  - 旧matrixのgroup-wide TERMでstock PID 1配下へRetroArch zombie 5件を残した。launcherへ先に
+    TERMしてchildをwait/reapさせ、応答しない場合だけprocess groupへescalateするよう修正。
+    zombieはfd/DRM/audioを持たず、次回の通常rebootで回収される。
 
 ## P7: update, lifecycle and release
 
