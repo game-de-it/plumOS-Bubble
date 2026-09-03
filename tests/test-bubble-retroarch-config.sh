@@ -27,6 +27,7 @@ test "$unique_count" -eq 3376
 grep -qx 'video_driver = "drm"' "$factory"
 grep -qx 'video_context_driver = ""' "$factory"
 grep -qx 'video_rotation = "0"' "$factory"
+grep -qx 'aspect_ratio_index = "22"' "$factory"
 grep -qx 'video_aspect_ratio_auto = "true"' "$factory"
 grep -qx 'video_threaded = "true"' "$factory"
 grep -qx 'audio_device = "hw:0,0"' "$factory"

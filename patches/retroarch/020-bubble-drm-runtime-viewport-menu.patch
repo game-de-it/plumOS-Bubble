@@ -1,0 +1,154 @@
+diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
+--- a/gfx/drivers/drm_gfx.c
++++ b/gfx/drivers/drm_gfx.c
+@@ -256,11 +256,24 @@
+    *sp = NULL;
+ }
+ 
+-/* Changes surface ratio only without recreating the buffers etc. */
+-static void drm_surface_set_aspect(struct drm_surface *surface, float aspect)
++static void drm_invalidate_surfaces(struct drm_video *drmvars,
++      const char *reason)
+ {
+-   if (surface)
+-      surface->aspect = aspect;
++   if (!drmvars)
++      return;
++
++   if (drmvars->main_surface)
++      drm_surface_free(drmvars, &drmvars->main_surface);
++   if (drmvars->menu_surface)
++      drm_surface_free(drmvars, &drmvars->menu_surface);
++
++   /* Bubble scales into viewport-sized dumb buffers. Force the next game
++    * frame to allocate a buffer with the newly selected viewport. Keep
++    * menu_active unchanged so an open RGUI is rebuilt instead of closed. */
++   drmvars->core_width  = 0;
++   drmvars->core_height = 0;
++   RARCH_LOG("[DRM] Bubble surfaces invalidated for %s.\n",
++         reason ? reason : "runtime video state change");
+ }
+ 
+ /* The MF display plane applies a filtered scale when its source and CRTC
+@@ -269,6 +282,8 @@
+ static void drm_surface_update_viewport(struct drm_surface *surface)
+ {
+    settings_t *settings              = config_get_ptr();
++   bool keep_aspect                  = settings
++      ? settings->bools.video_force_aspect : true;
+    struct video_viewport *vp         = &surface->viewport;
+ 
+    if (surface->rotation & 1)
+@@ -281,9 +296,25 @@
+       vp->full_width  = drm.current_mode->hdisplay;
+       vp->full_height = drm.current_mode->vdisplay;
+    }
+-   video_driver_update_viewport(vp, false,
+-         settings ? settings->bools.video_force_aspect : true);
+ 
++   vp->x      = 0;
++   vp->y      = 0;
++   vp->width  = vp->full_width;
++   vp->height = vp->full_height;
++
++   /* surface->aspect is the post-rotation Core Provided ratio. Reading the
++    * global pre-rotation ratio here reproduces Pixel2's stale viewport bug.
++    * Integer scale is a content setting; applying it to RGUI shrinks and
++    * corrupts the 640x480 menu instead of changing the game viewport. */
++   if (surface->layer != 2 && settings &&
++       settings->bools.video_scale_integer)
++      video_viewport_get_scaled_integer(vp, vp->full_width, vp->full_height,
++            surface->aspect, keep_aspect, true);
++   else if (surface->layer != 2 && keep_aspect)
++      video_viewport_get_scaled_aspect2(vp, vp->full_width, vp->full_height,
++            true, (float)vp->full_width / (float)vp->full_height,
++            surface->aspect);
++
+    if (!vp->width)
+       vp->width = 1;
+    if (!vp->height)
+@@ -320,9 +351,9 @@
+    surface->rotation    = _drmvars ? (_drmvars->rotation & 3) : 0;
+    if (_drmvars && layer == 2)
+    {
++      /* RGUI belongs to Bubble's landscape 4:3 panel, not to the core. */
+       surface->rotation = _drmvars->panel_rotation & 3;
+-      if (((surface->rotation ^ _drmvars->rotation) & 1) && aspect > 0.0f)
+-         surface->aspect = 1.0f / aspect;
++      surface->aspect   = 4.0f / 3.0f;
+    }
+    surface->layer       = layer;
+    drm_surface_update_viewport(surface);
+@@ -1358,6 +1389,19 @@
+ 
+    if (!_drmvars->menu_active)
+       return;
++
++   /* RGUI may change its output dimensions after viewport_info switches from
++    * the game surface to the fixed menu viewport. Never copy that new frame
++    * through a surface retaining the old dimensions and pitch. */
++   if (_drmvars->menu_surface &&
++       (_drmvars->menu_surface->frame_width != (int)width ||
++        _drmvars->menu_surface->frame_height != (int)height ||
++        _drmvars->menu_surface->total_pitch != (int)(width * 4)))
++   {
++      RARCH_LOG("[DRM] Bubble recreating RGUI surface for %ux%u input.\n",
++            width, height);
++      drm_surface_free(_drmvars, &_drmvars->menu_surface);
++   }
+ 
+    /* If menu is active in this frame but the
+     * menu surface is NULL, we allocate a new one.*/
+@@ -1436,6 +1480,21 @@
+    if (!vid)
+       return;
+ 
++   /* The first RGUI frame is laid out before menu_surface exists. Report its
++    * fixed panel viewport immediately, otherwise frame zero inherits the
++    * content viewport and the following frame changes dimensions. */
++   if (vid->menu_active && !vid->menu_surface)
++   {
++      struct drm_surface menu_view;
++      memset(&menu_view, 0, sizeof(menu_view));
++      menu_view.layer    = 2;
++      menu_view.rotation = vid->panel_rotation & 3;
++      menu_view.aspect   = 4.0f / 3.0f;
++      drm_surface_update_viewport(&menu_view);
++      *vp = menu_view.viewport;
++      return;
++   }
++
+    surface = (vid->menu_active && vid->menu_surface)
+       ? vid->menu_surface : vid->main_surface;
+ 
+@@ -1460,10 +1519,7 @@
+    if (!_drmvars)
+       return;
+ 
+-   if (_drmvars->menu_active && _drmvars->menu_surface)
+-      drm_plane_setup(_drmvars->menu_surface);
+-   else if (_drmvars->main_surface)
+-      drm_plane_setup(_drmvars->main_surface);
++   drm_invalidate_surfaces(_drmvars, "runtime video state change");
+ }
+ 
+ static void drm_set_rotation(void *data, unsigned rotation)
+@@ -1516,17 +1572,7 @@
+    if (_drmvars && _drmvars->current_aspect != new_aspect)
+    {
+       _drmvars->current_aspect = new_aspect;
+-      drm_surface_set_aspect(_drmvars->main_surface, new_aspect);
+-      if (_drmvars->menu_active)
+-      {
+-         drm_surface_set_aspect(_drmvars->menu_surface, new_aspect);
+-         drm_plane_setup(_drmvars->menu_surface);
+-      }
+-      else if (_drmvars->main_surface)
+-      {
+-         /* The plane geometry is not changed by updating the cached aspect. */
+-         drm_plane_setup(_drmvars->main_surface);
+-      }
++      drm_invalidate_surfaces(_drmvars, "runtime aspect change");
+    }
+ }
+ 
