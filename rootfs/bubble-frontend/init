@@ -234,14 +234,23 @@ if [ ! -f /storage/plumos/manifest.json ] || \
     fat_stage E39_APP_LAYER_METADATA_MISSING
     exec $bb sh
 fi
-if ! (cd /storage/plumos && $bb sha256sum -c checksums.sha256) \
-    >>/storage/plumos/logs/app-layer-verify.log 2>&1; then
-    log 'stage=E39_APP_LAYER_CHECKSUM_FAILED'
-    fat_stage E39_APP_LAYER_CHECKSUM_FAILED
+for required in \
+    /storage/plumos/bin/plumos-frontend-launch \
+    /storage/plumos/components/frontend/manifest.json \
+    /storage/plumos/components/frontend/checksums.sha256; do
+    if [ ! -s "$required" ]; then
+        log "stage=E39_FRONTEND_REQUIRED_FILE_MISSING path=$required"
+        fat_stage E39_FRONTEND_REQUIRED_FILE_MISSING
+        exec $bb sh
+    fi
+done
+if [ ! -x /storage/plumos/bin/plumos-frontend-launch ]; then
+    log 'stage=E39_FRONTEND_LAUNCHER_NOT_EXECUTABLE'
+    fat_stage E39_FRONTEND_LAUNCHER_NOT_EXECUTABLE
     exec $bb sh
 fi
-log 'stage=S39_APP_LAYER_VERIFIED'
-fat_stage S39_APP_LAYER_VERIFIED
+log 'stage=S39_APP_LAYER_METADATA_READY verification=build-update-deploy'
+fat_stage S39_APP_LAYER_METADATA_READY
 
 if [ -x /storage/plumos/bin/plumos-bubble-audio-init ]; then
     /storage/plumos/bin/plumos-bubble-audio-init || \

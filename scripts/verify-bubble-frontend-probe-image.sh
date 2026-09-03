@@ -82,11 +82,13 @@ MTOOLS_SKIP_CHECK=1 mcopy -i "$verify/flash.fat" \
 cmp "$system" "$verify/system-a.squashfs"
 cmp "$system" "$verify/system-b.squashfs"
 unsquashfs -d "$verify/system-root" "$verify/system-a.squashfs" >/dev/null
-for stage in S39_APP_LAYER_VERIFIED S40_FRONTEND_SUPERVISOR_READY \
+for stage in S39_APP_LAYER_METADATA_READY S40_FRONTEND_SUPERVISOR_READY \
     S41_FRONTEND_START E39_APP_LAYER_METADATA_MISSING \
-    E39_APP_LAYER_CHECKSUM_FAILED E80_FRONTEND_EXIT E81_FRONTEND_RESTART_LIMIT_RECOVERY_CONSOLE; do
+    E39_FRONTEND_REQUIRED_FILE_MISSING E39_FRONTEND_LAUNCHER_NOT_EXECUTABLE \
+    E80_FRONTEND_EXIT E81_FRONTEND_RESTART_LIMIT_RECOVERY_CONSOLE; do
     grep -q "$stage" "$verify/system-root/init"
 done
+! grep -q 'sha256sum -c checksums.sha256' "$verify/system-root/init"
 MTOOLS_SKIP_CHECK=1 mtype -i "$verify/flash.fat" ::/System/active-slot | grep -qx a
 MTOOLS_SKIP_CHECK=1 mtype -i "$verify/flash.fat" ::/uEnv.txt > "$verify/uEnv.txt"
 grep -q '^rootuuid=42554242-4c45-5359-5300-000000000003$' "$verify/uEnv.txt"

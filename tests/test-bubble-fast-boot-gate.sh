@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+init="$repo_root/rootfs/bubble-frontend/init"
+builder="$repo_root/scripts/build-bubble-frontend-system.sh"
+
+sh -n "$init"
+grep -q "stage=S39_APP_LAYER_METADATA_READY" "$init"
+grep -q "stage=E39_APP_LAYER_METADATA_MISSING" "$init"
+grep -q "stage=E39_FRONTEND_REQUIRED_FILE_MISSING" "$init"
+grep -q "stage=E39_FRONTEND_LAUNCHER_NOT_EXECUTABLE" "$init"
+grep -q '/storage/plumos/bin/plumos-frontend-launch' "$init"
+grep -q '/storage/plumos/components/frontend/manifest.json' "$init"
+grep -q '/storage/plumos/components/frontend/checksums.sha256' "$init"
+! grep -q 'sha256sum -c checksums.sha256' "$init"
+grep -q '^app_layer_verification=full-at-build-update-deploy,boot-critical-metadata-only$' \
+    "$builder"
+
+printf '%s\n' 'bubble_fast_boot_gate=result-ok boot_full_hash=no critical_metadata=yes'
