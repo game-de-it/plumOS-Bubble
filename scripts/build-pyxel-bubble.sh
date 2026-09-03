@@ -239,7 +239,10 @@ export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH="$PYTHON_ROOT/site-packages${PLUMOS_PYTHON_EXTRA_PATH:+:$PLUMOS_PYTHON_EXTRA_PATH}"
 export SSL_CERT_FILE="${SSL_CERT_FILE:-$PYTHON_ROOT/ca-certificates.crt}"
 export REQUESTS_CA_BUNDLE="${REQUESTS_CA_BUNDLE:-$SSL_CERT_FILE}"
-PYTHON_LIBRARY_PATH="$PYXEL_ROOT/lib:$PYTHON_ROOT/lib:/usr/lib"
+# Keep the Python utility route (Pyxel Setup and PortMaster Update) on the
+# same component-scoped C++ runtime as the validated Pyxel game launcher.
+# The Bubble base System intentionally does not provide libgcc_s/libstdc++.
+PYTHON_LIBRARY_PATH="$PYXEL_ROOT/lib:$PYTHON_ROOT/lib:$PLUMOS_ROOT/emulator/lib:/usr/lib"
 if [ -n "${PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH:-}" ]; then
   PYTHON_LIBRARY_PATH="${PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH}:$PYTHON_LIBRARY_PATH"
 fi
