@@ -46,6 +46,29 @@ if [ -x "$PLUMOS_ROOT/bin/plumos-network-services" ]; then
     PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
         "$BB" sh "$PLUMOS_ROOT/bin/plumos-network-services" start-enabled \
         >>"$PLUMOS_ROOT/logs/network-services.log" 2>&1 || true
+    # PID 1 associates Wi-Fi in parallel with frontend startup.  FTP/SSH can
+    # bind before an address exists, but Samba needs a usable interface.  Run
+    # one bounded reconciliation after IPv4 appears so saved ON preferences
+    # and runtime state cannot diverge without delaying the frontend.
+    (
+        attempts=0
+        while [ "$attempts" -lt 30 ]; do
+            if "$BB" ip -4 addr show scope global 2>/dev/null |
+                "$BB" grep -q '^[[:space:]]*inet '; then
+                PLUMOS_ROOT="$PLUMOS_ROOT" \
+                    PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+                    "$BB" sh "$PLUMOS_ROOT/bin/plumos-network-services" \
+                    start-enabled >>"$PLUMOS_ROOT/logs/network-services.log" 2>&1 || true
+                printf 'network_services_reconcile=result-complete attempts=%s\n' \
+                    "$attempts" >>"$PLUMOS_ROOT/logs/frontend.log"
+                exit 0
+            fi
+            attempts=$((attempts + 1))
+            "$BB" sleep 1
+        done
+        printf 'network_services_reconcile=result=timeout attempts=%s\n' \
+            "$attempts" >>"$PLUMOS_ROOT/logs/frontend.log"
+    ) &
 fi
 export PLUMOS_SDCARD_ROOT PLUMOS_ROM_ROOT
 export PLUMOS_BIOS_ROOT PLUMOS_IMAGE_ROOT
@@ -53,9 +76,12 @@ export PLUMOS_BIOS_ROOT PLUMOS_IMAGE_ROOT
 $BB mkdir -p "$PLUMOS_ROOT/logs" "$RUNTIME_ROOT/frontend" \
     "$PLUMOS_ROOT/state/frontend" "$PLUMOS_ROOT/config/frontend" \
     "$PLUMOS_ROOT/config/system"
-case "$PLUMOS_ROM_ROOT" in /storage/*) $BB mkdir -p "$PLUMOS_ROM_ROOT/FC" ;; esac
-case "$PLUMOS_BIOS_ROOT" in /storage/*) $BB mkdir -p "$PLUMOS_BIOS_ROOT" ;; esac
-case "$PLUMOS_IMAGE_ROOT" in /storage/*) $BB mkdir -p "$PLUMOS_IMAGE_ROOT/nes" ;; esac
+# SD2 content is deliberately exposed read-only.  Compatibility directories
+# are best-effort seeds for writable SD1 storage and must never make frontend
+# startup fail when a read-only SD2 bind is active.
+case "$PLUMOS_ROM_ROOT" in /storage/*) $BB mkdir -p "$PLUMOS_ROM_ROOT/FC" 2>/dev/null || true ;; esac
+case "$PLUMOS_BIOS_ROOT" in /storage/*) $BB mkdir -p "$PLUMOS_BIOS_ROOT" 2>/dev/null || true ;; esac
+case "$PLUMOS_IMAGE_ROOT" in /storage/*) $BB mkdir -p "$PLUMOS_IMAGE_ROOT/nes" 2>/dev/null || true ;; esac
 printf 'frontend_start=stage-S40 device=bubble renderer=software-drm\n' >>"$LOG"
 printf 'frontend_media=sdcard_root=%s rom_root=%s bios_root=%s image_root=%s\n' \
     "$PLUMOS_SDCARD_ROOT" "$PLUMOS_ROM_ROOT" "$PLUMOS_BIOS_ROOT" \

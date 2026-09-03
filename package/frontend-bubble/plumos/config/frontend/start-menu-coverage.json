@@ -80,7 +80,7 @@
     {"path": "system/update/runtime", "backend": "signed Ed25519 transactional updater with frontend readiness rollback"},
     {"path": "system/factory-reset/picoarch", "backend": "factory-defaults/picoarch"},
     {"path": "network/services/ftp", "backend": "BusyBox ftpd"},
-    {"path": "network/services/sftp", "backend": "Dropbear forced-command SFTP on port 2222"},
+    {"path": "network/services/sftp", "backend": "Dropbear SFTP subsystem shared with SSH on port 22"},
     {"path": "network/services/samba", "backend": "Samba smbd"}
   ],
   "unsupported_visible": [

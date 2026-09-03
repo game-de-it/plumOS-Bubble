@@ -9892,13 +9892,13 @@ static void setting_help_lines(const struct ui_state *ui,
       copy_string(line2, line2_size, "Use Connect Wi-Fi to start a new connection.");
     } else if (strcmp(id, "network_ssh_enabled") == 0) {
       copy_string(line1, line1_size, "SSH remote shell service.");
-      copy_string(line2, line2_size, "Port 2222; SFTP depends on this service.");
+      copy_string(line2, line2_size, "Port 22; SFTP depends on this service.");
     } else if (strcmp(id, "network_ftp_enabled") == 0) {
       copy_string(line1, line1_size, "FTP file transfer service.");
-      copy_string(line2, line2_size, "Home is /mnt/SDCARD; ON/OFF persists after reboot.");
+      copy_string(line2, line2_size, "Home is /storage; ON/OFF persists after reboot.");
     } else if (strcmp(id, "network_sftp_enabled") == 0) {
       copy_string(line1, line1_size, "SFTP file transfer over SSH.");
-      copy_string(line2, line2_size, "SFTP uses SSH port 2222; ON/OFF persists after reboot.");
+      copy_string(line2, line2_size, "SFTP uses SSH port 22; ON/OFF persists after reboot.");
     } else if (strcmp(id, "network_samba_enabled") == 0) {
       copy_string(line1, line1_size, "Windows/macOS network drive service.");
       copy_string(line2, line2_size, "Share is SDCARD; ON/OFF persists after reboot.");
@@ -9908,10 +9908,10 @@ static void setting_help_lines(const struct ui_state *ui,
                   "Changes apply after reboot to avoid the MF vendor USB hang.");
     } else if (strcmp(id, "network_ftp_status") == 0) {
       copy_string(line1, line1_size, "Current FTP service status.");
-      copy_string(line2, line2_size, "FTP home is /mnt/SDCARD.");
+      copy_string(line2, line2_size, "FTP home is /storage.");
     } else if (strcmp(id, "network_sftp_status") == 0) {
       copy_string(line1, line1_size, "Current SFTP service status.");
-      copy_string(line2, line2_size, "SFTP uses the SSH service on port 2222.");
+      copy_string(line2, line2_size, "SFTP uses the SSH service on port 22.");
     } else if (strcmp(id, "network_samba_status") == 0) {
       copy_string(line1, line1_size, "Current Samba service status.");
       copy_string(line2, line2_size, "SDCARD shares the SD card root.");

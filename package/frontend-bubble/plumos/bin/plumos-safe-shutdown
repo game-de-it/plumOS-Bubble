@@ -87,6 +87,18 @@ clean_markers=0
     log 'result=error stage=power-request-directory'
     exit 1
 }
+# A committed request is volatile (/run) and is written only after p4 was
+# marked and unmounted successfully.  If the frontend did not exit after that
+# first request, let a repeated selection complete the same transaction
+# instead of deleting its clean-shutdown evidence and trapping the UI in the
+# running system with /storage/user unavailable.
+pending_action=$($BB sed -n '1p' "$POWER_REQUEST" 2>/dev/null || true)
+if ! "$BB" grep -qs " $USER_MOUNT " "$MOUNTS_FILE" 2>/dev/null &&
+    [ "$pending_action" = "$ACTION" ]; then
+    log "result=requested action=$ACTION owner=pid1 pending=reused"
+    printf 'result=requested action=%s owner=pid1 pending=reused\n' "$ACTION"
+    exit 0
+fi
 printf '%s\n' "$ACTION" >"$POWER_REQUEST.next.$$" || {
     log 'result=error stage=power-request-stage'
     exit 1

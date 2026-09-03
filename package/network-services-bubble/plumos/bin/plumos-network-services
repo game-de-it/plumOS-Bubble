@@ -19,6 +19,7 @@ SFTP_PID=$RUN_DIR/dropbear-sftp.pid
 FTP_PID=$RUN_DIR/ftp.pid
 SMBD_PID=$RUN_DIR/smbd.pid
 FTP_PORT=${PLUMOS_FTP_PORT:-21}
+TRANSFER_MAX_CONNECTIONS=${PLUMOS_TRANSFER_MAX_CONNECTIONS:-20}
 
 mkdir -p "$RUN_DIR" "$CONFIG_DIR" "$PLUMOS_ROOT/logs" 2>/dev/null || true
 
@@ -188,6 +189,7 @@ write_smb_conf() {
     samba_run=$RUNTIME_ROOT/samba
     mkdir -p "$samba_run/private" "$samba_run/log" "$samba_run/lock" \
         "$samba_run/state" "$samba_run/cache" "$samba_run/ncalrpc"
+    chmod 0700 "$samba_run/private" "$samba_run/log" 2>/dev/null || true
     printf 'root:0:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:4F26822B803282B051EF3A3CD7A5F58D:[U          ]:LCT-FFFFFFFF:\n' \
         >"$samba_run/private/smbpasswd"
     chmod 0600 "$samba_run/private/smbpasswd"
@@ -203,12 +205,18 @@ write_smb_conf() {
    guest account = root
    passdb backend = smbpasswd:$samba_run/private/smbpasswd
    username map = $samba_run/private/smbusers
+   encrypt passwords = yes
    map to guest = Never
+   usershare allow guests = yes
    load printers = no
    disable spoolss = yes
+   printing = bsd
+   printcap name = /dev/null
    server min protocol = SMB2
    smb ports = 445
+   max smbd processes = $TRANSFER_MAX_CONNECTIONS
    disable netbios = yes
+   bind interfaces only = no
    pid directory = $RUN_DIR
    lock directory = $samba_run/lock
    state directory = $samba_run/state
@@ -216,15 +224,23 @@ write_smb_conf() {
    ncalrpc dir = $samba_run/ncalrpc
    private dir = $samba_run/private
    log file = $samba_run/log/samba-%m.log
+   max log size = 256
 [SDCARD]
    path = $SHARE_DIR
    browseable = yes
    read only = no
    guest ok = no
+   guest only = no
    valid users = root
    force user = root
+   max connections = $TRANSFER_MAX_CONNECTIONS
    create mask = 0666
    directory mask = 0777
+
+[IPC$]
+   path = $samba_run
+   read only = yes
+   guest ok = no
 EOF
 }
 
@@ -233,7 +249,8 @@ start_samba() {
     [ -x "$SMBD" ] || return 1
     if ! pid_matches "$SMBD_PID" smbd; then
         write_smb_conf
-        PLUMOS_ROOT="$PLUMOS_ROOT" "$SMBD" -D -s "$CONFIG_DIR/smb.conf" >>"$LOG" 2>&1 || true
+        PLUMOS_ROOT="$PLUMOS_ROOT" "$SMBD" -D -s "$CONFIG_DIR/smb.conf" \
+            >>"$LOG" 2>&1 </dev/null || true
         sleep 1
     fi
     status_service samba

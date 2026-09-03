@@ -149,6 +149,20 @@ PLUMOS_POWER_REQUEST="$tmp/power-request" \
 grep -q "^umount $tmp/power-user$" "$tmp/power-calls.log"
 grep -qx reboot "$tmp/power-request"
 ! grep -Eq '^(reboot|poweroff) ' "$tmp/power-calls.log"
+# Repeating the same FE action after a committed request must let the UI exit;
+# /run cannot contain a stale request from an earlier boot.
+: >"$tmp/mounts"
+PLUMOS_ROOT="$tmp/power-root" \
+PLUMOS_RUNTIME_ROOT="$tmp/power-runtime" \
+PLUMOS_USER_MOUNT="$tmp/power-user" \
+PLUMOS_MOUNTS_FILE="$tmp/mounts" \
+PLUMOS_BUSYBOX="$tmp/fake-busybox" \
+PLUMOS_TEST_POWER_CALLS="$tmp/power-calls.log" \
+PLUMOS_NETWORK_SERVICES=/nonexistent \
+PLUMOS_POWER_REQUEST="$tmp/power-request" \
+    sh "$package/bin/plumos-safe-shutdown" --reboot >"$tmp/power-repeat.log"
+grep -q 'pending=reused' "$tmp/power-repeat.log"
+[[ -f "$tmp/power-root/provision/clean-shutdown" ]]
 grep -q 'finalize_power_action' "$repo_root/rootfs/bubble-frontend/init"
 grep -q 'ui->exit_requested = 1' "$repo_root/src/frontend/plumos_controller_ui.c"
 
@@ -171,6 +185,11 @@ grep -q "print_status sftp running 'SFTP port 22'" \
 ! grep -q 'SFTP_PORT.*2222' "$network_package/bin/plumos-network-services"
 grep -q '"sftp": 22' "$repo_root/scripts/build-network-services-bubble.sh"
 grep -q 'usr/lib/sftp-server' "$repo_root/scripts/build-bubble-frontend-system.sh"
+grep -Fq '[IPC$]' "$network_package/bin/plumos-network-services"
+grep -q 'max smbd processes = $TRANSFER_MAX_CONNECTIONS' \
+    "$network_package/bin/plumos-network-services"
+! grep -Rq '2222' "$package/share/frontend/lang" \
+    "$package/config/frontend/start-menu-coverage.json"
 PLUMOS_ROOT="$tmp/root" PLUMOS_RUNTIME_ROOT="$tmp/run" \
     sh "$network_package/bin/plumos-network-services" status adb >"$tmp/adb.log" 2>&1 || true
 grep -q '^state=hardware_unavailable$' "$tmp/adb.log"
