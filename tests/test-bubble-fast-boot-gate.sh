@@ -14,7 +14,12 @@ grep -q '/storage/plumos/bin/plumos-frontend-launch' "$init"
 grep -q '/storage/plumos/components/frontend/manifest.json' "$init"
 grep -q '/storage/plumos/components/frontend/checksums.sha256' "$init"
 ! grep -q 'sha256sum -c checksums.sha256' "$init"
+grep -q "stage=S34_RECOVERY_NETWORK_BACKGROUND_DISPATCHED" "$init"
+grep -q '^start_recovery_network_background &$' "$init"
+! grep -qx 'start_recovery_network' "$init"
 grep -q '^app_layer_verification=full-at-build-update-deploy,boot-critical-metadata-only$' \
     "$builder"
+grep -q '^recovery_network_start=background-before-frontend$' "$builder"
 
-printf '%s\n' 'bubble_fast_boot_gate=result-ok boot_full_hash=no critical_metadata=yes'
+printf '%s\n' \
+    'bubble_fast_boot_gate=result-ok boot_full_hash=no critical_metadata=yes wifi=background'

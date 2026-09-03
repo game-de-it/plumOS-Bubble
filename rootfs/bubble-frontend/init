@@ -4,6 +4,7 @@ set -u
 bb=/bin/busybox
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export PATH HOME=/root HOSTNAME=plumos-bubble
+network_stage_fat=1
 
 mounted() {
     $bb grep -qs " $1 " /proc/mounts 2>/dev/null
@@ -40,7 +41,7 @@ fat_stage() {
 network_stage() {
     stage=$1
     log "stage=$stage"
-    fat_stage "$stage"
+    [ "$network_stage_fat" -ne 1 ] || fat_stage "$stage"
 }
 
 start_recovery_network() {
@@ -177,6 +178,24 @@ capture_snapshot() {
     } >/storage/plumos/logs/frontend-system-snapshot.txt 2>/dev/null || true
 }
 
+start_recovery_network_background() {
+    network_stage_fat=0
+    start_recovery_network
+    capture_snapshot
+    address=$($bb ip -4 addr show dev wlan0 2>/dev/null | \
+        $bb awk '/inet / { sub("/.*", "", $2); print $2; exit }')
+    result=ready
+    [ -z "$address" ] || result=connected
+    next=/run/plumos/network-boot/complete.next.$$
+    {
+        printf 'result=%s\n' "$result"
+        printf 'ip=%s\n' "${address:-none}"
+    } >"$next"
+    $bb mv -f "$next" /run/plumos/network-boot/complete
+    $bb rm -f /run/plumos/network-boot/in-progress
+    log "stage=S38_RECOVERY_NETWORK_BACKGROUND_FINISHED result=$result ip=${address:-none}"
+}
+
 mounted /proc || $bb mount -t proc proc /proc 2>/dev/null || true
 mounted /sys || $bb mount -t sysfs sysfs /sys 2>/dev/null || true
 mounted /dev || $bb mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
@@ -225,8 +244,10 @@ else
     fat_stage E33_FRAMEBUFFER_UNAVAILABLE
 fi
 
-start_recovery_network
-capture_snapshot
+$bb mkdir -p /run/plumos/network-boot
+: >/run/plumos/network-boot/in-progress
+log 'stage=S34_RECOVERY_NETWORK_BACKGROUND_DISPATCHED'
+start_recovery_network_background &
 
 if [ ! -f /storage/plumos/manifest.json ] || \
    [ ! -f /storage/plumos/checksums.sha256 ]; then

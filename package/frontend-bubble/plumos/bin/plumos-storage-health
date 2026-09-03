@@ -96,9 +96,8 @@ fi
     printf 'mount_options=%s\n' "${options:-unknown}"
     printf 'evidence=%s\n' "$evidence"
 } >"$tmp"
-"$BB" sync
 "$BB" mv "$tmp" "$STATUS"
-"$BB" sync
+[ "$ACTION" != check ] || "$BB" sync
 trap - EXIT HUP INT TERM
 printf 'storage_health=action=%s result=%s media=%s device=%s evidence=%s\n' \
     "$ACTION" "$result" "$MEDIA_ROOT" "${device:-unknown}" "$evidence" >>"$LOG"

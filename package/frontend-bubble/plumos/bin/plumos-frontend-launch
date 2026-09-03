@@ -94,16 +94,26 @@ seed_default "$PLUMOS_ROOT/config/frontend/settings.json" \
 seed_default "$PLUMOS_ROOT/config/system/settings.json" \
     "$PLUMOS_ROOT/factory-defaults/system/settings.json"
 
-# PID 1 performs the first connection. This reconciliation makes the saved
-# frontend switch authoritative after a frontend restart as well.
+# PID 1 performs the first connection in the background.  If that worker has
+# already finished without an address, retry in the background as well so an
+# unavailable AP can never delay the frontend.
 if [ -x "$PLUMOS_ROOT/bin/plumos-network-control" ]; then
-    if $BB grep -Eq '"wifi_enabled"[[:space:]]*:[[:space:]]*(false|0)' \
-        "$PLUMOS_ROOT/config/system/settings.json" 2>/dev/null; then
-        "$BB" sh "$PLUMOS_ROOT/bin/plumos-network-control" --wifi off \
-            >>"$LOG" 2>&1 || true
-    elif ! "$BB" ip -4 addr show dev wlan0 2>/dev/null | $BB grep -q 'inet '; then
-        "$BB" sh "$PLUMOS_ROOT/bin/plumos-network-control" --wifi on \
-            >>"$LOG" 2>&1 || true
+    if ! $BB grep -Eq '"wifi_enabled"[[:space:]]*:[[:space:]]*(false|0)' \
+            "$PLUMOS_ROOT/config/system/settings.json" 2>/dev/null && \
+       ! "$BB" ip -4 addr show dev wlan0 2>/dev/null | $BB grep -q 'inet '; then
+        if [ -e "$RUNTIME_ROOT/network-boot/in-progress" ]; then
+            printf 'frontend_network=background-owner-system\n' >>"$LOG"
+        else
+            reconcile_lock=$RUNTIME_ROOT/network-reconcile.lock
+            (
+                if "$BB" mkdir "$reconcile_lock" 2>/dev/null; then
+                    "$BB" sh "$PLUMOS_ROOT/bin/plumos-network-control" --wifi on \
+                        >>"$LOG" 2>&1 || true
+                    "$BB" rmdir "$reconcile_lock" 2>/dev/null || true
+                fi
+            ) &
+            printf 'frontend_network=background-reconcile-dispatched\n' >>"$LOG"
+        fi
     fi
 fi
 

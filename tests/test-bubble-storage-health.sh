@@ -15,6 +15,10 @@ grep -Fq '[ -s "$PLUMOS_ROOT/state/frontend/library-index.json" ]' "$launcher"
 grep -Fq "result=check_refused" "$helper"
 grep -Fq "read-only check refused because media is mounted read-write" "$helper"
 grep -Fq '"$checker" -n "$device"' "$helper"
+test "$(grep -Fc '"$BB" sync' "$helper")" -eq 1
+grep -Fq '[ "$ACTION" != check ] || "$BB" sync' "$helper"
+grep -Fq 'frontend_network=background-owner-system' "$launcher"
+grep -Fq 'frontend_network=background-reconcile-dispatched' "$launcher"
 if grep -Eq 'fsck\.(fat|vfat).*-[ary]|dosfsck.*-[ary]' "$helper"; then
     echo 'bubble_storage_health=result-failed reason=repair-option-present' >&2
     exit 1
