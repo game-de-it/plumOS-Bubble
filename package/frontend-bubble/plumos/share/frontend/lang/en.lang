@@ -3,6 +3,9 @@
 
 common.not_supported=Not Supported
 common.not_supported_on_device=This item remains visible for plumOS compatibility.
+common.start=Start
+common.stop=Stop
+common.unavailable=Unavailable
 
 settings.category.ui=UI Settings
 settings.category.ui_theme=Theme Settings

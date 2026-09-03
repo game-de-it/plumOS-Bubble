@@ -9,7 +9,7 @@ power=${PLUMOS_POWER_INPUT_EVENT:-}
 [ -n "$controller" ] || controller=$($BB sh "$PLUMOS_ROOT/bin/plumos-bubble-find-input" controller)
 [ -n "$power" ] || power=$($BB sh "$PLUMOS_ROOT/bin/plumos-bubble-find-input" power 2>/dev/null || true)
 
-export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT"
+export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" PLUMOS_BUSYBOX="$BB"
 if [ -x "$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2" ]; then
     "$BB" sh "$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2" || true
 fi

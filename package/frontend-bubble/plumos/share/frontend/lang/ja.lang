@@ -3,6 +3,9 @@
 
 common.not_supported=未対応
 common.not_supported_on_device=plumOS共通項目のため表示していますが、Bubbleでは未対応です。
+common.start=スタート
+common.stop=ストップ
+common.unavailable=利用不可
 
 settings.category.ui=UI 設定
 settings.category.ui_theme=テーマ設定

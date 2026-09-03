@@ -1485,13 +1485,10 @@ static int read_network_service_status(struct ui_state *ui, const char *service,
   char line[256];
   char state[64] = "";
   char summary[128] = "";
-  char enabled_value[32] = "";
   FILE *pipe;
   pid_t child_pid;
   int running = 0;
   int installed = 1;
-  int enabled = 0;
-  int enabled_seen = 0;
 
   if (status && status_size > 0) {
     status[0] = '\0';
@@ -1520,33 +1517,27 @@ static int read_network_service_status(struct ui_state *ui, const char *service,
       copy_truncated_string(state, sizeof(state), line + 6);
     } else if (strncmp(line, "summary=", 8) == 0) {
       copy_truncated_string(summary, sizeof(summary), line + 8);
-    } else if (strncmp(line, "enabled=", 8) == 0) {
-      copy_truncated_string(enabled_value, sizeof(enabled_value), line + 8);
-      enabled_seen = 1;
     }
   }
   close_plumos_script_pipe(pipe, child_pid);
 
-  enabled = strcmp(enabled_value, "1") == 0 ||
-            strcmp(enabled_value, "true") == 0 ||
-            strcmp(enabled_value, "on") == 0;
   if (strcmp(state, "running") == 0) {
     running = 1;
   } else if (strcmp(state, "not_installed") == 0) {
     installed = 0;
   }
   if (running_out) {
-    *running_out = enabled_seen ? enabled : running;
+    *running_out = running;
   }
   if (strcmp(state, "running") == 0) {
-    copy_string(status, status_size,
-                enabled_seen && !enabled ? "Running / Manual"
-                                         : "Running / Auto");
+    copy_string(status, status_size, tr(ui, "common.start", "Start"));
   } else if (strcmp(state, "waiting_network") == 0) {
     copy_string(status, status_size, "Waiting for Network");
   } else if (strcmp(state, "stopped") == 0) {
+    copy_string(status, status_size, tr(ui, "common.stop", "Stop"));
+  } else if (strcmp(state, "hardware_unavailable") == 0) {
     copy_string(status, status_size,
-                enabled_seen && enabled ? "Stopped / Auto" : "Stopped");
+                tr(ui, "common.unavailable", "Unavailable"));
   } else if (strcmp(state, "not_installed") == 0) {
     copy_string(status, status_size, "Not Installed");
   } else if (state[0]) {
@@ -1554,7 +1545,8 @@ static int read_network_service_status(struct ui_state *ui, const char *service,
   } else if (summary[0]) {
     copy_string(status, status_size, summary);
   } else {
-    copy_string(status, status_size, installed ? "Stopped" : "Not Installed");
+    copy_string(status, status_size,
+                installed ? tr(ui, "common.stop", "Stop") : "Not Installed");
   }
   return installed;
 }
@@ -2071,7 +2063,10 @@ static FILE *open_plumos_script_pipe(struct ui_state *ui, const char *script,
       if (!join_path(busybox, sizeof(busybox), ui->plumos_root,
                      "bin/busybox") ||
           access(busybox, X_OK) != 0) {
-        return NULL;
+        if (!copy_string(busybox, sizeof(busybox), "/bin/busybox") ||
+            access(busybox, X_OK) != 0) {
+          return NULL;
+        }
       }
     }
   }
@@ -2373,6 +2368,9 @@ static const char *runtime_busybox_shell_path(void) {
           (int)sizeof(root_busybox) &&
       access(root_busybox, X_OK) == 0) {
     return root_busybox;
+  }
+  if (access("/bin/busybox", X_OK) == 0) {
+    return "/bin/busybox";
   }
   return NULL;
 }

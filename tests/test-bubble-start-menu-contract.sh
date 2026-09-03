@@ -43,7 +43,19 @@ done
 for lang in "$package"/share/frontend/lang/*.lang; do
     grep -q '^common.not_supported=' "$lang"
     grep -q '^common.not_supported_on_device=' "$lang"
+    grep -q '^common.start=' "$lang"
+    grep -q '^common.stop=' "$lang"
+    grep -q '^common.unavailable=' "$lang"
 done
+
+grep -Fq 'PLUMOS_BUSYBOX="$BB"' "$package/bin/plumos-frontend-launch"
+grep -Fq 'PLUMOS_BUSYBOX="$BB"' "$package/bin/plumos-controller-ui-bubble"
+grep -Fq 'tr(ui, "common.start", "Start")' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -Fq 'tr(ui, "common.stop", "Stop")' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -Fq 'copy_string(busybox, sizeof(busybox), "/bin/busybox")' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
 
 for helper in plumos-display-control plumos-network-control plumos-network-services \
     plumos-time-sync plumos-factory-reset plumos-safe-shutdown \
