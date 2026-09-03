@@ -15,7 +15,10 @@ fi
 repo_root=/work
 ref=${PLUMOS_BUBBLE_RETROARCH_REF:-v1.22.2}
 url=https://github.com/libretro/RetroArch.git
+assets_url=https://github.com/libretro/retroarch-assets.git
+assets_ref=73106363e14e34c08a5854b4cfbc29f184e3b783
 work=$repo_root/output/build/retroarch-bubble-$ref
+assets_work=$repo_root/output/build/retroarch-assets-$assets_ref
 out=$repo_root/output/retroarch/bubble
 root=$out/plumos
 bin=$root/bin
@@ -35,12 +38,21 @@ git -C "$work" checkout --quiet "$ref"
 git -C "$work" reset --hard --quiet
 git -C "$work" clean -fdx --quiet
 for patch in "$repo_root"/patches/retroarch/*.patch; do git -C "$work" apply "$patch"; done
+if [[ ! -d $assets_work/.git ]]; then
+    rm -rf "$assets_work"
+    git clone --filter=blob:none "$assets_url" "$assets_work"
+fi
+git -C "$assets_work" fetch --quiet origin "$assets_ref"
+git -C "$assets_work" checkout --quiet --detach "$assets_ref"
+git -C "$assets_work" reset --hard --quiet "$assets_ref"
+git -C "$assets_work" clean -fdx --quiet
 (
     cd "$work"
     ./configure --prefix=/usr \
         --disable-x11 --disable-wayland --disable-opengl --disable-opengl1 \
         --disable-opengl_core --enable-opengles --enable-egl --enable-kms \
-        --enable-plain_drm --enable-rgui --disable-xmb --disable-ozone \
+        --enable-plain_drm --enable-rgui --enable-xmb --enable-ozone \
+        --enable-freetype \
         --disable-sdl --disable-sdl2 --enable-alsa --enable-udev \
         --disable-pulse --disable-jack --disable-oss --disable-vulkan \
         --disable-ffmpeg --disable-networking
@@ -51,15 +63,48 @@ for patch in "$repo_root"/patches/retroarch/*.patch; do git -C "$work" apply "$p
             exit 1
         }
     done
+    for menu_driver in RGUI XMB OZONE; do
+        grep -Eq "^HAVE_${menu_driver} = 1$" config.mk || {
+            printf 'error: RetroArch menu driver was not built: %s\n' \
+                "$menu_driver" >&2
+            exit 1
+        }
+    done
+    grep -Eq '^HAVE_LANGEXTRA = 1$' config.mk || {
+        printf 'error: RetroArch multi-language support was not built\n' >&2
+        exit 1
+    }
+    nm retroarch >menu-symbols.txt
+    for menu_symbol in menu_ctx_rgui menu_ctx_ozone menu_ctx_xmb; do
+        grep -Eq "[[:space:]]${menu_symbol}$" menu-symbols.txt || {
+            printf 'error: RetroArch menu symbol is missing: %s\n' \
+                "$menu_symbol" >&2
+            exit 1
+        }
+    done
+    rm -f menu-symbols.txt
 )
 
 rm -rf "$out"
 mkdir -p "$bin" "$lib" "$component" "$root/licenses" \
+    "$root/retroarch/assets" \
     "$root/factory-defaults/retroarch/autoconfig/udev" "$root/share/alsa"
 install -m 0755 "$work/retroarch" "$bin/retroarch"
 install -m 0755 /usr/bin/amixer "$bin/plumos-amixer"
 strip "$bin/retroarch" "$bin/plumos-amixer"
 install -m 0644 "$work/COPYING" "$root/licenses/RetroArch-COPYING"
+for asset_tree in fonts glui ozone pkg rgui sounds xmb; do
+    [[ -d $assets_work/$asset_tree ]] || {
+        printf 'error: RetroArch assets tree is missing: %s\n' \
+            "$asset_tree" >&2
+        exit 1
+    }
+    cp -a "$assets_work/$asset_tree" "$root/retroarch/assets/"
+done
+install -m 0644 "$assets_work/COPYING" \
+    "$root/licenses/RetroArch-Assets-COPYING"
+install -m 0644 "$assets_work/README.md" \
+    "$root/licenses/RetroArch-Assets-README.md"
 install -m 0644 "$repo_root/configs/retroarch/bubble-software-drm.cfg" \
     "$root/factory-defaults/retroarch/retroarch-bubble.cfg"
 install -m 0644 "$repo_root/configs/retroarch/bubble-pre-v90s-expanded.cfg" \
@@ -113,6 +158,7 @@ printf '%s\n' "$needed" | grep -qx 'libEGL.so.1'
 printf '%s\n' "$needed" | grep -qx 'libGLESv2.so.2'
 printf '%s\n' "$needed" | grep -qx 'libgbm.so.1'
 resolved=$(git -C "$work" rev-parse HEAD)
+resolved_assets=$(git -C "$assets_work" rev-parse HEAD)
 cat >"$component/manifest.json" <<EOF
 {
   "name": "RetroArch for plumOS Bubble",
@@ -125,7 +171,11 @@ cat >"$component/manifest.json" <<EOF
   "source_date_epoch": $epoch,
   "video_drivers": ["drm", "gl"],
   "video_context_drivers": ["kms"],
-  "menu_drivers": ["rgui"],
+  "menu_drivers": ["rgui", "xmb", "ozone"],
+  "menu_assets": "retroarch/assets",
+  "menu_assets_source": "$assets_url",
+  "menu_assets_commit": "$resolved_assets",
+  "menu_languages": "libretro-language-catalog-with-Japanese",
   "rendering": "software-plain-drm-and-hardware-kms-egl-gles",
   "gpu_runtime_required": false,
   "hardware_core_gpu_runtime_required": true,
@@ -139,7 +189,7 @@ cat >"$component/manifest.json" <<EOF
 EOF
 (
     cd "$root"
-    find bin emulator factory-defaults licenses share/alsa -type f -print | LC_ALL=C sort |
+    find bin emulator factory-defaults licenses retroarch share/alsa -type f -print | LC_ALL=C sort |
         while IFS= read -r path; do sha256sum "$path"; done
     sha256sum components/retroarch/manifest.json
 ) >"$component/checksums.sha256"

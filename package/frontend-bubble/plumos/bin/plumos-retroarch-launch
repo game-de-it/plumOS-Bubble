@@ -67,8 +67,15 @@ else
     export ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf"
 fi
 export XDG_CONFIG_HOME="$PLUMOS_ROOT/config"
+get_config_string() {
+    key=$1
+    "$BB" sed -n \
+        "s/^${key}[[:space:]]*=[[:space:]]*\"\\([^\"]*\\)\"[[:space:]]*$/\\1/p" \
+        "$config" | "$BB" tail -n 1
+}
 core_id=${core##*/}
 core_id=${core_id%_libretro.so}
+menu_driver=$(get_config_string menu_driver)
 append_config="$RUNTIME_ROOT/retroarch/launch.$$.cfg"
 cpu_snapshot="$RUNTIME_ROOT/retroarch/cpu-governors.$$"
 if [ -x "$cpu_control" ] &&
@@ -84,9 +91,10 @@ else
     echo 'CPU policy control unavailable' >&2
     exit 1
 fi
-case "$core_id" in
-    flycast|flycast_xtreme|km_duckswanstation_xtreme_amped|\
-    mupen64plus_next|parallel_n64|yabasanshiro)
+case "$core_id:$menu_driver" in
+    *:xmb|*:ozone|\
+    flycast:*|flycast_xtreme:*|km_duckswanstation_xtreme_amped:*|\
+    mupen64plus_next:*|parallel_n64:*|yabasanshiro:*)
         {
             printf '%s\n' 'video_driver = "gl"'
             printf '%s\n' 'video_context_driver = "kms"'

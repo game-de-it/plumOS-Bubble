@@ -53,9 +53,17 @@ cat >"$root/bin/plumos-volume-control" <<'EOF'
 #!/bin/sh
 exit 0
 EOF
+cat >"$root/bin/plumos-cpu-control" <<'EOF'
+#!/bin/sh
+case "$1" in
+    snapshot) printf '%s\n' 'policy0=ondemand' >"$2" ;;
+    apply|restore) ;;
+    *) exit 2 ;;
+esac
+EOF
 chmod 0755 "$root/bin/retroarch" "$root/bin/plumos-retroarch-launch" \
     "$root/bin/plumos-retroarch-config-merge" "$root/bin/plumos-audio-output" \
-    "$root/bin/plumos-volume-control"
+    "$root/bin/plumos-volume-control" "$root/bin/plumos-cpu-control"
 
 run_launcher() {
     trace=$1
@@ -81,6 +89,16 @@ grep -qx "savestate_directory = \"$root/states\"" "$tmp/software.append"
 grep -qx 'audio_device = "plumos_output"' "$tmp/software.append"
 ! grep -q '^config_save_on_exit = ' "$tmp/software.append"
 ! find "$runtime/retroarch" -type f -name 'launch.*.cfg' -print -quit | grep -q .
+
+sed -i 's/^menu_driver = "rgui"$/menu_driver = "xmb"/' \
+    "$root/config/retroarch/retroarch-bubble.cfg"
+run_launcher "$tmp/xmb" --system nes \
+    --core "$root/cores/quicknes_libretro.so" \
+    --rom "$rom_root/nes/test.nes"
+grep -qx 'video_driver = "gl"' "$tmp/xmb.append"
+grep -qx 'video_context_driver = "kms"' "$tmp/xmb.append"
+sed -i 's/^menu_driver = "xmb"$/menu_driver = "rgui"/' \
+    "$root/config/retroarch/retroarch-bubble.cfg"
 
 run_launcher "$tmp/hardware" --system n64 \
     --core "$root/cores/parallel_n64_libretro.so" \

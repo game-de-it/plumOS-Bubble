@@ -75,7 +75,7 @@ cat >"$root/manifest.json" <<EOF
   "source_date_epoch": $epoch,
   "managed_components": ["frontend", "retroarch", "libretro-cores", "picoarch", "standalone", "pyxel", "portmaster"],
   "frontend": "cpu-drm-dumb-buffer",
-  "retroarch": "software-plain-drm-and-hardware-kms-egl-gles-rgui",
+  "retroarch": "software-plain-drm-rgui-and-hardware-kms-egl-gles-xmb-ozone",
   "core_baseline": "all-114-source-records",
   "catalog_complete": true,
   "release_complete": false,

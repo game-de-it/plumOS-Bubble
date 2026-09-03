@@ -29,6 +29,12 @@ else
     export ALSA_CONFIG_PATH="$PLUMOS_ROOT/share/alsa/alsa.conf"
 fi
 export XDG_CONFIG_HOME="$PLUMOS_ROOT/config"
+get_config_string() {
+    key=$1
+    "$BB" sed -n \
+        "s/^${key}[[:space:]]*=[[:space:]]*\"\\([^\"]*\\)\"[[:space:]]*$/\\1/p" \
+        "$config" | "$BB" tail -n 1
+}
 append_config=
 cleanup() {
     [ -z "$append_config" ] || $BB rm -f "$append_config"
@@ -38,6 +44,16 @@ if [ -n "${ALSA_CONFIG_PATH:-}" ] && [ -x "$PLUMOS_ROOT/bin/plumos-audio-output"
     append_config="$RUNTIME_ROOT/retroarch/menu.$$.cfg"
     printf '%s\n' 'audio_device = "plumos_output"' >"$append_config"
 fi
+case "$(get_config_string menu_driver)" in
+    xmb|ozone)
+        if [ -z "$append_config" ]; then
+            append_config="$RUNTIME_ROOT/retroarch/menu.$$.cfg"
+            : >"$append_config"
+        fi
+        printf '%s\n' 'video_driver = "gl"' >>"$append_config"
+        printf '%s\n' 'video_context_driver = "kms"' >>"$append_config"
+        ;;
+esac
 printf 'retroarch_menu=stage-S60 begin\n' >>"$PLUMOS_ROOT/logs/session.log"
 set +e
 set -- "$PLUMOS_ROOT/bin/retroarch" -v -c "$config"
