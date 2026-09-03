@@ -66,6 +66,10 @@
   - warm bootと時間baselineは未実施。
   - external initramfs用にU-Boot `S12/E12` initrd、`S13/E13` kernel、`S14/E14` DTB、
     early userspace `S21..S29/E23..E29`とp3 persistent logをhost検証済み。
+  - source `24635cc`のcold bootで、FE process開始6.33秒、Wi-Fi/DHCP/SSH完了約10秒、
+    FE ready約12秒を実測した。Wi-Fi完了はFE開始を阻害せず、最終FAT markerは`S40`を保持、
+    current bootの`stage=E`は0件、full app-layer hashはboot中に再実行されていない。
+    詳細は`docs/validation/2026-09-03-bubble-fast-boot-physical.md`。warm boot比較は未実施。
 - [ ] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
 - [x] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
   - AArch64 static BusyBox、stock handoff互換entrypoint、FAT/ext4/console/kmsg stage、
@@ -91,6 +95,9 @@
   - full Systemに先立つminimal diagnostic Systemは専用arm64 containerから再現build済み。
 - [ ] `BUB-P3-02` vendor artifact を hash、source identity、license、capture procedure 付きの外部入力として固定する。
 - [ ] `BUB-P3-03` read-only System A/B、atomic slot metadata、checksum verification を実装する。
+  - development slot切替とinactive image readbackは実機合格。現状のseed-level
+    `SYSTEM.manifest`/`plumos-image.manifest`は元seedを表すため、正式updaterではslot-scoped
+    System manifestとactive identityをatomicに切り替える必要がある。
 - [ ] `BUB-P3-04` `/run`、`/tmp`、managed persistent、mutable config、user media の mount contract を実装する。
 - [ ] `BUB-P3-05` plumOS supervisor、boot log、visible error screen、recovery SSH を実装する。
 - [ ] `BUB-P3-06` Bubble root/app-layer manifest と `checksums.sha256` を生成・検証する。
