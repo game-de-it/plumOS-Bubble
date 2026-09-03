@@ -80,7 +80,9 @@
     slot A到達を確認した。強制電源断後のp3 orphanは旧BusyBox/旧FE実行ファイルだけと
     read-only特定・退避してoffline修復し、5-pass再検査と`Filesystem state: clean`を確認済み。
     10秒を超えたFE初期化、初回partition作成、OS updateには共通logo上の可視進捗を表示し、
-    通常bootには進捗用の追加処理を入れない。修復後のpanel handoffと通常boot計測を残す。
+    通常bootには進捗用の追加処理を入れない。source `ae5501c`のSystem B/initramfsを
+    incoming write、byte/SHA readback後にslot Bへ切替え、slot Aをrollbackとして保持した。
+    修復後のpanel handoffと通常boot計測を残す。
 - [ ] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
 - [x] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
   - AArch64 static BusyBox、stock handoff互換entrypoint、FAT/ext4/console/kmsg stage、

@@ -153,6 +153,27 @@ not show a busy rendering loop. The next physical boot therefore remains the
 gate for panel handoff, the 10-second delayed progress notice, and normal-path
 timing after the ext4 repair.
 
+Source `ae5501c` was then built and deployed offline with slot A retained as the
+rollback. Each payload was copied under an incoming name, byte-compared with
+the host artifact, renamed into place, synced, and SHA-256 read back before the
+active slot was changed to B:
+
+| Object | Installed SHA-256 |
+| --- | --- |
+| rollback System A | `43427fa2ff62a7d290101d0fa4bb5868367d3401c8298a55ff43263b499eaca6` |
+| active System B | `6748e14553776292fa151615f709ceb7f77484ad9010bb2bba58cbcd05137505` |
+| external initramfs | `3fd58c82444dd236221bb01f517a42cfff5c6bfe9c7b405d73eced70c118930d` |
+| dynamic-size `boot.cmd` | `5ea363415ff1d7e60c50dd84699ea0718132a68db813fcb2a3d0c85fb3c32e65` |
+| compiled `boot.scr` | `f5e1a00d681a28860f6a1cca919e0d8016cdfd9b2b3e7e1b5108b53f0096df9b` |
+
+`uEnv.txt` now records the new fallback `initrdsize=0x3f8482`, while the
+compiled boot script still contains `setenv initrdsize ${filesize}`. Both
+per-slot checksum files passed on the mounted FAT volume. After deployment,
+p3 again passed a forced read-only five-pass check. macOS did not grant the
+p1 raw device read permission for an additional offline FAT checker run, so p1
+acceptance here is limited to file readback plus a successful whole-disk
+unmount and eject; no FAT repair was attempted.
+
 ## Remaining metadata work
 
 The seed-level `/flash/System/SYSTEM.manifest` and
