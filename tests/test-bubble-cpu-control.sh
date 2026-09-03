@@ -73,7 +73,7 @@ assert_equal ondemand "$(sed -n '1p' "$CPUFREQ_ROOT/policy4/scaling_governor")" 
   'policy4 restore'
 [ ! -e "$snapshot" ] || fail 'snapshot not removed after restore'
 
-grep -q 'CPU_POLICY="${PLUMOS_PYXEL_CPU_POLICY:-ondemand}"' \
+grep -q 'CPU_POLICY="${PLUMOS_PYXEL_CPU_POLICY:-performance}"' \
   "$ROOT_DIR/scripts/build-pyxel-bubble.sh" || fail 'Pyxel policy not wired'
 grep -q 'snapshot "$CPU_SNAPSHOT"' "$ROOT_DIR/scripts/build-pyxel-bubble.sh" ||
   fail 'Pyxel snapshot not wired'

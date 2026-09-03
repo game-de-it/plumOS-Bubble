@@ -226,6 +226,11 @@
     standalone YabaSanshiroもSaturn content、GLES、ALSA、正常終了に合格した。
   - OpenBORはgeneric SDL2 software rendererでKMSDRM surface生成に失敗していたため、
     Pyxel/PCSXと同じBubble SDL2 + Mali GLES2へ統一。DRM ownerとPCM `RUNNING`を実機合格。
+  - renderer auditでPyxel/PortMaster GUIのMesa `kms_swrast` fallbackと、PortMaster portへの
+    global software強制を除去。PFSを同一60fps設定で測定し、`ondemand`は28.74–29.16fps、
+    `performance`は36.58–56.43fpsだった。全試行でMaliを使用しsoftware GL mappingはゼロ。
+    Pyxelだけをgame中`performance`既定とし、終了時に元governorへ復元する。実LCD操作と
+    PFS既存30fps設定を60へ戻した物理確認は未完了。
 - [ ] `BUB-P6-04` package済みcoreからFE導線、FE導線からlauncher/coreを双方向検証し、
   実行不能な導線も`未実装`/`未対応`理由付きで表示する。QuickNES-only app-layerはreleaseを拒否する。
   - 98 system / 196 profile / RetroArch 116 id / PicoArch 20 id / standalone 5 idと
@@ -235,6 +240,9 @@
   save/state pathをcoreごとのmachine-readable coverage manifestへ固定する。
 - [ ] `BUB-P6-06` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。
 - [ ] `BUB-P6-07` app/game終了時に同一sessionだけを回収し、frontend/device ownershipを復元する。
+  - SSH benchmarkがfrontendを複数回停止してPID 1の4回restart limitへ到達した。`sync`後の
+    強制rebootで通常FE 1 processへ復旧。今後の繰返し性能試験は通常FE導線を各試行で使うか、
+    validation hold中にfrontend restart attemptを消費しない専用supervision契約が必要。
 - [ ] `BUB-P6-08` 全system表示、全profile選択、全core load smoke、代表content起動をhostで通してから、
   ROMセットを変更せず一括実機acceptanceを開始する。
   - hostでは全system/profile解決と114/114 core load smokeまで合格。

@@ -278,7 +278,7 @@ MALI_LIBRARY="${PLUMOS_PYXEL_MALI_LIBRARY:-$PLUMOS_ROOT/emulator/lib/libmali.so.
 LOG_DIR="${PLUMOS_PYXEL_LOG_DIR:-$PLUMOS_ROOT/logs/pyxel}"
 RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
 CPU_CONTROL="$PLUMOS_ROOT/bin/plumos-cpu-control"
-CPU_POLICY="${PLUMOS_PYXEL_CPU_POLICY:-ondemand}"
+CPU_POLICY="${PLUMOS_PYXEL_CPU_POLICY:-performance}"
 CPU_SNAPSHOT="$RUNTIME_ROOT/pyxel/cpu-governors.$$"
 CPU_SNAPSHOT_ACTIVE=0
 PYXEL_PID=""
@@ -562,7 +562,7 @@ cat >"$TARGET_DIR/plumos/components/pyxel/manifest.json" <<EOF
   "software_fallback": false,
   "external_gpu_runtime": ["emulator/lib/libmali.so.1", "/dev/mali0"],
   "cpu_backend": "bin/plumos-cpu-control",
-  "default_cpu_policy": "ondemand",
+  "default_cpu_policy": "performance",
   "audio": "SDL2 ALSA direct-hw or managed router",
   "input": "retrogame_joypad"
 }
@@ -577,6 +577,7 @@ baseline=$PYXEL_SITE
 user_site=/storage/plumos/state/pyxel-site
 display=SDL2 KMSDRM Bubble Mali-G52 GLES2 aspect-fit
 software_fallback=false
+default_cpu_policy=performance
 audio=ALSA direct-hw or managed router
 EOF
 (

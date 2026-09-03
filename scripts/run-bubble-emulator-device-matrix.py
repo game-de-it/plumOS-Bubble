@@ -174,7 +174,7 @@ def route_command(system: dict, profile: str, content: str, bios_root: str) -> t
         return command, STANDALONE_LOGS.get(emulator, f"{ROOT}/logs/standalone-route.log"), 8
     if profile.startswith("pyxel:"):
         command = (
-            f"PLUMOS_ROOT={ROOT} PLUMOS_PYXEL_CPU_POLICY=ondemand /bin/busybox sh "
+            f"PLUMOS_ROOT={ROOT} PLUMOS_PYXEL_CPU_POLICY=performance /bin/busybox sh "
             f"{ROOT}/bin/plumos-pyxel-bubble-launch -m pyxel play {shlex.quote(content)}"
         )
         return command, f"{ROOT}/logs/pyxel/runtime.log", 8
