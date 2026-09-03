@@ -149,7 +149,7 @@ mkdir -p "$verify/app-layer"
 debugfs -R "rdump /plumos $verify/app-layer" "$verify/runtime.ext4" >/dev/null 2>&1
 app=$verify/app-layer/plumos
 (cd "$app" && sha256sum -c checksums.sha256)
-for component in frontend retroarch libretro-cores picoarch standalone pyxel portmaster; do
+for component in frontend nextcommander music-player retroarch libretro-cores picoarch standalone pyxel portmaster; do
     (cd "$app" && sha256sum -c "components/$component/checksums.sha256")
 done
 jq -e '.device == "bubble" and .user_media_included == false and
@@ -178,9 +178,23 @@ grep -q 'config_save_on_exit = "false"' "$app/bin/plumos-retroarch-launch"
 grep -q 'menu_driver = "rgui"' "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
 grep -q 'rgui_show_start_screen = "false"' \
     "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
-for entry in ui-settings system-settings network-settings apps help reboot shutdown; do
+for entry in ui-settings system-settings network-settings performance-settings apps help reboot shutdown; do
     grep -q "\"id\": \"$entry\"" "$app/config/frontend/menus.json"
 done
+jq -e '.bubble_only_start_entries == [] and .bubble_only_apps_entries == [] and
+    .apps_reference_match == ["plumOS-MF", "plumOS-V90S_v2-public"]' \
+    "$app/config/frontend/start-menu-coverage.json" >/dev/null
+for helper in plumos-display-control plumos-network-control \
+    plumos-network-services plumos-time-sync plumos-factory-reset \
+    plumos-safe-shutdown plumos-thumbnail-scraper \
+    plumos-nextcommander-launch plumos-music-player-launch; do
+    test -x "$app/bin/$helper"
+done
+test -x "$app/apps/nextcommander/bin/NextCommander"
+test -x "$app/apps/music-player/bin/plumos-music-player.bin"
+jq -e 'all(.start_entries[]; .status == "implemented") and
+    all(.apps_entries[]; .status == "implemented")' \
+    "$app/config/frontend/start-menu-coverage.json" >/dev/null
 grep -q 'PLUMOS_ACTION_TRACE_PATH' "$app/bin/plumos-controller-ui-bubble"
 grep -q 'input_device = "retrogame_joypad"' \
     "$app/factory-defaults/retroarch/autoconfig/udev/gkd-bubble-retrogame-joypad.cfg"

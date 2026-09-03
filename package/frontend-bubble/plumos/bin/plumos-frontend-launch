@@ -74,6 +74,19 @@ seed_default "$PLUMOS_ROOT/config/frontend/settings.json" \
 seed_default "$PLUMOS_ROOT/config/system/settings.json" \
     "$PLUMOS_ROOT/factory-defaults/system/settings.json"
 
+# PID 1 performs the first connection. This reconciliation makes the saved
+# frontend switch authoritative after a frontend restart as well.
+if [ -x "$PLUMOS_ROOT/bin/plumos-network-control" ]; then
+    if $BB grep -Eq '"wifi_enabled"[[:space:]]*:[[:space:]]*(false|0)' \
+        "$PLUMOS_ROOT/config/system/settings.json" 2>/dev/null; then
+        "$BB" sh "$PLUMOS_ROOT/bin/plumos-network-control" --wifi off \
+            >>"$LOG" 2>&1 || true
+    elif ! "$BB" ip -4 addr show dev wlan0 2>/dev/null | $BB grep -q 'inet '; then
+        "$BB" sh "$PLUMOS_ROOT/bin/plumos-network-control" --wifi on \
+            >>"$LOG" 2>&1 || true
+    fi
+fi
+
 printf 'frontend_scan=stage-S41\n' >>"$LOG"
 storage_result=$($BB awk -F= '$1 == "result" { print $2; exit }' \
     "$PLUMOS_ROOT/state/storage-health/status" 2>/dev/null || true)

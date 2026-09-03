@@ -4,6 +4,8 @@
   "model": "GKD Bubble",
   "language": "ja.lang",
   "timezone": "Asia/Tokyo",
-  "brightness": 128,
-  "volume": 40
+  "brightness": 10,
+  "volume": 8,
+  "automatic_time": true,
+  "wifi_enabled": true
 }

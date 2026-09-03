@@ -6,6 +6,8 @@ image=${PLUMOS_BUBBLE_TOOLS_IMAGE:-plumos-bubble-tools:dev}
 if [[ ${1:-} != --inside ]]; then
     if [[ ${1:-} != --assemble-only ]]; then
         "$repo_root/scripts/build-bubble-frontend.sh"
+        "$repo_root/scripts/build-nextcommander-bubble.sh"
+        "$repo_root/scripts/build-music-player-bubble.sh"
         "$repo_root/scripts/build-bubble-retroarch.sh"
         "$repo_root/scripts/build-libretro-core-catalog-bubble.sh" \
             --filter all --concurrency "${PLUMOS_BUBBLE_CORE_CONCURRENCY:-2}"
@@ -22,6 +24,14 @@ if [[ ${1:-} != --inside ]]; then
         output/portmaster/bubble/plumos; do
         [[ -d "$repo_root/$required" ]] || {
             printf 'error: full emulator-stack input is missing: %s\n' "$required" >&2
+            exit 1
+        }
+    done
+    for required in \
+        output/nextcommander/bubble/plumos \
+        output/music-player/bubble/plumos; do
+        [[ -d "$repo_root/$required" ]] || {
+            printf 'error: common app input is missing: %s\n' "$required" >&2
             exit 1
         }
     done
@@ -43,6 +53,8 @@ epoch=${SOURCE_DATE_EPOCH:-}
 rm -rf "$out"
 mkdir -p "$root"
 cp -a "$repo_root/output/frontend/bubble/plumos/." "$root/"
+cp -a "$repo_root/output/nextcommander/bubble/plumos/." "$root/"
+cp -a "$repo_root/output/music-player/bubble/plumos/." "$root/"
 cp -a "$repo_root/output/retroarch/bubble/plumos/." "$root/"
 cp -a "$repo_root/output/libretro-cores/bubble-all/plumos/." "$root/"
 cp -a "$repo_root/output/picoarch/bubble/plumos/." "$root/"
@@ -57,7 +69,7 @@ for json in "$root"/config/frontend/*.json "$root"/factory-defaults/*/*.json \
 PLUMOS_BUBBLE_APP_ROOT="$root" \
     "$repo_root/scripts/verify-bubble-emulator-catalog.sh"
 for component in \
-    frontend retroarch libretro-cores picoarch standalone pyxel portmaster; do
+    frontend nextcommander music-player retroarch libretro-cores picoarch standalone pyxel portmaster; do
     (cd "$root" && sha256sum -c "components/$component/checksums.sha256")
 done
 LD_LIBRARY_PATH="$root/emulator/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
@@ -73,7 +85,7 @@ cat >"$root/manifest.json" <<EOF
   "version": "$version",
   "source_ref": "$source_ref",
   "source_date_epoch": $epoch,
-  "managed_components": ["frontend", "retroarch", "libretro-cores", "picoarch", "standalone", "pyxel", "portmaster"],
+  "managed_components": ["frontend", "nextcommander", "music-player", "retroarch", "libretro-cores", "picoarch", "standalone", "pyxel", "portmaster"],
   "frontend": "cpu-drm-dumb-buffer",
   "retroarch": "software-plain-drm-rgui-and-hardware-kms-egl-gles-xmb-ozone",
   "core_baseline": "all-114-source-records",

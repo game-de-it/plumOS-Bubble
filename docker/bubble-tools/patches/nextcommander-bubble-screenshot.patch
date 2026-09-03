@@ -1,0 +1,55 @@
+diff --git a/Makefile b/Makefile
+--- a/Makefile
++++ b/Makefile
+@@ -89,7 +89,7 @@ NEXTUI_SYSTEM_PATH := $(SDCARD_ROOT)/plumos/apps/nextcommander
+ 
+ CXXFLAGS += -O2 -pipe -fomit-frame-pointer
+ CXXFLAGS += -DPLUMOS_MF
+-CXXFLAGS += $$(pkg-config --cflags libdrm)
++CXXFLAGS += $$(pkg-config --cflags libdrm libpng)
+ CXXFLAGS += -DPATH_DEFAULT=\"$(SDCARD_ROOT)\"
+ CXXFLAGS += -DPATH_DEFAULT_RIGHT=\"$(SDCARD_ROOT)/Roms\"
+ CXXFLAGS += -DFILE_SYSTEM=\"$(SDCARD_ROOT)\"
+@@ -115,6 +115,6 @@ CXXFLAGS += -DPPU_X=2
+ CXXFLAGS += -DPPU_Y=2
+ CXXFLAGS += -DSCREEN_BPP=32
+-LINKFLAGS += -ldrm
++LINKFLAGS += -ldrm -lpng -lz
+ endif
+ 
+ SDL := SDL2
+diff --git a/src/screen.cpp b/src/screen.cpp
+--- a/src/screen.cpp
++++ b/src/screen.cpp
+@@ -10,5 +10,6 @@
+ 
+ #ifdef PLUMOS_MF
+ #define PLUMOS_FBDEV_ENABLE_DRM 1
++#define PLUMOS_FBDEV_ENABLE_PNG 1
+ #include "plumos_fbdev_renderer.h"
+ #endif
+@@ -176,7 +177,22 @@ void Screen::nativeFlip()
+             source + static_cast<long>(y) * surface->pitch,
+             static_cast<size_t>(row_bytes));
+     }
+-    if (!plumos_fbdev_present(native)) {
++    if (plumos_fbdev_present(native)) {
++        static int capture_attempted = 0;
++        const char *capture_path =
++            std::getenv("PLUMOS_NEXTCOMMANDER_SCREENSHOT");
++        if (!capture_attempted && capture_path != nullptr &&
++                capture_path[0] != '\0') {
++            char error[256] = {};
++            capture_attempted = 1;
++            if (plumos_fbdev_write_screenshot_png(
++                    native, capture_path, error, sizeof(error))) {
++                SDL_Log("MF screenshot saved: %s", capture_path);
++            } else {
++                SDL_Log("MF screenshot failed: %s", error);
++            }
++        }
++    } else {
+         SDL_Log("MF DRM page flip failed");
+     }
+ }
+

@@ -404,12 +404,14 @@ struct menu_entry {
   int confirm;
   int background;
   int show_results;
+  int available;
 };
 
 struct setting_entry {
   char id[64];
   char display_name[128];
   char value[256];
+  int available;
 };
 
 struct setting_choice {
@@ -2710,7 +2712,8 @@ static int run_display_control_command(const char *action, long brightness,
     return 0;
   }
   if (include_brightness) {
-    long max_brightness = runtime_device_is_mf() ? 20 : 6;
+    long max_brightness =
+        (runtime_device_is_mf() || runtime_device_is_bubble()) ? 20 : 6;
     snprintf(brightness_buf, sizeof(brightness_buf), "%ld",
              clamp_long(brightness, 1, max_brightness));
   } else {
@@ -2935,7 +2938,10 @@ static void update_device_backend_status(struct device_settings *device) {
   mmf_lcd_available = runtime_mmf_lcd_backend_available();
   mmf_enhance_available = runtime_mmf_enhance_backend_available();
   v90s_backlight_available = runtime_v90s_backlight_available();
-  if (runtime_device_is_mf() && v90s_backlight_available) {
+  if (runtime_device_is_bubble() && v90s_backlight_available) {
+    copy_string(device->brightness_backend, sizeof(device->brightness_backend),
+                "Bubble RK3566 backlight");
+  } else if (runtime_device_is_mf() && v90s_backlight_available) {
     copy_string(device->brightness_backend, sizeof(device->brightness_backend),
                 "MF RK3566 backlight");
   } else if (v90s_backlight_available && runtime_v90s_enhance_backend_available()) {
@@ -3037,10 +3043,11 @@ static int apply_runtime_v90s_brightness(
     const struct device_settings *device) {
   long maximum;
 
-  if (!device || (!runtime_device_is_v90s() && !runtime_device_is_mf())) {
+  if (!device || (!runtime_device_is_v90s() && !runtime_device_is_mf() &&
+                  !runtime_device_is_bubble())) {
     return 0;
   }
-  maximum = runtime_device_is_mf() ? 20 : 6;
+  maximum = (runtime_device_is_mf() || runtime_device_is_bubble()) ? 20 : 6;
   return run_display_control_command(
       "apply", clamp_long(device->brightness, 1, maximum), 1);
 }
@@ -5592,6 +5599,7 @@ static void add_setting_entry(struct ui_state *ui, const char *id, const char *n
   }
   entry = &ui->setting_entries[ui->setting_count++];
   memset(entry, 0, sizeof(*entry));
+  entry->available = 1;
   copy_string(entry->id, sizeof(entry->id), id);
   if (id && id[0]) {
     snprintf(key, sizeof(key), "settings.item.%s.name", id);
@@ -5601,6 +5609,19 @@ static void add_setting_entry(struct ui_state *ui, const char *id, const char *n
     copy_string(entry->display_name, sizeof(entry->display_name), name);
   }
   copy_string(entry->value, sizeof(entry->value), value && value[0] ? value : "-");
+}
+
+static void add_unavailable_setting_entry(struct ui_state *ui, const char *id,
+                                          const char *name) {
+  struct setting_entry *entry;
+
+  add_setting_entry(ui, id, name,
+                    tr(ui, "common.not_supported", "Not Supported"));
+  if (ui->setting_count == 0) {
+    return;
+  }
+  entry = &ui->setting_entries[ui->setting_count - 1];
+  entry->available = 0;
 }
 
 static void add_bool_setting_entry(struct ui_state *ui, const char *id, const char *name,
@@ -6239,11 +6260,19 @@ static void add_system_settings_entries(struct ui_state *ui) {
   format_runtime_number_setting_value("system_brightness", device->brightness,
                                       value, sizeof(value));
   add_setting_entry(ui, "system_brightness", "Brightness", value);
-  add_bool_setting_entry(ui, "system_lid_suspend", "Lid Suspend",
-                         device->lid_suspend_enabled);
+  if (runtime_device_is_bubble()) {
+    add_unavailable_setting_entry(ui, "system_lid_suspend", "Lid Suspend");
+  } else {
+    add_bool_setting_entry(ui, "system_lid_suspend", "Lid Suspend",
+                           device->lid_suspend_enabled);
+  }
   format_runtime_number_setting_value("system_lumination", device->lumination,
                                       value, sizeof(value));
-  add_setting_entry(ui, "system_lumination", "Lumination", value);
+  if (system_number_setting_runtime_available("system_lumination")) {
+    add_setting_entry(ui, "system_lumination", "Lumination", value);
+  } else {
+    add_unavailable_setting_entry(ui, "system_lumination", "Lumination");
+  }
   format_runtime_number_setting_value("system_contrast", device->contrast,
                                       contrast_value, sizeof(contrast_value));
   format_runtime_number_setting_value("system_hue", device->hue,
@@ -6252,7 +6281,13 @@ static void add_system_settings_entries(struct ui_state *ui) {
                                       saturation_value, sizeof(saturation_value));
   snprintf(value, sizeof(value), "C=%s T=%s S=%s",
            contrast_value, hue_value, saturation_value);
-  add_setting_entry(ui, "system_display_color", "Display Color", value);
+  if (system_number_setting_runtime_available("system_contrast") ||
+      system_number_setting_runtime_available("system_hue") ||
+      system_number_setting_runtime_available("system_saturation")) {
+    add_setting_entry(ui, "system_display_color", "Display Color", value);
+  } else {
+    add_unavailable_setting_entry(ui, "system_display_color", "Display Color");
+  }
 
   add_setting_entry(ui, "system_time_settings", "Time Settings",
                     setting_choice_display_value("system_timezone", device->timezone));
@@ -6287,27 +6322,43 @@ static void add_system_factory_reset_entries(struct ui_state *ui) {
   int has_pico = 0;
   int has_sa = 0;
 
-  if (join_path(path, sizeof(path), ui->plumos_root, "factory-defaults/ra")) {
+  if (join_path(path, sizeof(path), ui->plumos_root,
+                runtime_device_is_bubble() ? "factory-defaults/retroarch"
+                                           : "factory-defaults/ra")) {
     has_ra = dir_exists(path);
   }
-  if (join_path(path, sizeof(path), ui->plumos_root, "factory-defaults/pico")) {
+  if (join_path(path, sizeof(path), ui->plumos_root,
+                runtime_device_is_bubble() ? "factory-defaults/picoarch"
+                                           : "factory-defaults/pico")) {
     has_pico = dir_exists(path);
   }
-  if (join_path(path, sizeof(path), ui->plumos_root, "factory-defaults/sa")) {
+  if (join_path(path, sizeof(path), ui->plumos_root,
+                runtime_device_is_bubble() ? "factory-defaults/standalone"
+                                           : "factory-defaults/sa")) {
     has_sa = dir_exists(path);
   }
-  if (has_ra && has_pico && has_sa) {
+  if ((runtime_device_is_bubble() && (has_ra || has_pico || has_sa)) ||
+      (has_ra && has_pico && has_sa)) {
     add_setting_entry(ui, "system_factory_reset_all", "All Emulator Settings",
                       "RA + PICO + SA");
   }
   if (has_ra) {
     add_setting_entry(ui, "system_factory_reset_ra", "RetroArch Settings", "");
+  } else if (runtime_device_is_bubble()) {
+    add_unavailable_setting_entry(ui, "system_factory_reset_ra",
+                                  "RetroArch Settings");
   }
   if (has_pico) {
     add_setting_entry(ui, "system_factory_reset_pico", "PicoArch Settings", "");
+  } else if (runtime_device_is_bubble()) {
+    add_unavailable_setting_entry(ui, "system_factory_reset_pico",
+                                  "PicoArch Settings");
   }
   if (has_sa) {
     add_setting_entry(ui, "system_factory_reset_sa", "Standalone Settings", "");
+  } else if (runtime_device_is_bubble()) {
+    add_unavailable_setting_entry(ui, "system_factory_reset_sa",
+                                  "Standalone Settings");
   }
   if (!has_ra && !has_pico && !has_sa) {
     add_setting_entry(ui, "system_factory_reset_none", "No Defaults Installed",
@@ -6409,14 +6460,21 @@ static void add_network_service_entries(struct ui_state *ui) {
 
   add_bool_setting_entry(ui, "network_ssh_enabled", "SSH",
                          device->ssh_service_running);
-  add_bool_setting_entry(ui, "network_ftp_enabled", "FTP",
-                         device->ftp_service_running);
-  add_bool_setting_entry(ui, "network_sftp_enabled", "SFTP",
-                         device->sftp_service_running);
-  add_bool_setting_entry(ui, "network_samba_enabled", "Samba",
-                         device->samba_service_running);
-  add_bool_setting_entry(ui, "network_adb_enabled", "ADB",
-                         device->adb_service_running);
+  if (runtime_device_is_bubble()) {
+    add_unavailable_setting_entry(ui, "network_ftp_enabled", "FTP");
+    add_unavailable_setting_entry(ui, "network_sftp_enabled", "SFTP");
+    add_unavailable_setting_entry(ui, "network_samba_enabled", "Samba");
+    add_unavailable_setting_entry(ui, "network_adb_enabled", "ADB");
+  } else {
+    add_bool_setting_entry(ui, "network_ftp_enabled", "FTP",
+                           device->ftp_service_running);
+    add_bool_setting_entry(ui, "network_sftp_enabled", "SFTP",
+                           device->sftp_service_running);
+    add_bool_setting_entry(ui, "network_samba_enabled", "Samba",
+                           device->samba_service_running);
+    add_bool_setting_entry(ui, "network_adb_enabled", "ADB",
+                           device->adb_service_running);
+  }
 }
 
 static void add_network_information_entries(struct ui_state *ui) {
@@ -6984,12 +7042,14 @@ static int load_start_menu_entries(struct ui_state *ui) {
         break;
       }
       memset(&entry, 0, sizeof(entry));
+      entry.available = 1;
       json_get_string(obj_start, obj_end, "id", entry.id, sizeof(entry.id));
       json_get_string(obj_start, obj_end, "display_name", entry.display_name,
                       sizeof(entry.display_name));
       json_get_string(obj_start, obj_end, "kind", entry.kind, sizeof(entry.kind));
       json_get_string(obj_start, obj_end, "action", entry.action, sizeof(entry.action));
       entry.confirm = json_get_bool(obj_start, obj_end, "confirm", 0);
+      entry.available = json_get_bool(obj_start, obj_end, "available", 1);
       if (!entry.display_name[0]) {
         copy_string(entry.display_name, sizeof(entry.display_name), entry.id);
       }
@@ -7039,6 +7099,7 @@ static int load_apps_menu_entries(struct ui_state *ui) {
       break;
     }
     memset(&entry, 0, sizeof(entry));
+    entry.available = 1;
     visible = json_get_bool(obj_start, obj_end, "visible", 1);
     json_get_string(obj_start, obj_end, "id", entry.id, sizeof(entry.id));
     json_get_string(obj_start, obj_end, "display_name", entry.display_name,
@@ -7050,6 +7111,7 @@ static int load_apps_menu_entries(struct ui_state *ui) {
     entry.confirm = json_get_bool(obj_start, obj_end, "confirm", 0);
     entry.background = json_get_bool(obj_start, obj_end, "background", 0);
     entry.show_results = json_get_bool(obj_start, obj_end, "show_results", 0);
+    entry.available = json_get_bool(obj_start, obj_end, "available", 1);
     if (!visible || !entry.id[0] || strcmp(menu_id, "apps") != 0) {
       continue;
     }
@@ -9409,12 +9471,20 @@ static void render_start_menu(struct ui_state *ui) {
   ui_printf(ui, "\n");
   for (i = start; i < end; i++) {
     const struct menu_entry *entry = &ui->menu_entries[i];
+    char label[256];
+
+    if (entry->available) {
+      copy_string(label, sizeof(label), entry->display_name);
+    } else {
+      snprintf(label, sizeof(label), "%s [%s]", entry->display_name,
+               tr(ui, "common.not_supported", "Not Supported"));
+    }
     if (ui_renderer_a30_tty_capable(ui)) {
       ui_printf(ui, "%c %2zu  %s\n",
-                i == ui->menu_cursor ? '>' : ' ', i + 1, entry->display_name);
+                i == ui->menu_cursor ? '>' : ' ', i + 1, label);
     } else {
       ui_printf(ui, "%c %3zu  %-24s %-10s %-24s\n",
-                i == ui->menu_cursor ? '>' : ' ', i + 1, entry->display_name,
+                i == ui->menu_cursor ? '>' : ' ', i + 1, label,
                 entry->kind[0] ? entry->kind : "-", entry->action);
     }
   }
@@ -9558,6 +9628,10 @@ static void format_setting_row_mali(const struct ui_state *ui, const struct sett
   if (!entry) {
     return;
   }
+  if (!entry->available) {
+    snprintf(out, out_size, "%s [%s]", entry->display_name, entry->value);
+    return;
+  }
   if (control == SETTING_CONTROL_CHECKBOX) {
     snprintf(out, out_size, "[%c] %s",
              setting_value_is_true(entry->value) ? 'x' : ' ', entry->display_name);
@@ -9605,6 +9679,14 @@ static void setting_help_lines(const struct ui_state *ui,
     line2[0] = '\0';
   }
   if (!entry) {
+    return;
+  }
+  if (!entry->available) {
+    copy_string(line1, line1_size,
+                tr(ui, "common.not_supported", "Not Supported"));
+    copy_string(line2, line2_size,
+                tr(ui, "common.not_supported_on_device",
+                   "This item remains visible for plumOS compatibility."));
     return;
   }
 
@@ -9980,7 +10062,11 @@ static void render_settings(struct ui_state *ui) {
                 i == ui->settings_cursor ? '>' : ' ', i + 1, row);
     } else {
       enum setting_control_type control = setting_control_type_for_id(entry->id);
-      if (control == SETTING_CONTROL_ACTION) {
+      if (!entry->available) {
+        ui_printf(ui, "%c %3zu  %-24s [%s]\n",
+                  i == ui->settings_cursor ? '>' : ' ', i + 1,
+                  entry->display_name, entry->value);
+      } else if (control == SETTING_CONTROL_ACTION) {
         ui_printf(ui, "%c %3zu  %s\n",
                   i == ui->settings_cursor ? '>' : ' ', i + 1,
                   entry->display_name);
@@ -13538,6 +13624,11 @@ static int handle_setting_control(struct ui_state *ui, enum ui_action action) {
     return 0;
   }
   entry = &ui->setting_entries[ui->settings_cursor];
+  if (!entry->available) {
+    set_status(ui, tr(ui, "common.not_supported_on_device",
+                      "This item remains visible for plumOS compatibility."));
+    return 1;
+  }
   copy_string(id, sizeof(id), entry->id);
   copy_string(value, sizeof(value), entry->value);
   control = setting_control_type_for_id(id);
@@ -14479,6 +14570,11 @@ static void handle_action_impl(struct ui_state *ui, enum ui_action action) {
         return;
       }
       entry = &ui->menu_entries[ui->menu_cursor];
+      if (!entry->available) {
+        set_status(ui, tr(ui, "common.not_supported_on_device",
+                          "This item remains visible for plumOS compatibility."));
+        return;
+      }
       if (strcmp(entry->action, "internal:settings") == 0 ||
           strcmp(entry->action, "internal:ui-settings") == 0) {
         open_settings_screen(ui, SETTINGS_CATEGORY_UI);
@@ -15167,8 +15263,9 @@ static int settings_value_action_repeats(const struct ui_state *ui,
   if (control != SETTING_CONTROL_NUMBER && control != SETTING_CONTROL_CHOICE) {
     return 0;
   }
-  return setting_is_writable(entry->id) ||
-         strncmp(entry->id, "performance_", 12) == 0;
+  return entry->available &&
+         (setting_is_writable(entry->id) ||
+          strncmp(entry->id, "performance_", 12) == 0);
 }
 
 static int action_repeat_interval_ms(const struct ui_state *ui,

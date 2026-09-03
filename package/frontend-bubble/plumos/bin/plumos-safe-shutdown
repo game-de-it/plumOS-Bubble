@@ -1,22 +1,74 @@
 #!/bin/sh
-set -eu
+set -u
 
-action=shutdown
-dry_run=no
-for arg in "$@"; do
-    case "$arg" in
-        --reboot) action=reboot ;;
-        --shutdown|--poweroff) action=shutdown ;;
-        --dry-run) dry_run=yes ;;
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+LOG=${PLUMOS_POWER_ACTION_LOG:-$PLUMOS_ROOT/logs/power-action.log}
+SD2_MOUNT=${PLUMOS_SD2_MOUNT:-/run/media/sd2}
+ACTION=shutdown
+POWER_OFF=0
+DRY_RUN=0
+
+usage() {
+    printf '%s\n' \
+        'Usage: plumos-safe-shutdown [--shutdown|--reboot|--sleep]' \
+        '       [--poweroff|--no-poweroff] [--dry-run]'
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --shutdown) ACTION=shutdown ;;
+        --reboot) ACTION=reboot ;;
+        --sleep) ACTION=sleep ;;
+        --poweroff) POWER_OFF=1 ;;
+        --no-poweroff|--no-hold-resume|--hold-resume) : ;;
+        --power-backend|--sleep-backend|--wakeup-sec|--wait-sec)
+            shift
+            [ "$#" -gt 0 ] || { usage >&2; exit 2; }
+            ;;
+        --dry-run) DRY_RUN=1 ;;
+        -h|--help) usage; exit 0 ;;
+        *) printf 'error: unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
     esac
+    shift
 done
-printf 'safe_power=begin action=%s\n' "$action" >/dev/console 2>/dev/null || true
-/bin/busybox sync
-[ "$dry_run" = no ] || exit 0
-/bin/busybox mount -o remount,ro /storage 2>/dev/null || true
-/bin/busybox mount -o remount,ro /flash 2>/dev/null || true
-/bin/busybox sync
-if [ "$action" = reboot ]; then
-    exec /bin/busybox reboot -f
+
+mkdir -p "${LOG%/*}" "$RUNTIME_ROOT" 2>/dev/null || true
+log() {
+    message="$($BB date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown) $*"
+    printf '%s\n' "$message" >>"$LOG" 2>/dev/null || true
+    printf 'plumos-bubble-power=%s\n' "$*" >/dev/console 2>/dev/null || true
+}
+
+if [ "$ACTION" = sleep ]; then
+    log 'result=unsupported action=sleep reason=bubble-backend-not-validated'
+    printf 'result=unsupported action=sleep\n'
+    exit 78
 fi
-exec /bin/busybox poweroff -f
+
+if [ "$DRY_RUN" -eq 1 ]; then
+    printf 'result=dry-run action=%s poweroff=%s sd2=%s\n' "$ACTION" "$POWER_OFF" "$SD2_MOUNT"
+    exit 0
+fi
+
+log "stage=begin action=$ACTION poweroff=$POWER_OFF"
+"$BB" sync
+if "$BB" grep -qs " $SD2_MOUNT " /proc/mounts 2>/dev/null; then
+    "$BB" umount "$SD2_MOUNT" 2>/dev/null || log 'stage=sd2-unmount result=failed'
+fi
+"$BB" sync
+
+if [ "$ACTION" = shutdown ] && [ "$POWER_OFF" -eq 0 ]; then
+    log 'result=sync-only'
+    exit 0
+fi
+
+log "stage=terminal action=$ACTION"
+"$BB" mount -o remount,ro /storage 2>/dev/null || true
+"$BB" mount -o remount,ro /flash 2>/dev/null || true
+"$BB" sync
+if [ "$ACTION" = reboot ]; then
+    exec "$BB" reboot -f
+fi
+exec "$BB" poweroff -f

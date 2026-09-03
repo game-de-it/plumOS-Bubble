@@ -1,6 +1,9 @@
 # plumOS frontend language file
 # Format: key=value
 
+common.not_supported=Nicht unterstützt
+common.not_supported_on_device=Dieser Eintrag bleibt zur plumOS-Kompatibilität sichtbar.
+
 settings.category.ui=UI-Einstellungen
 settings.category.ui_theme=Theme-Einstellungen
 settings.category.system=Systemeinstellungen

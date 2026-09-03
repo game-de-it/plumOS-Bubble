@@ -187,12 +187,18 @@
     日本語glyphをbuild時に検査するよう修正。日本語ファイル名が`???`にならず表示されることを
     利用者が実機確認済み。P5-01全体はDRM/page-flip gateが残るためopenを維持する。
 - [ ] `BUB-P5-02` FEのinput、audio、brightness/volume、power menu ownershipをBubble helperへ接続する。
+  - 共通STARTをUI / System / Network / Performance / Apps / Help / Reboot /
+    Shutdownの8項目へ揃え、Bubbleで欠落していたPerformance導線を復元した。
+    brightness、Wi-Fi、SSH、time/RTC、factory reset、safe reboot/shutdown helperを実装し、
+    lid/color/luminationおよび未搭載network serviceは項目を保持して`未対応`表示にした。
+    System UpdateはMFと同じ手動SD更新導線を維持し、将来のA/B updaterとは分離した。
+    host contract/buildは合格。実LCDでの各画面、設定反映、reboot/shutdown後のclean mountを残す。
 - [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
   - RetroArch v1.22.2とQuickNES `058d665`をAArch64 containerからbuildし、
     software DRM/RGUI/ALSA/udev、GPU runtime非依存、component checksumをhost検証済み。
   - RGUIに加えてXMB/Ozoneをbuildし、pinned公式assetと日本語fontを同梱。既定RGUIは
     plain DRM、XMB/Ozone選択時はKMS/EGL/GLESを使用し、3 driverの実機初期化まで合格。
-    XMB/Ozoneの物理LCD表示と操作確認を残す。
+    利用者がCore Provided/整数scale、RGUI、XMB、Ozoneの物理LCD表示と操作を確認し合格。
 - [ ] `BUB-P5-04` 利用者提供の小さな既知正常NES content 1本だけをGit外からtest deploymentする。
 - [ ] `BUB-P5-05` FE -> QuickNES -> FE のdisplay/input/audio lifecycleを実機確認する。
   - RetroArchとPicoArchのQuickNESはcontent起動、ALSA pointer進行、停止後FE 1 process、
@@ -242,6 +248,10 @@
   - 98 system / 196 profile / RetroArch 116 id / PicoArch 20 id / standalone 5 idと
     visible app launcherをhostで双方向検証済み。app-layerは7 component必須、
     `all-114-source-records`以外を拒否し、`release_complete=false`/`publishable=false`を固定した。
+  - STARTおよびAppsをA30/MF/MMF/V90S/XU20と再監査。Bubble独自項目は双方0件、Apps 10項目は
+    MF/V90S v2と順序まで一致した。Scraping/thumbnail取得を共通実装へ置換し、File Managerと
+    Music PlayerをBubbleのDRM/input/audio/SD2契約でbuildして全Apps導線を実装した。
+    機械可読coverageとhost testは合格。各アプリの物理LCD/input/audio/終了復帰を残す。
 - [ ] `BUB-P6-05` BIOS requirement、content extension、renderer、loader/library、license、
   save/state pathをcoreごとのmachine-readable coverage manifestへ固定する。
 - [ ] `BUB-P6-06` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。

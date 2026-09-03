@@ -89,6 +89,7 @@ The original frontend PID 441 was stopped only with `SIGSTOP` during these
 bounded probes and resumed with `SIGCONT`; it remained the sole frontend
 process. CPU governors returned `ondemand` and persisted volume remained zero.
 
-Physical LCD acceptance is intentionally still open: repeat the reported game,
-toggle integer scale, open/close RGUI, then separately restart with XMB and
-Ozone and check visible geometry, text/icons, controls, audio and resume.
+The user completed physical LCD acceptance on 2026-09-03. Core Provided and
+integer scaling, RGUI geometry, and both XMB and Ozone were reported correct.
+This closes the physical menu/aspect check; per-emulator display classes remain
+tracked separately in the all-route matrix.

@@ -1,6 +1,9 @@
 # plumOS frontend language file
 # Format: key=value
 
+common.not_supported=不支持
+common.not_supported_on_device=为保持plumOS兼容性而保留此项目；Bubble不支持。
+
 settings.category.ui=UI 设置
 settings.category.ui_theme=主题设置
 settings.category.system=系统设置

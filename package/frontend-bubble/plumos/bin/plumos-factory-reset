@@ -1,0 +1,107 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+FACTORY_ROOT=${PLUMOS_FACTORY_DEFAULTS_ROOT:-$PLUMOS_ROOT/factory-defaults}
+BACKUP_ROOT=${PLUMOS_FACTORY_RESET_BACKUP_ROOT:-$PLUMOS_ROOT/backups/factory-reset}
+TARGET=${1:-}
+DRY_RUN=0
+[ "${2:-}" = --dry-run ] && DRY_RUN=1
+
+usage() { printf 'Usage: plumos-factory-reset ra|pico|sa|all [--dry-run]\n' >&2; }
+available() {
+    case $1 in
+        ra) [ -d "$FACTORY_ROOT/retroarch" ] ;;
+        pico) [ -d "$FACTORY_ROOT/picoarch" ] ;;
+        sa) [ -d "$FACTORY_ROOT/standalone" ] ;;
+        *) return 1 ;;
+    esac
+}
+
+case "$TARGET" in
+    ra|retroarch) targets=ra ;;
+    pico|picoarch) targets=pico ;;
+    sa|standalone) targets=sa ;;
+    all|emulators)
+        targets=
+        for candidate in ra pico sa; do
+            available "$candidate" && targets="${targets}${targets:+ }$candidate"
+        done
+        ;;
+    *) usage; exit 2 ;;
+esac
+
+[ -n "$targets" ] || { printf 'error: no installed factory defaults\n' >&2; exit 1; }
+for candidate in $targets; do
+    available "$candidate" || { printf 'error: %s factory defaults are not installed\n' "$candidate" >&2; exit 78; }
+done
+
+if [ "$DRY_RUN" -eq 1 ]; then
+    backup_base=$BACKUP_ROOT/dry-run
+else
+    stamp=$(date '+%Y%m%d-%H%M%S' 2>/dev/null || printf unknown)
+    backup_base=$BACKUP_ROOT/$stamp
+    mkdir -p "$backup_base" || exit 1
+fi
+
+restore_file() {
+    group=$1
+    source=$2
+    destination=$3
+    [ -f "$source" ] || return 1
+    relative=${destination#"$PLUMOS_ROOT"/}
+    if [ "$DRY_RUN" -eq 1 ]; then
+        printf 'would restore %s: %s\n' "$group" "$relative"
+        return 0
+    fi
+    if [ -f "$destination" ]; then
+        backup=$backup_base/$relative
+        mkdir -p "${backup%/*}" || return 1
+        cp -p "$destination" "$backup" || return 1
+    fi
+    mkdir -p "${destination%/*}" || return 1
+    next=$destination.factory-reset.$$
+    cp -p "$source" "$next" && mv -f "$next" "$destination" || return 1
+    printf 'restored %s: %s\n' "$group" "$relative"
+}
+
+restore_tree() {
+    group=$1
+    source_root=$2
+    destination_root=$3
+    status=0
+    find "$source_root" -type f | while IFS= read -r source; do
+        relative=${source#"$source_root"/}
+        restore_file "$group" "$source" "$destination_root/$relative" || status=1
+    done
+    return "$status"
+}
+
+restore_ra() {
+    restore_tree ra "$FACTORY_ROOT/retroarch" "$PLUMOS_ROOT/config/retroarch"
+}
+
+restore_pico() {
+    restore_tree pico "$FACTORY_ROOT/picoarch" "$PLUMOS_ROOT/config/picoarch"
+}
+
+restore_sa() {
+    status=0
+    restore_tree sa "$FACTORY_ROOT/standalone/ppsspp/PSP/SYSTEM" \
+        "$PLUMOS_ROOT/config/standalone/ppsspp/ppsspp/PSP/SYSTEM" || status=1
+    restore_file sa "$FACTORY_ROOT/standalone/yabasanshiro/keymapv2.json" \
+        "$PLUMOS_ROOT/config/standalone/yabasanshiro/home/.yabasanshiro/keymapv2.json" || status=1
+    restore_file sa "$FACTORY_ROOT/standalone/pcsx_rearmed/pcsx.cfg" \
+        "$PLUMOS_ROOT/config/standalone/pcsx_rearmed/home/.pcsx/pcsx.cfg" || status=1
+    return "$status"
+}
+
+status=0
+for candidate in $targets; do
+    "restore_$candidate" || status=1
+done
+if [ "$DRY_RUN" -eq 0 ]; then
+    sync 2>/dev/null || true
+    printf 'backup: %s\n' "$backup_base"
+fi
+exit "$status"

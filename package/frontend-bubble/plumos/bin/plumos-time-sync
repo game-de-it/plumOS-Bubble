@@ -1,0 +1,86 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+RUN_DIR=${PLUMOS_TIME_SYNC_RUN_DIR:-$RUNTIME_ROOT/time-sync}
+SETTINGS=${PLUMOS_SYSTEM_SETTINGS_JSON:-$PLUMOS_ROOT/config/system/settings.json}
+STATUS=${PLUMOS_TIME_SYNC_STATUS:-$RUN_DIR/status}
+LOG=${PLUMOS_TIME_SYNC_LOG:-$PLUMOS_ROOT/logs/time-sync.log}
+RTC=${PLUMOS_RTC_DEVICE:-/dev/rtc0}
+RTC_SYSFS=${PLUMOS_RTC_SYSFS:-/sys/class/rtc/rtc0}
+SERVER=${PLUMOS_TIME_SERVER:-time.nist.gov}
+TIMEOUT=${PLUMOS_TIME_SYNC_TIMEOUT:-8}
+
+usage() { printf 'Usage: plumos-time-sync sync|force-sync|store-rtc|status\n'; }
+mkdir -p "$RUN_DIR" "${LOG%/*}" 2>/dev/null || true
+
+automatic_enabled() {
+    ! grep -Eq '"automatic_time"[[:space:]]*:[[:space:]]*(false|0)' "$SETTINGS" 2>/dev/null
+}
+
+automatic_value() { automatic_enabled && printf on || printf off; }
+
+write_status() {
+    state=$1
+    detail=$2
+    next=$STATUS.next.$$
+    {
+        printf 'state=%s\ndetail=%s\n' "$state" "$detail"
+        printf 'epoch=%s\n' "$($BB date +%s 2>/dev/null || printf unknown)"
+        printf 'utc=%s\n' "$($BB date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown)"
+        printf 'automatic_time=%s\n' "$(automatic_value)"
+    } >"$next" && mv -f "$next" "$STATUS"
+}
+
+store_rtc() {
+    [ -e "$RTC" ] && "$BB" hwclock -u -f "$RTC" -w >/dev/null 2>&1
+}
+
+sync_clock() {
+    force=$1
+    if [ "$force" -ne 1 ] && ! automatic_enabled; then
+        write_status disabled automatic-time-off
+        printf 'result=disabled\n'
+        return 0
+    fi
+    if "$BB" timeout "$TIMEOUT" "$BB" rdate -s "$SERVER" >/dev/null 2>&1; then
+        if store_rtc; then
+            write_status synced "$SERVER"
+            printf 'result=synced\n'
+            return 0
+        fi
+        write_status synced-rtc-failed "$SERVER"
+        printf 'result=failed\nstage=rtc-store\n'
+        return 1
+    fi
+    write_status failed "server-$SERVER"
+    printf 'result=failed\nstage=network-time\n'
+    return 1
+}
+
+case ${1:-sync} in
+    sync) sync_clock 0 ;;
+    force-sync) sync_clock 1 ;;
+    store-rtc)
+        if store_rtc; then write_status rtc-stored manual-time; printf 'result=rtc-stored\n';
+        else write_status rtc-store-failed manual-time; printf 'result=failed\nstage=rtc-store\n'; exit 1; fi
+        ;;
+    status)
+        printf 'automatic_time=%s\n' "$(automatic_value)"
+        [ ! -r "$STATUS" ] || sed '/^automatic_time=/d' "$STATUS"
+        [ -r "$STATUS" ] || printf 'state=never\n'
+        system_epoch=$($BB date +%s 2>/dev/null || true)
+        printf 'system_epoch=%s\n' "${system_epoch:-unknown}"
+        printf 'system_utc=%s\n' "$($BB date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown)"
+        if [ -r "$RTC_SYSFS/since_epoch" ]; then
+            rtc_epoch=$($BB cat "$RTC_SYSFS/since_epoch" 2>/dev/null || true)
+            printf 'rtc_epoch=%s\n' "${rtc_epoch:-unknown}"
+        else
+            printf 'rtc_epoch=unavailable\n'
+        fi
+        ;;
+    -h|--help|help) usage ;;
+    *) usage >&2; exit 2 ;;
+esac

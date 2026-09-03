@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "device": "bubble",
+  "reference_ports": [
+    "plumOS-MF",
+    "plumOS-V90S_v2-public",
+    "plumOS-A30",
+    "plumOS-MMF",
+    "plumOS-XU20V32"
+  ],
+  "start_order": [
+    "ui-settings",
+    "system-settings",
+    "network-settings",
+    "performance-settings",
+    "apps",
+    "help",
+    "reboot",
+    "shutdown"
+  ],
+  "start_entries": [
+    {"id": "ui-settings", "status": "implemented", "backend": "frontend"},
+    {"id": "system-settings", "status": "implemented", "backend": "frontend-and-device-helpers"},
+    {"id": "network-settings", "status": "implemented", "backend": "plumos-network-control"},
+    {"id": "performance-settings", "status": "implemented", "backend": "plumos-cpu-control"},
+    {"id": "apps", "status": "implemented", "backend": "apps-catalog"},
+    {"id": "help", "status": "implemented", "backend": "frontend"},
+    {"id": "reboot", "status": "implemented", "backend": "plumos-safe-shutdown"},
+    {"id": "shutdown", "status": "implemented", "backend": "plumos-safe-shutdown"}
+  ],
+  "apps_order": [
+    "scraping",
+    "file_manager",
+    "music_player",
+    "retroarch",
+    "pyxel_setup",
+    "portmaster",
+    "portmaster_update",
+    "thumbnail-plan",
+    "thumbnail-fetch",
+    "thumbnail-results"
+  ],
+  "apps_reference_match": ["plumOS-MF", "plumOS-V90S_v2-public"],
+  "apps_entries": [
+    {"id": "scraping", "status": "implemented"},
+    {"id": "file_manager", "status": "implemented"},
+    {"id": "music_player", "status": "implemented"},
+    {"id": "retroarch", "status": "implemented"},
+    {"id": "pyxel_setup", "status": "implemented"},
+    {"id": "portmaster", "status": "implemented"},
+    {"id": "portmaster_update", "status": "implemented"},
+    {"id": "thumbnail-plan", "status": "implemented"},
+    {"id": "thumbnail-fetch", "status": "implemented"},
+    {"id": "thumbnail-results", "status": "implemented"}
+  ],
+  "bubble_only_start_entries": [],
+  "bubble_only_apps_entries": [],
+  "unsupported_visible": [
+    {"path": "system/lid-suspend", "reason": "no-lid-device", "todo": "BUB-P5-02"},
+    {"path": "system/lumination", "reason": "no-runtime-backend", "todo": "BUB-P5-02"},
+    {"path": "system/display-color", "reason": "no-runtime-backend", "todo": "BUB-P5-02"},
+    {"path": "system/factory-reset/picoarch", "reason": "no-packaged-factory-defaults", "todo": "BUB-P5-02"},
+    {"path": "network/services/ftp", "reason": "runtime-not-packaged", "todo": "BUB-P5-02"},
+    {"path": "network/services/sftp", "reason": "runtime-not-packaged", "todo": "BUB-P5-02"},
+    {"path": "network/services/samba", "reason": "runtime-not-packaged", "todo": "BUB-P5-02"},
+    {"path": "network/services/adb", "reason": "device-node-and-runtime-absent", "todo": "BUB-P5-02"}
+  ]
+}

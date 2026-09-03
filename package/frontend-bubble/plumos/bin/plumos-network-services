@@ -1,0 +1,108 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+CONFIG=${PLUMOS_NETWORK_SERVICES_CONFIG:-$PLUMOS_ROOT/config/network/services.conf}
+LOG=${PLUMOS_NETWORK_SERVICES_LOG:-$PLUMOS_ROOT/logs/network-services.log}
+DROPBEAR=${PLUMOS_DROPBEAR:-/usr/sbin/dropbear}
+DROPBEARKEY=${PLUMOS_DROPBEARKEY:-/usr/bin/dropbearkey}
+HOST_KEY=${PLUMOS_DROPBEAR_HOST_KEY:-$PLUMOS_ROOT/ssh/dropbear_ed25519_host_key}
+PID_FILE=${PLUMOS_SSH_PID_FILE:-/run/dropbear/dropbear.pid}
+PORT=${PLUMOS_SSH_PORT:-22}
+
+usage() { printf 'Usage: plumos-network-services status|start|stop ssh|ftp|sftp|samba|adb\n'; }
+mkdir -p "${CONFIG%/*}" "${LOG%/*}" "${PID_FILE%/*}" "${HOST_KEY%/*}" 2>/dev/null || true
+
+key_for() {
+    case $1 in ssh|ftp|sftp|samba|adb) printf '%s_enabled\n' "$1" ;; *) return 1 ;; esac
+}
+
+enabled() {
+    key=$(key_for "$1") || return 1
+    value=$(sed -n "s/^${key}=//p" "$CONFIG" 2>/dev/null | tail -n 1)
+    [ -n "$value" ] || { [ "$1" = ssh ]; return; }
+    case "$value" in 1|true|on) return 0 ;; *) return 1 ;; esac
+}
+
+set_enabled() {
+    service=$1
+    value=$2
+    key=$(key_for "$service") || return 1
+    next=$CONFIG.next.$$
+    if [ -r "$CONFIG" ]; then grep -v "^${key}=" "$CONFIG" >"$next" || true; else : >"$next"; fi
+    printf '%s=%s\n' "$key" "$value" >>"$next"
+    mv -f "$next" "$CONFIG" && "$BB" sync
+}
+
+dropbear_running() {
+    for path in /proc/[0-9]*/cmdline; do
+        [ -r "$path" ] || continue
+        cmd=$(tr '\000' ' ' <"$path" 2>/dev/null || true)
+        case "$cmd" in *dropbear*) return 0 ;; esac
+    done
+    return 1
+}
+
+print_status() {
+    service=$1
+    state=$2
+    summary=$3
+    printf 'service=%s\nstate=%s\nsummary=%s\n' "$service" "$state" "$summary"
+    if enabled "$service"; then printf 'enabled=1\n'; else printf 'enabled=0\n'; fi
+}
+
+status() {
+    service=$1
+    if [ "$service" != ssh ]; then
+        print_status "$service" not_installed "Not supported on GKD Bubble"
+        return 1
+    fi
+    if dropbear_running; then
+        print_status ssh running "SSH service controlled by plumOS"
+        return 0
+    fi
+    [ -x "$DROPBEAR" ] || { print_status ssh not_installed "Dropbear is not installed"; return 1; }
+    print_status ssh stopped "SSH stopped"
+    return 2
+}
+
+start_ssh() {
+    if dropbear_running; then set_enabled ssh 1; return 0; fi
+    [ -x "$DROPBEAR" ] && [ -x "$DROPBEARKEY" ] || return 1
+    if [ ! -s "$HOST_KEY" ]; then
+        "$DROPBEARKEY" -t ed25519 -f "$HOST_KEY" >>"$LOG" 2>&1 || return 1
+        chmod 0600 "$HOST_KEY" || return 1
+    fi
+    "$DROPBEAR" -E -P "$PID_FILE" -r "$HOST_KEY" -p "$PORT" -K 30 -I 300 >>"$LOG" 2>&1 || return 1
+    set_enabled ssh 1
+}
+
+stop_ssh() {
+    if [ -r "$PID_FILE" ]; then
+        pid=$(sed -n '1p' "$PID_FILE" 2>/dev/null || true)
+        case "$pid" in ''|*[!0-9]*) ;; *) kill "$pid" 2>/dev/null || true ;; esac
+    else
+        return 1
+    fi
+    rm -f "$PID_FILE"
+    set_enabled ssh 0
+}
+
+action=${1:-}
+service=${2:-}
+case "$service" in ssh|ftp|sftp|samba|adb) ;; *) usage >&2; exit 2 ;; esac
+case "$action" in
+    status) status "$service" ;;
+    start)
+        [ "$service" = ssh ] || { print_status "$service" not_installed "Not supported on GKD Bubble"; exit 78; }
+        start_ssh
+        ;;
+    stop)
+        [ "$service" = ssh ] || { print_status "$service" not_installed "Not supported on GKD Bubble"; exit 78; }
+        stop_ssh
+        ;;
+    -h|--help|help) usage ;;
+    *) usage >&2; exit 2 ;;
+esac

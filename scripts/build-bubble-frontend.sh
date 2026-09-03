@@ -82,6 +82,11 @@ cat >"$component/manifest.json" <<EOF
   "input_mapping": "bubble-physical-labels",
   "library_scope": "frontend/lib",
   "cpu_backend": "bin/plumos-cpu-control",
+  "start_menu_contract": "config/frontend/start-menu-coverage.json",
+  "start_menu_entries": 8,
+  "apps_menu_entries": 10,
+  "bubble_only_menu_entries": [],
+  "settings_backends": ["display", "volume", "network", "network-services", "time-sync", "factory-reset", "storage-health", "cpu", "safe-power"],
   "cpu_policies": ["interactive", "performance", "ondemand", "schedutil", "conservative"],
   "reference_port": "plumOS-MF@0095017c39226ad1c22bf8df852202673075936d"
 }

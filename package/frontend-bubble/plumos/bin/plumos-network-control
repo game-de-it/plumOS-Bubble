@@ -1,0 +1,244 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+WIFI_IFACE=${PLUMOS_WIFI_INTERFACE:-wlan0}
+RUN_DIR=${PLUMOS_NETWORK_RUN_DIR:-$RUNTIME_ROOT/network-control}
+STATUS_FILE=${PLUMOS_WPA_STATUS:-$RUN_DIR/wpa_status.txt}
+WPA_CONFIG=${PLUMOS_WPA_CONFIG:-$PLUMOS_ROOT/config/wpa_supplicant.conf}
+WPA_CTRL=${PLUMOS_WPA_CTRL_DIR:-/run/wpa_supplicant}
+WPA_PID=${PLUMOS_WPA_PID_FILE:-/run/wpa_supplicant.pid}
+DHCP_PID=${PLUMOS_DHCP_PID_FILE:-/run/udhcpc-wlan0.pid}
+DHCP_SCRIPT=${PLUMOS_DHCP_SCRIPT:-/usr/share/udhcpc/default.script}
+WPA_SUPPLICANT=${PLUMOS_WPA_SUPPLICANT:-/usr/sbin/wpa_supplicant}
+WPA_CLI=${PLUMOS_WPA_CLI:-/usr/sbin/wpa_cli}
+LOG=${PLUMOS_NETWORK_LOG:-$PLUMOS_ROOT/logs/network-control.log}
+WAIT=${PLUMOS_WPA_WAIT_SECONDS:-20}
+
+usage() {
+    printf '%s\n' \
+        'Usage: plumos-network-control --wifi on|off|status' \
+        '       plumos-network-control --scan' \
+        '       plumos-network-control --connect-file FILE'
+}
+
+mkdir -p "$RUN_DIR" "${LOG%/*}" "$WPA_CTRL" "${WPA_CONFIG%/*}" 2>/dev/null || true
+
+log() {
+    printf '%s %s\n' "$($BB date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown)" "$*" \
+        >>"$LOG" 2>/dev/null || true
+}
+
+iface_exists() { [ -d "/sys/class/net/$WIFI_IFACE" ]; }
+
+iface_ip() {
+    "$BB" ip -4 addr show dev "$WIFI_IFACE" 2>/dev/null |
+        "$BB" sed -n 's/^[[:space:]]*inet \([0-9.]*\)\/.*/\1/p' |
+        "$BB" sed -n '1p'
+}
+
+wpa() { "$WPA_CLI" -p "$WPA_CTRL" -i "$WIFI_IFACE" "$@"; }
+wpa_ready() { [ -x "$WPA_CLI" ] && wpa ping 2>/dev/null | "$BB" grep -q '^PONG$'; }
+
+field() {
+    key=$1
+    "$BB" sed -n "s/^${key}=//p" "$2" 2>/dev/null | "$BB" sed -n '1p'
+}
+
+write_status() {
+    raw=$RUN_DIR/status.raw.$$
+    signal=$RUN_DIR/signal.raw.$$
+    next=$STATUS_FILE.next.$$
+    state=DISCONNECTED
+    ip=$(iface_ip || true)
+    rssi=
+    linkspeed=
+    frequency=
+    if ! iface_exists; then
+        state=NO_WIFI_INTERFACE
+    elif wpa_ready; then
+        wpa status >"$raw" 2>/dev/null || true
+        wpa signal_poll >"$signal" 2>/dev/null || true
+        state=$(field wpa_state "$raw")
+        rssi=$(field RSSI "$signal")
+        linkspeed=$(field LINKSPEED "$signal")
+        frequency=$(field FREQUENCY "$signal")
+        [ -n "$state" ] || state=DISCONNECTED
+    fi
+    {
+        printf 'wpa_state=%s\n' "$state"
+        printf 'ip_address=%s\n' "$ip"
+        printf 'RSSI=%s\n' "$rssi"
+        printf 'LINKSPEED=%s\n' "$linkspeed"
+        printf 'FREQUENCY=%s\n' "$frequency"
+    } >"$next" && "$BB" mv -f "$next" "$STATUS_FILE"
+    "$BB" rm -f "$raw" "$signal" 2>/dev/null || true
+}
+
+print_status() {
+    write_status
+    "$BB" cat "$STATUS_FILE"
+    state=$(field wpa_state "$STATUS_FILE")
+    ip=$(field ip_address "$STATUS_FILE")
+    if [ "$state" = COMPLETED ] && [ -n "$ip" ]; then
+        printf 'result=connected\nip=%s\n' "$ip"
+    elif iface_exists; then
+        printf 'result=ready\n'
+    else
+        printf 'result=failed\nstage=interface\n'
+    fi
+}
+
+wait_completed() {
+    count=0
+    while [ "$count" -lt "$WAIT" ]; do
+        state=$(wpa status 2>/dev/null | "$BB" sed -n 's/^wpa_state=//p' | "$BB" sed -n '1p')
+        [ "$state" = COMPLETED ] && return 0
+        "$BB" sleep 1
+        count=$((count + 1))
+    done
+    return 1
+}
+
+request_dhcp() {
+    [ -x "$DHCP_SCRIPT" ] || return 1
+    "$BB" udhcpc -q -n -t 5 -T 3 -i "$WIFI_IFACE" -p "$DHCP_PID" \
+        -s "$DHCP_SCRIPT" >>"$LOG" 2>&1
+}
+
+wifi_on() {
+    iface_exists || { printf 'result=failed\nstage=interface\n'; return 1; }
+    "$BB" ip link set "$WIFI_IFACE" up >/dev/null 2>&1 || {
+        printf 'result=failed\nstage=interface-up\n'; return 1;
+    }
+    if ! wpa_ready; then
+        [ -x "$WPA_SUPPLICANT" ] && [ -x "$WPA_CLI" ] && [ -s "$WPA_CONFIG" ] || {
+            printf 'result=failed\nstage=wpa-backend\n'; return 1;
+        }
+        "$WPA_SUPPLICANT" -B -P "$WPA_PID" -i "$WIFI_IFACE" -D nl80211,wext \
+            -c "$WPA_CONFIG" >>"$LOG" 2>&1 || {
+            printf 'result=failed\nstage=wpa-start\n'; return 1;
+        }
+    fi
+    if wait_completed; then
+        [ -n "$(iface_ip || true)" ] || request_dhcp || true
+    fi
+    print_status
+}
+
+wifi_off() {
+    wpa_ready && wpa terminate >/dev/null 2>&1 || true
+    if [ -r "$DHCP_PID" ]; then
+        pid=$(sed -n '1p' "$DHCP_PID" 2>/dev/null || true)
+        case "$pid" in ''|*[!0-9]*) ;; *) kill "$pid" 2>/dev/null || true ;; esac
+    fi
+    "$BB" ip address flush dev "$WIFI_IFACE" >/dev/null 2>&1 || true
+    "$BB" ip link set "$WIFI_IFACE" down >/dev/null 2>&1 || true
+    "$BB" rm -f "$WPA_PID" "$DHCP_PID" 2>/dev/null || true
+    write_status
+    printf 'result=off\n'
+}
+
+scan_networks() {
+    wifi_on >/dev/null || return 1
+    wpa scan >/dev/null 2>&1 || return 1
+    "$BB" sleep 2
+    wpa scan_results 2>/dev/null | "$BB" awk -F '\t' '
+        NR > 1 && NF >= 5 && $5 != "" {
+            security = ($4 ~ /WPA|WEP/) ? "secured" : "open"
+            if (!seen[$5]++) print "network\t" security "\t" $3 "\t" $5
+        }
+    '
+}
+
+escape_wpa_string() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+gateway_ip() {
+    "$BB" ip route 2>/dev/null | "$BB" awk '$1 == "default" {print $3; exit}'
+}
+
+save_single_network() {
+    ssid=$1
+    password=$2
+    next=$WPA_CONFIG.next.$$
+    backup=$WPA_CONFIG.backup
+    escaped_ssid=$(escape_wpa_string "$ssid")
+    escaped_password=$(escape_wpa_string "$password")
+    country=$($BB sed -n 's/^country=//p' "$WPA_CONFIG" 2>/dev/null | $BB sed -n '1p')
+    [ -n "$country" ] || country=JP
+    {
+        printf 'ctrl_interface=%s\n' "$WPA_CTRL"
+        printf 'update_config=0\n'
+        printf 'country=%s\n' "$country"
+        printf 'network={\n'
+        printf '    ssid="%s"\n' "$escaped_ssid"
+        if [ -n "$password" ]; then
+            printf '    psk="%s"\n' "$escaped_password"
+        else
+            printf '    key_mgmt=NONE\n'
+        fi
+        printf '}\n'
+    } >"$next" || return 1
+    chmod 0600 "$next" || return 1
+    [ ! -f "$WPA_CONFIG" ] || cp -p "$WPA_CONFIG" "$backup" || return 1
+    mv -f "$next" "$WPA_CONFIG" && "$BB" sync
+}
+
+connect_file() {
+    input=$1
+    [ -r "$input" ] || { printf 'result=failed\nstage=input\n'; return 1; }
+    ssid=$(sed -n '1p' "$input")
+    password=$(sed -n '2p' "$input")
+    [ -n "$ssid" ] || { printf 'result=failed\nstage=ssid\n'; return 1; }
+    wifi_on >/dev/null || { printf 'result=failed\nstage=wpa-start\n'; return 1; }
+    id=$(wpa add_network 2>/dev/null | sed -n '1p')
+    case "$id" in ''|*[!0-9]*) printf 'result=failed\nstage=add-network\n'; return 1 ;; esac
+    escaped_ssid=$(escape_wpa_string "$ssid")
+    escaped_password=$(escape_wpa_string "$password")
+    wpa set_network "$id" ssid "\"$escaped_ssid\"" >/dev/null || return 1
+    if [ -n "$password" ]; then
+        wpa set_network "$id" psk "\"$escaped_password\"" >/dev/null || return 1
+    else
+        wpa set_network "$id" key_mgmt NONE >/dev/null || return 1
+    fi
+    wpa enable_network "$id" >/dev/null || return 1
+    wpa select_network "$id" >/dev/null || return 1
+    if ! wait_completed; then
+        write_status
+        printf 'result=failed\nstage=association\n'
+        return 1
+    fi
+    "$BB" ip address flush dev "$WIFI_IFACE" >/dev/null 2>&1 || true
+    request_dhcp || {
+        write_status
+        printf 'result=failed\nstage=dhcp\n'
+        return 1
+    }
+    ip=$(iface_ip || true)
+    [ -n "$ip" ] || { printf 'result=failed\nstage=address\n'; return 1; }
+    save_single_network "$ssid" "$password" || {
+        printf 'result=failed\nstage=save-config\n'; return 1;
+    }
+    gateway=$(gateway_ip || true)
+    gateway_ping=skipped
+    if [ -n "$gateway" ]; then
+        if "$BB" ping -c 1 -W 1 "$gateway" >/dev/null 2>&1; then gateway_ping=ok; else gateway_ping=failed; fi
+    fi
+    write_status
+    log "connect result=ok iface=$WIFI_IFACE ip=$ip credential=redacted"
+    printf 'result=connected\nip=%s\ngateway=%s\ngateway_ping=%s\n' "$ip" "$gateway" "$gateway_ping"
+}
+
+case ${1:-} in
+    --wifi)
+        case ${2:-} in on) wifi_on ;; off) wifi_off ;; status) print_status ;; *) usage >&2; exit 2 ;; esac
+        ;;
+    --scan) scan_networks ;;
+    --connect-file) [ -n "${2:-}" ] || { usage >&2; exit 2; }; connect_file "$2" ;;
+    -h|--help|help) usage ;;
+    *) usage >&2; exit 2 ;;
+esac
