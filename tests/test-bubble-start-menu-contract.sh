@@ -75,6 +75,17 @@ for helper in plumos-display-control plumos-network-control plumos-network-servi
     sh -n "$package/bin/$helper"
 done
 
+network_control="$package/bin/plumos-network-control"
+scan_body=$(sed -n '/^scan_networks()/,/^}/p' "$network_control")
+connect_body=$(sed -n '/^connect_file()/,/^}/p' "$network_control")
+wifi_on_body=$(sed -n '/^wifi_on()/,/^}/p' "$network_control")
+grep -q 'ensure_wpa_backend' <<<"$scan_body"
+grep -q 'ensure_wpa_backend' <<<"$connect_body"
+! grep -q 'wifi_on' <<<"$scan_body"
+! grep -q 'wifi_on' <<<"$connect_body"
+grep -q 'association=not-required' "$network_control"
+grep -q 'config_has_network' <<<"$wifi_on_body"
+
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/root/config/system" "$tmp/run" "$tmp/backlight"

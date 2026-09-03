@@ -16,6 +16,7 @@ WPA_SUPPLICANT=${PLUMOS_WPA_SUPPLICANT:-/usr/sbin/wpa_supplicant}
 WPA_CLI=${PLUMOS_WPA_CLI:-/usr/sbin/wpa_cli}
 LOG=${PLUMOS_NETWORK_LOG:-$PLUMOS_ROOT/logs/network-control.log}
 WAIT=${PLUMOS_WPA_WAIT_SECONDS:-20}
+CONTROL_WAIT=${PLUMOS_WPA_CONTROL_WAIT_SECONDS:-5}
 
 usage() {
     printf '%s\n' \
@@ -102,6 +103,42 @@ wait_completed() {
     return 1
 }
 
+config_has_network() {
+    "$BB" grep -Eq '^[[:space:]]*network[[:space:]]*=' "$WPA_CONFIG" 2>/dev/null
+}
+
+wait_wpa_control() {
+    count=0
+    while [ "$count" -lt "$CONTROL_WAIT" ]; do
+        wpa_ready && return 0
+        "$BB" sleep 1
+        count=$((count + 1))
+    done
+    return 1
+}
+
+# Bring up only the interface and wpa_supplicant control socket.  Scanning and
+# first-time connection must not wait for an association that cannot exist in
+# a credential-free image.  This mirrors the split used by the MF frontend.
+ensure_wpa_backend() {
+    iface_exists || { printf 'result=failed\nstage=interface\n'; return 1; }
+    "$BB" ip link set "$WIFI_IFACE" up >/dev/null 2>&1 || {
+        printf 'result=failed\nstage=interface-up\n'; return 1;
+    }
+    wpa_ready && return 0
+    [ -x "$WPA_SUPPLICANT" ] && [ -x "$WPA_CLI" ] && [ -s "$WPA_CONFIG" ] || {
+        printf 'result=failed\nstage=wpa-backend\n'; return 1;
+    }
+    "$WPA_SUPPLICANT" -B -P "$WPA_PID" -i "$WIFI_IFACE" -D nl80211,wext \
+        -c "$WPA_CONFIG" >>"$LOG" 2>&1 || {
+        printf 'result=failed\nstage=wpa-start\n'; return 1;
+    }
+    wait_wpa_control || {
+        printf 'result=failed\nstage=wpa-control\n'; return 1;
+    }
+    log "wifi backend=result-ready association=not-required"
+}
+
 request_dhcp() {
     [ -x "$DHCP_SCRIPT" ] || return 1
     "$BB" udhcpc -q -n -t 5 -T 3 -i "$WIFI_IFACE" -p "$DHCP_PID" \
@@ -109,20 +146,10 @@ request_dhcp() {
 }
 
 wifi_on() {
-    iface_exists || { printf 'result=failed\nstage=interface\n'; return 1; }
-    "$BB" ip link set "$WIFI_IFACE" up >/dev/null 2>&1 || {
-        printf 'result=failed\nstage=interface-up\n'; return 1;
-    }
-    if ! wpa_ready; then
-        [ -x "$WPA_SUPPLICANT" ] && [ -x "$WPA_CLI" ] && [ -s "$WPA_CONFIG" ] || {
-            printf 'result=failed\nstage=wpa-backend\n'; return 1;
-        }
-        "$WPA_SUPPLICANT" -B -P "$WPA_PID" -i "$WIFI_IFACE" -D nl80211,wext \
-            -c "$WPA_CONFIG" >>"$LOG" 2>&1 || {
-            printf 'result=failed\nstage=wpa-start\n'; return 1;
-        }
-    fi
-    if wait_completed; then
+    ensure_wpa_backend || return 1
+    if ! config_has_network; then
+        log "wifi on=result-ready credential=none"
+    elif wait_completed; then
         [ -n "$(iface_ip || true)" ] || request_dhcp || true
     fi
     print_status
@@ -142,15 +169,34 @@ wifi_off() {
 }
 
 scan_networks() {
-    wifi_on >/dev/null || return 1
-    wpa scan >/dev/null 2>&1 || return 1
-    "$BB" sleep 2
-    wpa scan_results 2>/dev/null | "$BB" awk -F '\t' '
-        NR > 1 && NF >= 5 && $5 != "" {
-            security = ($4 ~ /WPA|WEP/) ? "secured" : "open"
-            if (!seen[$5]++) print "network\t" security "\t" $3 "\t" $5
-        }
-    '
+    ensure_wpa_backend >/dev/null || {
+        printf 'result=failed\nstage=wpa-start\n'
+        return 1
+    }
+    wpa scan >/dev/null 2>&1 || {
+        printf 'result=failed\nstage=scan-request\n'
+        return 1
+    }
+    count=0
+    rows=$RUN_DIR/scan-rows.$$
+    while [ "$count" -lt 8 ]; do
+        "$BB" sleep 1
+        wpa scan_results 2>/dev/null | "$BB" awk -F '\t' '
+            NR > 1 && NF >= 5 && $5 != "" {
+                security = ($4 ~ /WPA|WEP/) ? "secured" : "open"
+                if (!seen[$5]++) print "network\t" security "\t" $3 "\t" $5
+            }
+        ' >"$rows"
+        if [ -s "$rows" ]; then
+            "$BB" cat "$rows"
+            "$BB" rm -f "$rows"
+            log "wifi scan=result-ok"
+            return 0
+        fi
+        count=$((count + 1))
+    done
+    "$BB" rm -f "$rows"
+    log "wifi scan=result-empty"
 }
 
 escape_wpa_string() {
@@ -194,7 +240,7 @@ connect_file() {
     ssid=$(sed -n '1p' "$input")
     password=$(sed -n '2p' "$input")
     [ -n "$ssid" ] || { printf 'result=failed\nstage=ssid\n'; return 1; }
-    wifi_on >/dev/null || { printf 'result=failed\nstage=wpa-start\n'; return 1; }
+    ensure_wpa_backend >/dev/null || { printf 'result=failed\nstage=wpa-start\n'; return 1; }
     id=$(wpa add_network 2>/dev/null | sed -n '1p')
     case "$id" in ''|*[!0-9]*) printf 'result=failed\nstage=add-network\n'; return 1 ;; esac
     escaped_ssid=$(escape_wpa_string "$ssid")
