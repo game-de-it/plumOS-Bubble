@@ -164,6 +164,8 @@ services_after=$(sha256sum "$tmp/network-root/config/network/services.conf" | aw
 
 network_package="$repo_root/package/network-services-bubble/plumos"
 sh -n "$network_package/bin/plumos-network-services"
+grep -q "name __pycache__ -empty -delete" \
+    "$repo_root/scripts/build-bubble-frontend.sh"
 grep -q "print_status sftp running 'SFTP port 22'" \
     "$network_package/bin/plumos-network-services"
 ! grep -q 'SFTP_PORT.*2222' "$network_package/bin/plumos-network-services"

@@ -27,6 +27,10 @@ export SOURCE_DATE_EPOCH=$epoch
 rm -rf "$out"
 mkdir -p "$out"
 cp -a "$repo_root/package/frontend-bubble/plumos/." "$root/"
+# Host-side Python validation may leave ignored bytecode beside the managed
+# update helper.  It is neither runtime input nor reproducible release data.
+find "$root" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+find "$root" -depth -type d -name __pycache__ -empty -delete
 mkdir -p "$bin" "$lib" "$component" "$root/state/frontend" \
     "$root/config/frontend" "$root/config/system" "$root/logs"
 
