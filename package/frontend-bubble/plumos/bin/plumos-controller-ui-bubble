@@ -11,23 +11,14 @@ power=${PLUMOS_POWER_INPUT_EVENT:-}
 
 export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" PLUMOS_BUSYBOX="$BB"
 if [ -x "$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2" ]; then
-    "$BB" sh "$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2" || true
+    "$BB" sh "$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2" start || true
 fi
-if $BB grep -qs ' /run/media/sd2 ' /proc/mounts &&
-    { [ -z "${PLUMOS_SDCARD_ROOT:-}" ] || [ "$PLUMOS_SDCARD_ROOT" = /storage ]; }; then
-    PLUMOS_SDCARD_ROOT=/run/media/sd2
-elif [ -z "${PLUMOS_SDCARD_ROOT:-}" ]; then
-    PLUMOS_SDCARD_ROOT=/storage
-fi
-if [ -z "${PLUMOS_ROM_ROOT:-}" ]; then
-    case "$PLUMOS_SDCARD_ROOT" in
-        /run/media/sd2) PLUMOS_ROM_ROOT=$PLUMOS_SDCARD_ROOT ;;
-        *) PLUMOS_ROM_ROOT=$PLUMOS_SDCARD_ROOT/Roms ;;
-    esac
-fi
+PLUMOS_SDCARD_ROOT=${PLUMOS_SDCARD_ROOT:-/storage}
+PLUMOS_ROM_ROOT=${PLUMOS_ROM_ROOT:-/storage/Roms}
+PLUMOS_BIOS_ROOT=${PLUMOS_BIOS_ROOT:-/storage/BIOS}
+PLUMOS_IMAGE_ROOT=${PLUMOS_IMAGE_ROOT:-/storage/Images}
 export PLUMOS_SDCARD_ROOT PLUMOS_ROM_ROOT
-export PLUMOS_BIOS_ROOT=${PLUMOS_BIOS_ROOT:-$PLUMOS_SDCARD_ROOT/BIOS}
-export PLUMOS_IMAGE_ROOT=${PLUMOS_IMAGE_ROOT:-$PLUMOS_SDCARD_ROOT/Images}
+export PLUMOS_BIOS_ROOT PLUMOS_IMAGE_ROOT
 export PLUMOS_DEVICE_ID=bubble PLUMOS_RENDERER=fbdev
 export PLUMOS_DEVICE_NAME='GKD Bubble'
 export PLUMOS_FB=${PLUMOS_FB:-/dev/fb0}

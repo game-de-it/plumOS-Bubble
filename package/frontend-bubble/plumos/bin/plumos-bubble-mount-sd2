@@ -1,40 +1,194 @@
 #!/bin/sh
-set -eu
+set -u
 
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 DEVICE=${PLUMOS_SD2_DEVICE:-/dev/mmcblk3p1}
-TARGET=${PLUMOS_SD2_MOUNTPOINT:-/run/media/sd2}
+SD2_MOUNT=${PLUMOS_SD2_MOUNTPOINT:-/run/media/sd2}
+USER_ROOT=${PLUMOS_USERDATA_ROOT:-/storage/user}
+ROM_TARGET=${PLUMOS_ROM_BIND_TARGET:-$USER_ROOT/Roms}
+BIOS_TARGET=${PLUMOS_BIOS_BIND_TARGET:-$USER_ROOT/BIOS}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+STATE_DIR=$RUNTIME_ROOT/sd2-content
 LOG=${PLUMOS_ROOT:-/storage/plumos}/logs/storage-health.log
+MOUNTS_FILE=${PLUMOS_MOUNTS_FILE:-/proc/mounts}
 
-mounted_source=$($BB awk -v path="$TARGET" '$2 == path { print $1; exit }' /proc/mounts)
-if [ -n "$mounted_source" ]; then
-    if [ "$mounted_source" = "$DEVICE" ]; then
-        printf 'sd2_mount=result-already-mounted device=%s target=%s\n' "$DEVICE" "$TARGET"
-        exit 0
-    fi
-    printf 'sd2_mount=result-refused reason=target-owned source=%s target=%s\n' \
-        "$mounted_source" "$TARGET" >&2
-    exit 1
-fi
-
-[ -b "$DEVICE" ] || {
-    printf 'sd2_mount=result-unavailable device=%s\n' "$DEVICE"
-    exit 0
+log() {
+    message=$1
+    $BB mkdir -p "${LOG%/*}" 2>/dev/null || true
+    printf '%s\n' "$message" | $BB tee -a "$LOG" >/dev/null 2>&1 || true
 }
-storage_source=$($BB awk '$2 == "/storage" { print $1; exit }' /proc/mounts)
-if [ -n "$storage_source" ] && [ "$storage_source" = "$DEVICE" ]; then
-    printf 'sd2_mount=result-refused reason=os-storage-device device=%s\n' "$DEVICE" >&2
-    exit 1
-fi
 
-$BB mkdir -p "$TARGET" "${LOG%/*}"
-if $BB mount -t vfat -o ro,utf8,shortname=mixed,errors=remount-ro \
-    "$DEVICE" "$TARGET"; then
-    printf 'sd2_mount=result-ok device=%s target=%s mode=read-only\n' \
-        "$DEVICE" "$TARGET" | $BB tee -a "$LOG"
-    exit 0
-fi
-printf 'sd2_mount=result-failed device=%s target=%s\n' "$DEVICE" "$TARGET" |
-    $BB tee -a "$LOG" >&2
-exit 1
+mount_source() {
+    $BB awk -v path="$1" '$2 == path { print $1; exit }' "$MOUNTS_FILE" 2>/dev/null
+}
 
+is_mounted() {
+    [ -n "$(mount_source "$1")" ]
+}
+
+find_content_dir() {
+    base=$1
+    shift
+    for name in "$@"; do
+        [ -d "$base/$name" ] || continue
+        printf '%s/%s\n' "$base" "$name"
+        return 0
+    done
+    return 1
+}
+
+bind_content_dir() {
+    source_dir=$1
+    target_dir=$2
+    label=$3
+    sd2_source=$(mount_source "$SD2_MOUNT")
+    current_source=$(mount_source "$target_dir")
+
+    [ -n "$sd2_source" ] || return 1
+    if [ -n "$current_source" ]; then
+        if [ "$current_source" = "$sd2_source" ]; then
+            printf 'sd2_bind=result-already-mounted content=%s source=%s target=%s\n' \
+                "$label" "$source_dir" "$target_dir"
+            return 0
+        fi
+        printf 'sd2_bind=result-refused reason=target-owned content=%s source=%s target=%s\n' \
+            "$label" "$current_source" "$target_dir" >&2
+        return 1
+    fi
+
+    $BB mkdir -p "$target_dir" "$STATE_DIR" || return 1
+    if $BB mount --bind "$source_dir" "$target_dir"; then
+        printf '%s\n' "$target_dir" >"$STATE_DIR/$label.target"
+        printf 'sd2_bind=result-ok content=%s source=%s target=%s mode=read-only\n' \
+            "$label" "$source_dir" "$target_dir" | $BB tee -a "$LOG"
+        return 0
+    fi
+    printf 'sd2_bind=result-failed content=%s source=%s target=%s\n' \
+        "$label" "$source_dir" "$target_dir" | $BB tee -a "$LOG" >&2
+    return 1
+}
+
+unbind_content_dir() {
+    target_dir=$1
+    label=$2
+    sd2_source=$(mount_source "$SD2_MOUNT")
+    current_source=$(mount_source "$target_dir")
+
+    if [ -z "$current_source" ]; then
+        $BB rm -f "$STATE_DIR/$label.target" 2>/dev/null || true
+        return 0
+    fi
+    if [ -z "$sd2_source" ] || [ "$current_source" != "$sd2_source" ]; then
+        printf 'sd2_unbind=result-refused reason=foreign-mount content=%s source=%s target=%s\n' \
+            "$label" "$current_source" "$target_dir" >&2
+        return 1
+    fi
+    if $BB umount "$target_dir"; then
+        $BB rm -f "$STATE_DIR/$label.target" 2>/dev/null || true
+        printf 'sd2_unbind=result-ok content=%s target=%s fallback=sd1\n' \
+            "$label" "$target_dir" | $BB tee -a "$LOG"
+        return 0
+    fi
+    printf 'sd2_unbind=result-failed content=%s target=%s\n' \
+        "$label" "$target_dir" | $BB tee -a "$LOG" >&2
+    return 1
+}
+
+mount_sd2() {
+    mounted_source=$(mount_source "$SD2_MOUNT")
+    if [ -n "$mounted_source" ]; then
+        if [ "$mounted_source" = "$DEVICE" ]; then
+            return 0
+        fi
+        printf 'sd2_mount=result-refused reason=target-owned source=%s target=%s\n' \
+            "$mounted_source" "$SD2_MOUNT" >&2
+        return 1
+    fi
+
+    [ -b "$DEVICE" ] || {
+        printf 'sd2_mount=result-unavailable device=%s fallback=sd1\n' "$DEVICE"
+        return 2
+    }
+    storage_source=$($BB awk '$2 == "/storage" { print $1; exit }' "$MOUNTS_FILE")
+    if [ -n "$storage_source" ] && [ "$storage_source" = "$DEVICE" ]; then
+        printf 'sd2_mount=result-refused reason=os-storage-device device=%s\n' \
+            "$DEVICE" >&2
+        return 1
+    fi
+
+    $BB mkdir -p "$SD2_MOUNT" "${LOG%/*}"
+    if $BB mount -t vfat -o ro,utf8,shortname=mixed,errors=remount-ro \
+        "$DEVICE" "$SD2_MOUNT"; then
+        printf 'sd2_mount=result-ok device=%s target=%s mode=read-only\n' \
+            "$DEVICE" "$SD2_MOUNT" | $BB tee -a "$LOG"
+        return 0
+    fi
+    printf 'sd2_mount=result-failed device=%s target=%s\n' "$DEVICE" "$SD2_MOUNT" |
+        $BB tee -a "$LOG" >&2
+    return 1
+}
+
+start_sd2() {
+    mount_rc=0
+    mount_sd2 || mount_rc=$?
+    [ "$mount_rc" -eq 0 ] || {
+        [ "$mount_rc" -eq 2 ] && return 0
+        return "$mount_rc"
+    }
+
+    rom_source=$(find_content_dir "$SD2_MOUNT" roms ROMS Roms) || rom_source=
+    bios_source=$(find_content_dir "$SD2_MOUNT" bios BIOS Bios) || bios_source=
+    result=0
+    if [ -n "$rom_source" ]; then
+        bind_content_dir "$rom_source" "$ROM_TARGET" roms || result=1
+    else
+        log 'sd2_bind=result-unavailable content=roms fallback=sd1'
+    fi
+    if [ -n "$bios_source" ]; then
+        bind_content_dir "$bios_source" "$BIOS_TARGET" bios || result=1
+    else
+        log 'sd2_bind=result-unavailable content=bios fallback=sd1'
+    fi
+    printf 'sd2_content=result-started mount=%s roms=%s bios=%s mode=read-only\n' \
+        "$SD2_MOUNT" "${rom_source:-sd1}" "${bios_source:-sd1}"
+    return "$result"
+}
+
+stop_sd2() {
+    result=0
+    unbind_content_dir "$BIOS_TARGET" bios || result=1
+    unbind_content_dir "$ROM_TARGET" roms || result=1
+    if [ "$result" -ne 0 ]; then
+        printf 'sd2_content=result-stop-refused reason=content-bind-active\n' >&2
+        return 1
+    fi
+    if is_mounted "$SD2_MOUNT"; then
+        $BB sync 2>/dev/null || true
+        if $BB umount "$SD2_MOUNT"; then
+            printf 'sd2_mount=result-unmounted target=%s fallback=sd1\n' "$SD2_MOUNT" |
+                $BB tee -a "$LOG"
+        else
+            printf 'sd2_mount=result-unmount-failed target=%s\n' "$SD2_MOUNT" |
+                $BB tee -a "$LOG" >&2
+            return 1
+        fi
+    fi
+    $BB rm -rf "$STATE_DIR" 2>/dev/null || true
+    printf 'sd2_content=result-stopped fallback=sd1\n'
+}
+
+status_sd2() {
+    sd2_source=$(mount_source "$SD2_MOUNT")
+    rom_source=$(mount_source "$ROM_TARGET")
+    bios_source=$(mount_source "$BIOS_TARGET")
+    printf 'sd2_mount=%s\nsd2_source=%s\nrom_target=%s\nrom_source=%s\nbios_target=%s\nbios_source=%s\n' \
+        "$SD2_MOUNT" "${sd2_source:-unmounted}" "$ROM_TARGET" \
+        "${rom_source:-sd1}" "$BIOS_TARGET" "${bios_source:-sd1}"
+}
+
+case ${1:-start} in
+    start) start_sd2 ;;
+    stop) stop_sd2 ;;
+    status) status_sd2 ;;
+    *) printf 'Usage: plumos-bubble-mount-sd2 start|stop|status\n' >&2; exit 2 ;;
+esac

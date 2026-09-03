@@ -6,6 +6,7 @@ RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 LOG=${PLUMOS_POWER_ACTION_LOG:-$PLUMOS_ROOT/logs/power-action.log}
 SD2_MOUNT=${PLUMOS_SD2_MOUNT:-/run/media/sd2}
+SD2_MANAGER=${PLUMOS_SD2_MANAGER:-$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2}
 USER_MOUNT=${PLUMOS_USER_MOUNT:-/storage/user}
 CLEAN_P3_MARKER=${PLUMOS_CLEAN_P3_MARKER:-$PLUMOS_ROOT/provision/clean-shutdown}
 CLEAN_P4_MARKER=${PLUMOS_CLEAN_P4_MARKER:-$USER_MOUNT/.plumos-clean-shutdown}
@@ -61,7 +62,16 @@ fi
 
 log "stage=begin action=$ACTION poweroff=$POWER_OFF"
 "$BB" sync
-if "$BB" grep -qs " $SD2_MOUNT " "$MOUNTS_FILE" 2>/dev/null; then
+if [ "$ACTION" != shutdown ] || [ "$POWER_OFF" -eq 1 ]; then
+    if [ -x "$NETWORK_SERVICES" ]; then
+        "$BB" sh "$NETWORK_SERVICES" quiesce >/dev/null 2>&1 ||
+            log 'stage=network-quiesce result=failed'
+    fi
+fi
+if [ -x "$SD2_MANAGER" ]; then
+    PLUMOS_MOUNTS_FILE="$MOUNTS_FILE" "$BB" sh "$SD2_MANAGER" stop \
+        >>"$LOG" 2>&1 || log 'stage=sd2-content-stop result=failed'
+elif "$BB" grep -qs " $SD2_MOUNT " "$MOUNTS_FILE" 2>/dev/null; then
     "$BB" umount "$SD2_MOUNT" 2>/dev/null || log 'stage=sd2-unmount result=failed'
 fi
 "$BB" sync
@@ -81,10 +91,6 @@ printf '%s\n' "$ACTION" >"$POWER_REQUEST.next.$$" || {
     log 'result=error stage=power-request-stage'
     exit 1
 }
-if [ -x "$NETWORK_SERVICES" ]; then
-    "$BB" sh "$NETWORK_SERVICES" quiesce >/dev/null 2>&1 ||
-        log 'stage=network-quiesce result=failed'
-fi
 if "$BB" grep -qs " $USER_MOUNT " "$MOUNTS_FILE" 2>/dev/null; then
     if "$BB" mkdir -p "${CLEAN_P3_MARKER%/*}" 2>/dev/null &&
         "$BB" touch "$CLEAN_P3_MARKER" "$CLEAN_P4_MARKER" 2>/dev/null; then

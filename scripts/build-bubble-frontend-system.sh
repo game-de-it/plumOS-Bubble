@@ -63,6 +63,7 @@ for binary in wpa_supplicant wpa_cli dropbear dropbearkey; do
 done
 chmod 0600 "$rootfs/etc/shadow"
 chmod 0755 "$rootfs/usr/share/udhcpc/default.script"
+chmod 0755 "$rootfs/usr/lib/sftp-server"
 
 runtime=$repo_root/artifacts/vendor/bubble-stock-source/runtime
 verify_runtime() {
@@ -177,6 +178,7 @@ listing=$out_dir/squashfs-list.txt
 unsquashfs -ll "$payload/SYSTEM" > "$listing"
 for required in sbin/init usr/lib/systemd/systemd bin/busybox \
     usr/sbin/wpa_supplicant usr/sbin/wpa_cli usr/sbin/dropbear usr/bin/dropbearkey \
+    usr/lib/sftp-server \
     etc/shadow etc/firmware/fw_bcmdhd.bin etc/firmware/fw_bcm43438a1.bin \
     etc/firmware/nvram.txt etc/firmware/nvram_ap6212a.txt \
     lib/modules/4.19.193-g5a07852a55cf-dirty/kernel/drivers/net/wireless/rockchip_wlan/rkwifi/bcmdhd/bcmdhd.ko \

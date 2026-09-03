@@ -164,6 +164,11 @@ services_after=$(sha256sum "$tmp/network-root/config/network/services.conf" | aw
 
 network_package="$repo_root/package/network-services-bubble/plumos"
 sh -n "$network_package/bin/plumos-network-services"
+grep -q "print_status sftp running 'SFTP port 22'" \
+    "$network_package/bin/plumos-network-services"
+! grep -q 'SFTP_PORT.*2222' "$network_package/bin/plumos-network-services"
+grep -q '"sftp": 22' "$repo_root/scripts/build-network-services-bubble.sh"
+grep -q 'usr/lib/sftp-server' "$repo_root/scripts/build-bubble-frontend-system.sh"
 PLUMOS_ROOT="$tmp/root" PLUMOS_RUNTIME_ROOT="$tmp/run" \
     sh "$network_package/bin/plumos-network-services" status adb >"$tmp/adb.log" 2>&1 || true
 grep -q '^state=hardware_unavailable$' "$tmp/adb.log"

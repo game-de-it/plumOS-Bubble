@@ -11,6 +11,7 @@ SERVICES_CONF=$CONFIG_DIR/services.conf
 LOG=$PLUMOS_ROOT/logs/network-services.log
 BUSYBOX=$PLUMOS_ROOT/network-services/bin/busybox
 SFTP_SERVER=$PLUMOS_ROOT/network-services/ssh/libexec/sftp-server
+SFTP_SYSTEM_BRIDGE=${PLUMOS_SFTP_SYSTEM_BRIDGE:-/usr/lib/sftp-server}
 SMBD=$PLUMOS_ROOT/network-services/samba/sbin/smbd
 HOST_KEY=$PLUMOS_ROOT/ssh/dropbear_ed25519_host_key
 SSH_PID=${PLUMOS_SSH_PID_FILE:-/run/dropbear/dropbear.pid}
@@ -18,7 +19,6 @@ SFTP_PID=$RUN_DIR/dropbear-sftp.pid
 FTP_PID=$RUN_DIR/ftp.pid
 SMBD_PID=$RUN_DIR/smbd.pid
 FTP_PORT=${PLUMOS_FTP_PORT:-21}
-SFTP_PORT=${PLUMOS_SFTP_PORT:-2222}
 
 mkdir -p "$RUN_DIR" "$CONFIG_DIR" "$PLUMOS_ROOT/logs" 2>/dev/null || true
 
@@ -110,8 +110,12 @@ status_service() {
             print_status ftp stopped 'FTP stopped'; return 2
             ;;
         sftp)
-            [ -x "$SFTP_SERVER" ] || { print_status sftp not_installed 'SFTP runtime missing'; return 1; }
-            if pid_matches "$SFTP_PID" dropbear; then print_status sftp running "SFTP port $SFTP_PORT"; return 0; fi
+            [ -x "$SFTP_SERVER" ] && [ -x "$SFTP_SYSTEM_BRIDGE" ] || {
+                print_status sftp not_installed 'SFTP runtime missing'; return 1;
+            }
+            if enabled sftp && dropbear_running; then
+                print_status sftp running 'SFTP port 22'; return 0
+            fi
             print_status sftp stopped 'SFTP stopped'; return 2
             ;;
         samba)
@@ -140,6 +144,8 @@ start_ssh() {
 
 stop_ssh() {
     set_enabled ssh 0
+    set_enabled sftp 0
+    stop_pid "$SFTP_PID" dropbear
     stop_pid "$SSH_PID" dropbear
     status_service ssh || true
 }
@@ -164,23 +170,16 @@ stop_ftp() {
 
 start_sftp() {
     set_enabled sftp 1
-    [ -x "$SFTP_SERVER" ] && [ -x /usr/sbin/dropbear ] || return 1
-    if ! pid_matches "$SFTP_PID" dropbear; then
-        mkdir -p "${HOST_KEY%/*}"
-        if [ ! -s "$HOST_KEY" ]; then
-            /usr/bin/dropbearkey -t ed25519 -f "$HOST_KEY" >>"$LOG" 2>&1 || return 1
-            chmod 0600 "$HOST_KEY"
-        fi
-        PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
-            /usr/sbin/dropbear -E -P "$SFTP_PID" -r "$HOST_KEY" \
-            -p "$SFTP_PORT" -K 30 -I 300 -c "$SFTP_SERVER" >>"$LOG" 2>&1 || return 1
-        sleep 1
-    fi
+    [ -x "$SFTP_SERVER" ] && [ -x "$SFTP_SYSTEM_BRIDGE" ] || return 1
+    # Remove the pre-V90S-compatibility listener if this is a live upgrade.
+    stop_pid "$SFTP_PID" dropbear
+    start_ssh >/dev/null || return 1
     status_service sftp
 }
 
 stop_sftp() {
     set_enabled sftp 0
+    # The port-22 SSH daemon is shared and remains available, matching V90S.
     stop_pid "$SFTP_PID" dropbear
     status_service sftp || true
 }

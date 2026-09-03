@@ -56,7 +56,7 @@ cat >"$root/components/network-services/manifest.json" <<EOF
   "busybox_source_archive_sha256": "b8cc24c9574d809e7279c3be349795c5d5ceb6fdf19ca709f80cde50e47de314",
   "services": ["ssh", "ftp", "sftp", "samba"],
   "hardware_unavailable": {"adb": "kernel exposes no USB device controller"},
-  "ports": {"ssh": 22, "ftp": 21, "sftp": 2222, "samba": 445},
+  "ports": {"ssh": 22, "ftp": 21, "sftp": 22, "samba": 445},
   "mutable_paths": ["config/network/services.conf", "config/network/smb.conf", "logs/network-services.log"]
 }
 EOF

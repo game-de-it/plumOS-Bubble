@@ -1,0 +1,6 @@
+#!/bin/sh
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+SFTP_SERVER=$PLUMOS_ROOT/network-services/ssh/libexec/sftp-server
+[ -x "$SFTP_SERVER" ] || exit 1
+exec "$SFTP_SERVER" "$@"
