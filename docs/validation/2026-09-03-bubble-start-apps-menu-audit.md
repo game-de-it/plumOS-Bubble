@@ -87,6 +87,20 @@ state, hardware-blocked reason/TODO, and empty Bubble-only arrays.
   the same file was read back with the macOS SFTP client, and the service stopped.
 - Samba device/client test: port 445 started, macOS mounted `SDCARD`, read back
   the isolated file with the same SHA-256, unmounted, and the service stopped.
+- The integrated Runtime was deployed as source `bdb7916`. All 12,373 managed
+  app-layer files passed device-side SHA-256 verification. Existing frontend
+  settings, system settings and the Dropbear host key retained their exact
+  pre-deployment hashes; a 35 MB rollback snapshot remains on-device.
+- The final, normal `/storage/plumos` service path was retested after deployment:
+  FTP, SFTP and Samba each returned the same probe bytes to the macOS client and
+  were then disabled. This also verifies the SFTP forced-command fallback after
+  Dropbear removes its inherited environment.
+- A signed 71-byte Runtime fixture was transferred to the normal p4 inbox and
+  passed `inspect` and `scan` using the bundled AArch64 Python and OpenSSL. It
+  was not requested or applied, and was removed after the check.
+- The frontend returned as exactly one process, wrote renderer-ready proof, and
+  held `/dev/dri/card0`, `event0`, and `event2`. The live DSI property readback
+  was brightness/contrast/hue/saturation = 50/50/50/50.
 - File Manager and Music Player remained alive with DRM/input ownership; Music
   Player also held the expected PCM fds. Both were terminated by the bounded
   validation harness rather than crashing.

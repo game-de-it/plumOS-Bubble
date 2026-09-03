@@ -199,6 +199,8 @@
     managed fileだけをjournal付きで適用する。DRM FE ready未確認の次bootでは全pathをrollbackし、
     active config/save/state/log/ROM/BIOS/credential/PortMaster installed stateを更新対象外にした。
     Ed25519署名、2回のapply/rollback、health確定、managed delete、設定保全をhost fixtureで確認。
+    source `bdb7916`を実機へ反映し、署名packageの実機inspect/scan、全12,373 managed file hash、
+    設定/SSH key不変、FE renderer-ready復帰を確認した。実packageのapply/rollbackはrelease候補で残す。
     boot/kernel/DTB/System matching-setは正式A/B slot完成までfull-image更新として分離する。
     host contract/buildは合格。実LCDでの各画面、設定反映、reboot/shutdown後のclean mountを残す。
 - [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
