@@ -5,9 +5,10 @@ repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 systems=${PLUMOS_BUBBLE_SYSTEMS_JSON:-$repo_root/package/frontend-bubble/plumos/config/frontend/systems.json}
 apps=${PLUMOS_BUBBLE_APPS_JSON:-$repo_root/package/frontend-bubble/plumos/config/frontend/apps.json}
 coverage=${PLUMOS_BUBBLE_RUNTIME_COVERAGE_JSON:-$repo_root/package/frontend-bubble/plumos/config/frontend/runtime-coverage.json}
+rocknix_policy=${PLUMOS_BUBBLE_ROCKNIX_EXTENSION_POLICY:-$repo_root/package/frontend-bubble/plumos/config/frontend/rocknix-extension-policy.json}
 app_root=${PLUMOS_BUBBLE_APP_ROOT:-}
 
-for json in "$systems" "$apps" "$coverage"; do
+for json in "$systems" "$apps" "$coverage" "$rocknix_policy"; do
     jq -e . "$json" >/dev/null
 done
 
@@ -30,6 +31,41 @@ jq -e '
     (.default_launch_profile as $default |
       ((.launch_profiles | length) == 0 or
        (.launch_profiles | index($default)) != null)))
+' "$systems" >/dev/null
+
+jq -e '
+  .version == 1 and
+  .reference.sha256 == "ce4246759b8dcf2a571a60c9ebab9c7849e0ef19b63adf1682747bbc74a5f332" and
+  .reference.system_count == 123 and
+  ([.systems[].system_id] | length) ==
+    ([.systems[].system_id] | unique | length) and
+  all(.systems[];
+    if .state == "mapped" then
+      (.rocknix_ids | length) > 0 and
+      (([.required_extensions[], .excluded_extensions[].extension] | unique | sort) ==
+       (.reference_extensions | unique | sort)) and
+      all(.excluded_extensions[]; (.reason | length) > 0)
+    elif .state == "not_in_reference" then
+      (.rocknix_ids | length) == 0 and
+      (.reference_extensions | length) == 0 and
+      (.required_extensions | length) == 0 and
+      (.excluded_extensions | length) == 0
+    else
+      false
+    end)
+' "$rocknix_policy" >/dev/null
+
+jq -e --slurpfile policy "$rocknix_policy" '
+  .systems as $catalog |
+  (($catalog | map(.id) | sort) ==
+   ($policy[0].systems | map(.system_id) | sort)) and
+  all($policy[0].systems[];
+    . as $rule |
+    ($catalog[] | select(.id == $rule.system_id) | .extensions) as $actual |
+    all($rule.required_extensions[];
+      . as $extension | ($actual | index($extension)) != null) and
+    all($rule.excluded_extensions[];
+      .extension as $extension | ($actual | index($extension)) == null))
 ' "$systems" >/dev/null
 
 for route in \

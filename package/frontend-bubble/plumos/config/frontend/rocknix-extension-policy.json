@@ -1,0 +1,2049 @@
+{
+  "version": 1,
+  "reference": {
+    "name": "ROCKNIX EmulationStation system catalog snapshot used by plumOS A30",
+    "source_path": "plumOS-A30/artifacts/reference/es_systems.cfg",
+    "sha256": "ce4246759b8dcf2a571a60c9ebab9c7849e0ef19b63adf1682747bbc74a5f332",
+    "system_count": 123,
+    "policy": "Every reference extension is required or has an explicit exclusion reason."
+  },
+  "systems": [
+    {
+      "system_id": "nes",
+      "state": "mapped",
+      "rocknix_ids": [
+        "nes",
+        "famicom"
+      ],
+      "reference_extensions": [
+        "nes",
+        "unif",
+        "unf",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "nes",
+        "unif",
+        "unf",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "fds",
+      "state": "mapped",
+      "rocknix_ids": [
+        "fds"
+      ],
+      "reference_extensions": [
+        "fds",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "fds",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "sfc",
+      "state": "mapped",
+      "rocknix_ids": [
+        "sfc",
+        "snes"
+      ],
+      "reference_extensions": [
+        "smc",
+        "fig",
+        "sfc",
+        "swc",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "smc",
+        "fig",
+        "sfc",
+        "swc",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "gb",
+      "state": "mapped",
+      "rocknix_ids": [
+        "gb"
+      ],
+      "reference_extensions": [
+        "gb",
+        "gbc",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "gb",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "gbc",
+          "reason": "shared_gb_directory_routes_by_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "gbc",
+      "state": "mapped",
+      "rocknix_ids": [
+        "gbc"
+      ],
+      "reference_extensions": [
+        "gb",
+        "gbc",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "gbc",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "gb",
+          "reason": "shared_gb_directory_routes_by_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "gba",
+      "state": "mapped",
+      "rocknix_ids": [
+        "gba"
+      ],
+      "reference_extensions": [
+        "gba",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "gba",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "megadrive",
+      "state": "mapped",
+      "rocknix_ids": [
+        "megadrive",
+        "genesis"
+      ],
+      "reference_extensions": [
+        "bin",
+        "gen",
+        "md",
+        "sg",
+        "smd",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "bin",
+        "gen",
+        "md",
+        "smd",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "sg",
+          "reason": "dedicated_sg1000_system_avoids_console_misclassification"
+        }
+      ]
+    },
+    {
+      "system_id": "mastersystem",
+      "state": "mapped",
+      "rocknix_ids": [
+        "mastersystem"
+      ],
+      "reference_extensions": [
+        "bin",
+        "sms",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "bin",
+        "sms",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "gamegear",
+      "state": "mapped",
+      "rocknix_ids": [
+        "gamegear"
+      ],
+      "reference_extensions": [
+        "bin",
+        "gg",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "gg",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "bin",
+          "reason": "shared_md_directory_extension_is_ambiguous"
+        }
+      ]
+    },
+    {
+      "system_id": "sega32x",
+      "state": "mapped",
+      "rocknix_ids": [
+        "sega32x"
+      ],
+      "reference_extensions": [
+        "32x",
+        "smd",
+        "bin",
+        "md",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "32x",
+        "bin",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "smd",
+          "reason": "shared_md_directory_routes_by_extension"
+        },
+        {
+          "extension": "md",
+          "reason": "shared_md_directory_routes_by_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "segacd",
+      "state": "mapped",
+      "rocknix_ids": [
+        "segacd",
+        "megacd"
+      ],
+      "reference_extensions": [
+        "chd",
+        "cue",
+        "iso",
+        "m3u"
+      ],
+      "required_extensions": [
+        "chd",
+        "cue",
+        "iso",
+        "m3u"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "pcengine",
+      "state": "mapped",
+      "rocknix_ids": [
+        "pcengine",
+        "tg16"
+      ],
+      "reference_extensions": [
+        "pce",
+        "bin",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "pce",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "bin",
+          "reason": "default_core_does_not_advertise_this_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "supergrafx",
+      "state": "mapped",
+      "rocknix_ids": [
+        "supergrafx"
+      ],
+      "reference_extensions": [
+        "pce",
+        "sgx",
+        "cue",
+        "ccd",
+        "chd",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "pce",
+        "sgx",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "cue",
+          "reason": "dedicated_pcenginecd_system_avoids_cd_misclassification"
+        },
+        {
+          "extension": "ccd",
+          "reason": "dedicated_pcenginecd_system_avoids_cd_misclassification"
+        },
+        {
+          "extension": "chd",
+          "reason": "dedicated_pcenginecd_system_avoids_cd_misclassification"
+        }
+      ]
+    },
+    {
+      "system_id": "pcenginecd",
+      "state": "mapped",
+      "rocknix_ids": [
+        "pcenginecd",
+        "tg16cd"
+      ],
+      "reference_extensions": [
+        "cue",
+        "ccd",
+        "chd",
+        "toc",
+        "m3u"
+      ],
+      "required_extensions": [
+        "cue",
+        "ccd",
+        "chd",
+        "toc",
+        "m3u"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "psx",
+      "state": "mapped",
+      "rocknix_ids": [
+        "psx"
+      ],
+      "reference_extensions": [
+        "bin",
+        "cue",
+        "img",
+        "mdf",
+        "pbp",
+        "toc",
+        "cbn",
+        "m3u",
+        "ccd",
+        "chd",
+        "iso"
+      ],
+      "required_extensions": [
+        "bin",
+        "cue",
+        "img",
+        "mdf",
+        "pbp",
+        "toc",
+        "cbn",
+        "m3u",
+        "ccd",
+        "chd",
+        "iso"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "psp",
+      "state": "mapped",
+      "rocknix_ids": [
+        "psp"
+      ],
+      "reference_extensions": [
+        "iso",
+        "cso",
+        "pbp",
+        "chd"
+      ],
+      "required_extensions": [
+        "iso",
+        "cso",
+        "pbp",
+        "chd"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "n64",
+      "state": "mapped",
+      "rocknix_ids": [
+        "n64"
+      ],
+      "reference_extensions": [
+        "z64",
+        "n64",
+        "v64",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "z64",
+        "n64",
+        "v64",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "nds",
+      "state": "mapped",
+      "rocknix_ids": [
+        "nds"
+      ],
+      "reference_extensions": [
+        "nds",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "nds"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "zip",
+          "reason": "default_standalone_archive_extraction_is_unverified"
+        },
+        {
+          "extension": "7z",
+          "reason": "default_standalone_archive_extraction_is_unverified"
+        }
+      ]
+    },
+    {
+      "system_id": "dreamcast",
+      "state": "mapped",
+      "rocknix_ids": [
+        "dreamcast"
+      ],
+      "reference_extensions": [
+        "cdi",
+        "gdi",
+        "chd",
+        "m3u",
+        "cue"
+      ],
+      "required_extensions": [
+        "cdi",
+        "gdi",
+        "chd",
+        "m3u",
+        "cue"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "saturn",
+      "state": "mapped",
+      "rocknix_ids": [
+        "saturn"
+      ],
+      "reference_extensions": [
+        "cue",
+        "chd",
+        "iso",
+        "zip"
+      ],
+      "required_extensions": [
+        "cue",
+        "chd",
+        "iso"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "zip",
+          "reason": "default_standalone_archive_extraction_is_unverified"
+        }
+      ]
+    },
+    {
+      "system_id": "neogeo",
+      "state": "mapped",
+      "rocknix_ids": [
+        "neogeo"
+      ],
+      "reference_extensions": [
+        "7z",
+        "zip",
+        "neo"
+      ],
+      "required_extensions": [
+        "7z",
+        "zip"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "neo",
+          "reason": "packaged_default_core_does_not_advertise_this_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "neogeocd",
+      "state": "mapped",
+      "rocknix_ids": [
+        "neocd"
+      ],
+      "reference_extensions": [
+        "cue",
+        "iso",
+        "chd"
+      ],
+      "required_extensions": [
+        "cue",
+        "chd"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "iso",
+          "reason": "packaged_default_core_does_not_advertise_this_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "ngp",
+      "state": "mapped",
+      "rocknix_ids": [
+        "ngp"
+      ],
+      "reference_extensions": [
+        "ngp",
+        "ngc",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "ngp",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "ngc",
+          "reason": "shared_ngp_directory_routes_by_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "ngpc",
+      "state": "mapped",
+      "rocknix_ids": [
+        "ngpc"
+      ],
+      "reference_extensions": [
+        "ngp",
+        "ngc",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "ngc",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "ngp",
+          "reason": "shared_ngp_directory_routes_by_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "wonderswan",
+      "state": "mapped",
+      "rocknix_ids": [
+        "wonderswan"
+      ],
+      "reference_extensions": [
+        "ws",
+        "wsc",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "ws",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "wsc",
+          "reason": "shared_wsc_directory_routes_by_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "wonderswancolor",
+      "state": "mapped",
+      "rocknix_ids": [
+        "wonderswancolor"
+      ],
+      "reference_extensions": [
+        "ws",
+        "wsc",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "wsc",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "ws",
+          "reason": "shared_wsc_directory_routes_by_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "lynx",
+      "state": "mapped",
+      "rocknix_ids": [
+        "atarilynx"
+      ],
+      "reference_extensions": [
+        "lnx",
+        "lyx",
+        "o",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "lnx",
+        "lyx",
+        "o",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "virtualboy",
+      "state": "mapped",
+      "rocknix_ids": [
+        "virtualboy"
+      ],
+      "reference_extensions": [
+        "vb",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "vb",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "arcade",
+      "state": "mapped",
+      "rocknix_ids": [
+        "arcade"
+      ],
+      "reference_extensions": [
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "fbneo",
+      "state": "mapped",
+      "rocknix_ids": [
+        "fbn"
+      ],
+      "reference_extensions": [
+        "7z",
+        "zip"
+      ],
+      "required_extensions": [
+        "7z",
+        "zip"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "mame2003plus",
+      "state": "mapped",
+      "rocknix_ids": [
+        "mame"
+      ],
+      "reference_extensions": [
+        "7z",
+        "zip"
+      ],
+      "required_extensions": [
+        "7z",
+        "zip"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "cps1",
+      "state": "mapped",
+      "rocknix_ids": [
+        "cps1"
+      ],
+      "reference_extensions": [
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "cps2",
+      "state": "mapped",
+      "rocknix_ids": [
+        "cps2"
+      ],
+      "reference_extensions": [
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "cps3",
+      "state": "mapped",
+      "rocknix_ids": [
+        "cps3"
+      ],
+      "reference_extensions": [
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "dos",
+      "state": "mapped",
+      "rocknix_ids": [
+        "pc"
+      ],
+      "reference_extensions": [
+        "com",
+        "bat",
+        "exe",
+        "dosz"
+      ],
+      "required_extensions": [
+        "com",
+        "bat",
+        "exe",
+        "dosz"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "easyrpg",
+      "state": "mapped",
+      "rocknix_ids": [
+        "easyrpg"
+      ],
+      "reference_extensions": [
+        "zip",
+        "easyrpg",
+        "ldb"
+      ],
+      "required_extensions": [
+        "zip",
+        "easyrpg",
+        "ldb"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "pico8",
+      "state": "mapped",
+      "rocknix_ids": [
+        "pico-8"
+      ],
+      "reference_extensions": [
+        "p8",
+        "png"
+      ],
+      "required_extensions": [
+        "p8",
+        "png"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "scummvm",
+      "state": "mapped",
+      "rocknix_ids": [
+        "scummvm"
+      ],
+      "reference_extensions": [
+        "sh",
+        "svm",
+        "scummvm"
+      ],
+      "required_extensions": [
+        "svm",
+        "scummvm"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "sh",
+          "reason": "rocknix_launcher_script_is_not_scummvm_content"
+        }
+      ]
+    },
+    {
+      "system_id": "openbor",
+      "state": "mapped",
+      "rocknix_ids": [
+        "openbor"
+      ],
+      "reference_extensions": [
+        "pak"
+      ],
+      "required_extensions": [
+        "pak"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "ports",
+      "state": "mapped",
+      "rocknix_ids": [
+        "ports"
+      ],
+      "reference_extensions": [
+        "sh"
+      ],
+      "required_extensions": [
+        "sh"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "msx",
+      "state": "mapped",
+      "rocknix_ids": [
+        "msx"
+      ],
+      "reference_extensions": [
+        "dsk",
+        "mx1",
+        "mx2",
+        "rom",
+        "zip",
+        "7z",
+        "m3u"
+      ],
+      "required_extensions": [
+        "dsk",
+        "mx1",
+        "mx2",
+        "rom",
+        "zip",
+        "7z",
+        "m3u"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "pc88",
+      "state": "mapped",
+      "rocknix_ids": [
+        "pc-8800"
+      ],
+      "reference_extensions": [
+        "d88",
+        "u88",
+        "m3u"
+      ],
+      "required_extensions": [
+        "d88",
+        "u88",
+        "m3u"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "pc98",
+      "state": "mapped",
+      "rocknix_ids": [
+        "pc-9800"
+      ],
+      "reference_extensions": [
+        "d98",
+        "zip",
+        "fdi",
+        "fdd",
+        "2hd",
+        "tfd",
+        "d88",
+        "hdm",
+        "xdf",
+        "dup",
+        "hdi",
+        "thd",
+        "nhd",
+        "hdd",
+        "hdn"
+      ],
+      "required_extensions": [
+        "d98",
+        "zip",
+        "fdi",
+        "fdd",
+        "2hd",
+        "tfd",
+        "d88",
+        "hdm",
+        "xdf",
+        "dup",
+        "hdi",
+        "thd",
+        "nhd",
+        "hdd",
+        "hdn"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "x68000",
+      "state": "mapped",
+      "rocknix_ids": [
+        "x68000"
+      ],
+      "reference_extensions": [
+        "dim",
+        "img",
+        "d88",
+        "hdm",
+        "dup",
+        "2hd",
+        "xdf",
+        "hdf",
+        "cmd",
+        "m3u",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "dim",
+        "img",
+        "d88",
+        "hdm",
+        "dup",
+        "2hd",
+        "xdf",
+        "hdf",
+        "cmd",
+        "m3u",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "tic80",
+      "state": "mapped",
+      "rocknix_ids": [
+        "tic-80"
+      ],
+      "reference_extensions": [
+        "tic"
+      ],
+      "required_extensions": [
+        "tic"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "atari2600",
+      "state": "mapped",
+      "rocknix_ids": [
+        "atari2600"
+      ],
+      "reference_extensions": [
+        "a26",
+        "bin",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "a26",
+        "bin",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "atari7800",
+      "state": "mapped",
+      "rocknix_ids": [
+        "atari7800"
+      ],
+      "reference_extensions": [
+        "a78",
+        "bin",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "a78",
+        "bin",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "vectrex",
+      "state": "mapped",
+      "rocknix_ids": [
+        "vectrex"
+      ],
+      "reference_extensions": [
+        "bin",
+        "gam",
+        "vec",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "bin",
+        "vec",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "gam",
+          "reason": "packaged_default_core_does_not_advertise_this_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "supervision",
+      "state": "mapped",
+      "rocknix_ids": [
+        "supervision"
+      ],
+      "reference_extensions": [
+        "sv",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "sv",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "odyssey2",
+      "state": "mapped",
+      "rocknix_ids": [
+        "odyssey2"
+      ],
+      "reference_extensions": [
+        "bin",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "bin",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "gameandwatch",
+      "state": "mapped",
+      "rocknix_ids": [
+        "gameandwatch"
+      ],
+      "reference_extensions": [
+        "mgw",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "mgw",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "pokemini",
+      "state": "mapped",
+      "rocknix_ids": [
+        "pokemini"
+      ],
+      "reference_extensions": [
+        "min",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "min",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "doom",
+      "state": "mapped",
+      "rocknix_ids": [
+        "doom"
+      ],
+      "reference_extensions": [
+        "doom"
+      ],
+      "required_extensions": [],
+      "excluded_extensions": [
+        {
+          "extension": "doom",
+          "reason": "rocknix_launcher_descriptor_is_not_prboom_content"
+        }
+      ]
+    },
+    {
+      "system_id": "pyxel",
+      "state": "mapped",
+      "rocknix_ids": [
+        "pyxel"
+      ],
+      "reference_extensions": [
+        "py",
+        "pyxapp",
+        "edit"
+      ],
+      "required_extensions": [
+        "py",
+        "pyxapp"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "edit",
+          "reason": "bubble_pyxel_launcher_does_not_support_this_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "2048",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "3do",
+      "state": "mapped",
+      "rocknix_ids": [
+        "3do"
+      ],
+      "reference_extensions": [
+        "iso",
+        "bin",
+        "chd",
+        "cue"
+      ],
+      "required_extensions": [
+        "iso",
+        "bin",
+        "chd",
+        "cue"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "amiga",
+      "state": "mapped",
+      "rocknix_ids": [
+        "amiga"
+      ],
+      "reference_extensions": [
+        "zip",
+        "adf",
+        "uae",
+        "ipf",
+        "dms",
+        "adz",
+        "lha",
+        "m3u",
+        "hdf",
+        "hdz"
+      ],
+      "required_extensions": [
+        "zip",
+        "adf",
+        "uae",
+        "ipf",
+        "dms",
+        "adz",
+        "lha",
+        "m3u",
+        "hdf",
+        "hdz"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "atari5200",
+      "state": "mapped",
+      "rocknix_ids": [
+        "atari5200"
+      ],
+      "reference_extensions": [
+        "rom",
+        "xfd",
+        "atr",
+        "atx",
+        "cdm",
+        "cas",
+        "car",
+        "bin",
+        "a52",
+        "xex",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "rom",
+        "xfd",
+        "atr",
+        "atx",
+        "cas",
+        "car",
+        "bin",
+        "a52",
+        "xex",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "cdm",
+          "reason": "reference_extension_is_not_advertised_by_packaged_core"
+        }
+      ]
+    },
+    {
+      "system_id": "atari800",
+      "state": "mapped",
+      "rocknix_ids": [
+        "atari800"
+      ],
+      "reference_extensions": [
+        "rom",
+        "xfd",
+        "atr",
+        "atx",
+        "cdm",
+        "cas",
+        "car",
+        "bin",
+        "a52",
+        "xex",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "rom",
+        "xfd",
+        "atr",
+        "atx",
+        "cas",
+        "car",
+        "bin",
+        "a52",
+        "xex",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "cdm",
+          "reason": "reference_extension_is_not_advertised_by_packaged_core"
+        }
+      ]
+    },
+    {
+      "system_id": "atarist",
+      "state": "mapped",
+      "rocknix_ids": [
+        "atarist"
+      ],
+      "reference_extensions": [
+        "st",
+        "msa",
+        "stx",
+        "dim",
+        "ipf",
+        "m3u",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "st",
+        "msa",
+        "stx",
+        "dim",
+        "ipf",
+        "m3u",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "bk",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "c64",
+      "state": "mapped",
+      "rocknix_ids": [
+        "c64"
+      ],
+      "reference_extensions": [
+        "d64",
+        "d71",
+        "d80",
+        "d81",
+        "d82",
+        "g64",
+        "g41",
+        "x64",
+        "t64",
+        "tap",
+        "prg",
+        "p00",
+        "crt",
+        "bin",
+        "d6z",
+        "d7z",
+        "d8z",
+        "g6z",
+        "g4z",
+        "x6z",
+        "cmd",
+        "m3u",
+        "vsf",
+        "nib",
+        "nbz",
+        "zip"
+      ],
+      "required_extensions": [
+        "d64",
+        "d71",
+        "d80",
+        "d81",
+        "d82",
+        "g64",
+        "g41",
+        "x64",
+        "t64",
+        "tap",
+        "prg",
+        "p00",
+        "crt",
+        "bin",
+        "d6z",
+        "d7z",
+        "d8z",
+        "g6z",
+        "g4z",
+        "x6z",
+        "cmd",
+        "m3u",
+        "vsf",
+        "nib",
+        "nbz",
+        "zip"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "cannonball",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "cavestory",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "chailove",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "channelf",
+      "state": "mapped",
+      "rocknix_ids": [
+        "channelf"
+      ],
+      "reference_extensions": [
+        "bin",
+        "chf",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "bin",
+        "chf",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "colecovision",
+      "state": "mapped",
+      "rocknix_ids": [
+        "colecovision"
+      ],
+      "reference_extensions": [
+        "bin",
+        "col",
+        "rom",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "col",
+        "rom",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": [
+        {
+          "extension": "bin",
+          "reason": "packaged_default_core_does_not_advertise_this_extension"
+        }
+      ]
+    },
+    {
+      "system_id": "cpc",
+      "state": "mapped",
+      "rocknix_ids": [
+        "amstradcpc"
+      ],
+      "reference_extensions": [
+        "dsk",
+        "cpr",
+        "sna",
+        "tap",
+        "cdt",
+        "kcr",
+        "voc",
+        "m3u",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "dsk",
+        "cpr",
+        "sna",
+        "tap",
+        "cdt",
+        "kcr",
+        "voc",
+        "m3u",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "daphne",
+      "state": "mapped",
+      "rocknix_ids": [
+        "daphne"
+      ],
+      "reference_extensions": [
+        "daphne",
+        "singe"
+      ],
+      "required_extensions": [],
+      "excluded_extensions": [
+        {
+          "extension": "daphne",
+          "reason": "bubble_daphne_core_uses_zip_game_bundles"
+        },
+        {
+          "extension": "singe",
+          "reason": "bubble_daphne_core_uses_zip_game_bundles"
+        }
+      ]
+    },
+    {
+      "system_id": "dinothawr",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "flashback",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "intellivision",
+      "state": "mapped",
+      "rocknix_ids": [
+        "intellivision"
+      ],
+      "reference_extensions": [
+        "int",
+        "bin",
+        "rom",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "int",
+        "bin",
+        "rom",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "j2me",
+      "state": "mapped",
+      "rocknix_ids": [
+        "j2me"
+      ],
+      "reference_extensions": [
+        "jar"
+      ],
+      "required_extensions": [
+        "jar"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "jaguar",
+      "state": "mapped",
+      "rocknix_ids": [
+        "atarijaguar"
+      ],
+      "reference_extensions": [
+        "j64",
+        "jag",
+        "rom",
+        "abs",
+        "cof",
+        "bin",
+        "prg"
+      ],
+      "required_extensions": [
+        "j64",
+        "jag",
+        "rom",
+        "abs",
+        "cof",
+        "bin",
+        "prg"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "lowresnx",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "lutro",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "microw8",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "mrboom",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "music",
+      "state": "mapped",
+      "rocknix_ids": [
+        "music"
+      ],
+      "reference_extensions": [
+        "m3u",
+        "sh"
+      ],
+      "required_extensions": [],
+      "excluded_extensions": [
+        {
+          "extension": "m3u",
+          "reason": "current_gme_route_does_not_advertise_this_extension"
+        },
+        {
+          "extension": "sh",
+          "reason": "rocknix_launcher_script_is_not_game_music_content"
+        }
+      ]
+    },
+    {
+      "system_id": "palm",
+      "state": "mapped",
+      "rocknix_ids": [
+        "palm"
+      ],
+      "reference_extensions": [
+        "prc",
+        "pqa",
+        "img",
+        "pdb",
+        "zip"
+      ],
+      "required_extensions": [
+        "prc",
+        "pqa",
+        "img",
+        "pdb",
+        "zip"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "pcfx",
+      "state": "mapped",
+      "rocknix_ids": [
+        "pcfx"
+      ],
+      "reference_extensions": [
+        "chd",
+        "cue",
+        "ccd",
+        "toc"
+      ],
+      "required_extensions": [
+        "chd",
+        "cue",
+        "ccd",
+        "toc"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "quake",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "rickdangerous",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "sg1000",
+      "state": "mapped",
+      "rocknix_ids": [
+        "sg-1000"
+      ],
+      "reference_extensions": [
+        "bin",
+        "sg",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "bin",
+        "sg",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "sharpx1",
+      "state": "mapped",
+      "rocknix_ids": [
+        "x1"
+      ],
+      "reference_extensions": [
+        "dx1",
+        "2d",
+        "2hd",
+        "tfd",
+        "d88",
+        "88d",
+        "hdm",
+        "xdf",
+        "dup",
+        "tap",
+        "cmd",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "dx1",
+        "2d",
+        "2hd",
+        "tfd",
+        "d88",
+        "88d",
+        "hdm",
+        "xdf",
+        "dup",
+        "tap",
+        "cmd",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "thomson",
+      "state": "mapped",
+      "rocknix_ids": [
+        "moto"
+      ],
+      "reference_extensions": [
+        "fd",
+        "sap",
+        "k7",
+        "m7",
+        "m5",
+        "rom"
+      ],
+      "required_extensions": [
+        "fd",
+        "sap",
+        "k7",
+        "m7",
+        "m5",
+        "rom"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "ti83",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "uzebox",
+      "state": "mapped",
+      "rocknix_ids": [
+        "uzebox"
+      ],
+      "reference_extensions": [
+        "uze"
+      ],
+      "required_extensions": [
+        "uze"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "vic20",
+      "state": "mapped",
+      "rocknix_ids": [
+        "vic20"
+      ],
+      "reference_extensions": [
+        "20",
+        "a0",
+        "b0",
+        "d64",
+        "d71",
+        "d80",
+        "d81",
+        "d82",
+        "g64",
+        "g41",
+        "x64",
+        "t64",
+        "tap",
+        "prg",
+        "p00",
+        "crt",
+        "bin",
+        "gz",
+        "d6z",
+        "d7z",
+        "d8z",
+        "g6z",
+        "g4z",
+        "x6z",
+        "cmd",
+        "m3u",
+        "vsf",
+        "nib",
+        "nbz",
+        "zip"
+      ],
+      "required_extensions": [
+        "20",
+        "a0",
+        "b0",
+        "d64",
+        "d71",
+        "d80",
+        "d81",
+        "d82",
+        "g64",
+        "g41",
+        "x64",
+        "t64",
+        "tap",
+        "prg",
+        "p00",
+        "crt",
+        "bin",
+        "gz",
+        "d6z",
+        "d7z",
+        "d8z",
+        "g6z",
+        "g4z",
+        "x6z",
+        "cmd",
+        "m3u",
+        "vsf",
+        "nib",
+        "nbz",
+        "zip"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "vmu",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "wolf3d",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "zx81",
+      "state": "mapped",
+      "rocknix_ids": [
+        "zx81"
+      ],
+      "reference_extensions": [
+        "tzx",
+        "p",
+        "t81",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "tzx",
+        "p",
+        "t81",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "zxspectrum",
+      "state": "mapped",
+      "rocknix_ids": [
+        "zxspectrum"
+      ],
+      "reference_extensions": [
+        "tzx",
+        "tap",
+        "z80",
+        "rzx",
+        "scl",
+        "trd",
+        "dsk",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "tzx",
+        "tap",
+        "z80",
+        "rzx",
+        "scl",
+        "trd",
+        "dsk",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "arduboy",
+      "state": "mapped",
+      "rocknix_ids": [
+        "arduboy"
+      ],
+      "reference_extensions": [
+        "hex"
+      ],
+      "required_extensions": [
+        "hex"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "megaduck",
+      "state": "mapped",
+      "rocknix_ids": [
+        "megaduck"
+      ],
+      "reference_extensions": [
+        "bin",
+        "zip",
+        "7z"
+      ],
+      "required_extensions": [
+        "bin",
+        "zip",
+        "7z"
+      ],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "puzzlescript",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "superbroswar",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    },
+    {
+      "system_id": "3ds",
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
+    }
+  ]
+}

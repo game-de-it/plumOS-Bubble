@@ -937,7 +937,9 @@
       ],
       "extensions": [
         "cue",
+        "ccd",
         "chd",
+        "toc",
         "iso",
         "m3u"
       ],
@@ -992,7 +994,11 @@
         "m3u",
         "iso",
         "img",
-        "bin"
+        "bin",
+        "mdf",
+        "toc",
+        "cbn",
+        "ccd"
       ],
       "artwork": {
         "lookup": [
@@ -1174,7 +1180,8 @@
         "chd",
         "cdi",
         "gdi",
-        "m3u"
+        "m3u",
+        "cue"
       ],
       "artwork": {
         "lookup": [
@@ -2038,6 +2045,7 @@
         "conf",
         "exe",
         "bat",
+        "com",
         "zip"
       ],
       "artwork": {
@@ -2317,6 +2325,7 @@
         "mx2",
         "dsk",
         "cas",
+        "m3u",
         "zip",
         "7z"
       ],
@@ -2426,11 +2435,19 @@
       ],
       "extensions": [
         "d88",
+        "d98",
         "fdi",
         "hdi",
         "fdd",
+        "2hd",
+        "tfd",
+        "hdm",
+        "xdf",
+        "dup",
         "nhd",
         "hdd",
+        "thd",
+        "hdn",
         "m3u",
         "zip"
       ],
@@ -2475,8 +2492,14 @@
       ],
       "extensions": [
         "dim",
+        "img",
+        "d88",
+        "hdm",
+        "dup",
+        "2hd",
         "hdf",
         "xdf",
+        "cmd",
         "m3u",
         "zip",
         "7z"
@@ -3245,6 +3268,13 @@
       "extensions": [
         "a52",
         "bin",
+        "rom",
+        "xfd",
+        "atr",
+        "atx",
+        "cas",
+        "car",
+        "xex",
         "zip",
         "7z"
       ],
@@ -3313,6 +3343,7 @@
         "dcm",
         "cas",
         "bin",
+        "a52",
         "atx",
         "car",
         "rom",
@@ -3375,7 +3406,8 @@
         "vhd",
         "gem",
         "ide",
-        "m3u"
+        "m3u",
+        "7z"
       ],
       "artwork": {
         "lookup": [
@@ -3478,7 +3510,17 @@
         "bin",
         "zip",
         "gz",
-        "m3u"
+        "m3u",
+        "d6z",
+        "d7z",
+        "d8z",
+        "g6z",
+        "g4z",
+        "x6z",
+        "cmd",
+        "vsf",
+        "nib",
+        "nbz"
       ],
       "artwork": {
         "lookup": [
@@ -3668,7 +3710,8 @@
         "bin",
         "chf",
         "rom",
-        "zip"
+        "zip",
+        "7z"
       ],
       "artwork": {
         "lookup": [
@@ -3820,7 +3863,8 @@
         "voc",
         "cpr",
         "m3u",
-        "kcr"
+        "kcr",
+        "7z"
       ],
       "artwork": {
         "lookup": [
@@ -4621,7 +4665,9 @@
         "bin",
         "rom",
         "sms",
-        "gg"
+        "gg",
+        "zip",
+        "7z"
       ],
       "artwork": {
         "lookup": [
@@ -4694,7 +4740,8 @@
         "xdf",
         "dup",
         "tap",
-        "cmd"
+        "cmd",
+        "7z"
       ],
       "artwork": {
         "lookup": [
@@ -5062,7 +5109,8 @@
         "p",
         "tzx",
         "t81",
-        "zip"
+        "zip",
+        "7z"
       ],
       "artwork": {
         "lookup": [
@@ -5122,7 +5170,8 @@
         "gz",
         "udi",
         "mgt",
-        "img"
+        "img",
+        "7z"
       ],
       "artwork": {
         "lookup": [
@@ -5205,7 +5254,9 @@
       ],
       "extensions": [
         "bin",
-        "duck"
+        "duck",
+        "zip",
+        "7z"
       ],
       "artwork": {
         "lookup": [
