@@ -15,7 +15,6 @@ runtime_target_sectors=16777216
 
 console_log=/run/plumos-external-initramfs.log
 runtime_mount=/mnt/plumos-runtime
-user_inspect_mount=/mnt/plumos-user-inspect
 flash_mount=/mnt/plumos-flash
 matching_device=
 runtime_device=
@@ -23,6 +22,7 @@ user_device=
 flash_device=
 os_disk=
 persistent_log=
+progress_root=/usr/share/plumos/boot-progress
 
 mounted() {
     $bb grep -qs " $1 " /proc/mounts 2>/dev/null
@@ -51,6 +51,14 @@ show_shared_logo() {
     fi
 }
 
+show_progress() {
+    frame=$progress_root/$1.raw
+    if [ -c /dev/fb0 ] && [ -r "$frame" ]; then
+        $bb dd if="$frame" of=/dev/fb0 bs=2560 seek=336 conv=notrunc \
+            2>/dev/null || true
+    fi
+}
+
 fail() {
     stage=$1
     detail=$2
@@ -58,7 +66,6 @@ fail() {
     persist_console_log
     $bb sync
     mounted "$flash_mount" && $bb umount "$flash_mount" 2>/dev/null || true
-    mounted "$user_inspect_mount" && $bb umount "$user_inspect_mount" 2>/dev/null || true
     mounted "$runtime_mount/user" && $bb umount "$runtime_mount/user" 2>/dev/null || true
     mounted /mnt/plumos-system/flash && \
         $bb umount /mnt/plumos-system/flash 2>/dev/null || true
@@ -69,6 +76,7 @@ fail() {
         $bb mount -o remount,ro /mnt/plumos-system/storage 2>/dev/null || true
     fi
     show_shared_logo
+    show_progress boot-error
     log "stage=${stage}_RECOVERY_CONSOLE"
     exec $bb sh
 }
@@ -111,7 +119,7 @@ verify_file() {
 }
 
 $bb mkdir -p /proc /sys /dev /dev/pts /run /tmp /root \
-    "$flash_mount" "$runtime_mount" "$user_inspect_mount" /mnt/plumos-system
+    "$flash_mount" "$runtime_mount" /mnt/plumos-system
 mounted /proc || $bb mount -t proc proc /proc || exec $bb sh
 mounted /sys || $bb mount -t sysfs sysfs /sys || exec $bb sh
 mounted /dev || $bb mount -t devtmpfs devtmpfs /dev || exec $bb sh
@@ -176,18 +184,11 @@ if [ -f "$runtime_mount/plumos/provision/complete" ]; then
     provisioning_was_complete=yes
 else
     provisioning_was_complete=no
+    show_progress provision-start
 fi
-clean_fast_boot=no
-if [ "$provisioning_was_complete" = yes ] &&
-    [ -f "$runtime_mount/plumos/provision/clean-shutdown" ] &&
-    [ -b "$user_device" ] &&
-    $bb mount -t vfat -o ro "$user_device" "$user_inspect_mount" 2>/dev/null; then
-    if [ -f "$user_inspect_mount/.plumos-ready" ] &&
-        [ -f "$user_inspect_mount/.plumos-clean-shutdown" ]; then
-        clean_fast_boot=yes
-    fi
-    $bb umount "$user_inspect_mount" || fail E25 P4_PREAUTH_UNMOUNT_FAILED
-fi
+previous_shutdown_p3=missing
+[ ! -f "$runtime_mount/plumos/provision/clean-shutdown" ] || \
+    previous_shutdown_p3=present
 $bb umount "$runtime_mount" || fail E25 P3_PREAUTH_UNMOUNT_FAILED
 $bb umount "$flash_mount" || fail E25 P1_PREAUTH_UNMOUNT_FAILED
 log 'stage=S25_STORAGE_MUTATION_AUTHORIZED'
@@ -199,7 +200,8 @@ PLUMOS_PROVISION_P1="$flash_device" \
 PLUMOS_PROVISION_P2="$matching_device" \
 PLUMOS_PROVISION_P3="$runtime_device" \
 PLUMOS_PROVISION_P4="$user_device" \
-PLUMOS_PROVISION_FAST_BOOT="$clean_fast_boot" \
+PLUMOS_PROVISIONING_COMPLETE="$provisioning_was_complete" \
+PLUMOS_PROGRESS_ROOT="$progress_root" \
     /usr/sbin/plumos-bubble-provision-storage >"$provision_log" 2>&1
 provision_rc=$?
 $bb cat "$provision_log" >/dev/console 2>/dev/null || true
@@ -213,8 +215,14 @@ $bb mount -t ext4 -o rw,noatime "$runtime_device" "$runtime_mount" || \
 $bb mkdir -p "$runtime_mount/user"
 $bb mount -t vfat -o rw,noatime "$user_device" "$runtime_mount/user" || \
     fail E25 P4_MOUNT_FAILED
+previous_shutdown=unknown
+if [ "$previous_shutdown_p3" = present ] &&
+    [ -f "$runtime_mount/user/.plumos-clean-shutdown" ]; then
+    previous_shutdown=clean
+fi
 $bb rm -f "$runtime_mount/plumos/provision/clean-shutdown" \
     "$runtime_mount/user/.plumos-clean-shutdown"
+log "stage=S25_STORAGE_POLICY_READY previous_shutdown=$previous_shutdown automatic_repair=no"
 $bb mkdir -p "$runtime_mount/plumos/logs" "$runtime_mount/plumos/provision"
 if [ "$provisioning_was_complete" = yes ]; then
     persistent_log=$runtime_mount/plumos/logs/last-boot.log

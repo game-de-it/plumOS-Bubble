@@ -72,11 +72,15 @@
     詳細は`docs/validation/2026-09-03-bubble-fast-boot-physical.md`。warm boot比較は未実施。
   - 同bootでexternal initramfsが完了済みp3/p4にも`e2fsck -pf`、`resize2fs`、
     `fsck.fat -a`を再実行し、p4 dirty bitを修復していたことを検出。V90S同様のpaired
-    clean-shutdown marker fast pathを実装し、clean時は3処理をskip、marker欠落時だけ従来の
-    recovery/resumeを実行するhost fixtureに合格。実機deploy後の移行bootでは、更新した
+    completed layoutではclean marker有無にかかわらず3処理をskipし、自動修復は初回作成・
+    中断再開だけに限定する方針へ修正。FAT異常は自動修復せずユーザー主導scanへ委ねる。
+    実機deploy後の移行bootでは、更新した
     initramfsの実サイズを既存`uEnv.txt`の旧`initrdsize`が切り詰め、plumOS entry前で停止。
     U-Boot load成功直後に`${filesize}`を採用する修正を追加し、SD上のboot script修復と
-    clean reboot計測を残す。
+    slot A到達を確認した。強制電源断後のp3 orphanは旧BusyBox/旧FE実行ファイルだけと
+    read-only特定・退避してoffline修復し、5-pass再検査と`Filesystem state: clean`を確認済み。
+    10秒を超えたFE初期化、初回partition作成、OS updateには共通logo上の可視進捗を表示し、
+    通常bootには進捗用の追加処理を入れない。修復後のpanel handoffと通常boot計測を残す。
 - [ ] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
 - [x] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
   - AArch64 static BusyBox、stock handoff互換entrypoint、FAT/ext4/console/kmsg stage、
@@ -172,8 +176,9 @@
 - [ ] `BUB-P4-P03` normal shutdown/reboot、charger接続前後、cold boot、suspend/resumeを実機確認する。
 - [ ] `BUB-P4-P04` power action後にFAT/ext4がcleanであることを次boot/read-only fs checkで確認する。
   - terminal shutdown/rebootでp3/p4 clean markerを書いてsyncし、p4を明示unmountしてから
-    p3をread-only化する実装を追加。marker作成/unmount順とclean fast bootはhost fixture合格、
-    実機power actionと次bootでのmarker消費・fsck skip確認を残す。
+    p3をread-only化する実装を追加。marker作成/unmount順はhost fixture合格。markerは
+    clean-shutdown proofに使うが起動時修復のtriggerにはせず、完了済みlayoutでは常にfsckを
+    skipする。実機power actionと次bootでのmarker消費確認を残す。
 
 ### Network/USB/storage
 

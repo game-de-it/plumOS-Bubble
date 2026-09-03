@@ -93,6 +93,34 @@ test "$(sha256sum "$shared_boot_logo" | cut -d' ' -f1)" = \
     6b4be39f18289bffe0a9ea65c11f0d479fd12946bd67154ae7332350df795fa8
 python3 "$repo_root/scripts/generate-bubble-fb-marker.py" \
     "$shared_boot_logo" "$rootfs/usr/share/plumos/bubble-s33-xrgb8888.raw"
+boot_progress_dir=$rootfs/usr/share/plumos/boot-progress
+update_progress_dir=$rootfs/usr/share/plumos/update-progress
+mkdir -p "$boot_progress_dir" "$update_progress_dir"
+python3 "$repo_root/scripts/generate-bubble-fb-marker.py" \
+    --message 'STARTING FRONTEND - PLEASE WAIT' --percent 95 --crop-y 336 \
+    "$shared_boot_logo" "$boot_progress_dir/frontend-wait.raw"
+python3 "$repo_root/scripts/generate-bubble-fb-marker.py" \
+    --message 'BOOT ERROR - CHECK LOG' --percent 0 --error --crop-y 336 \
+    "$shared_boot_logo" "$boot_progress_dir/boot-error.raw"
+test "$(stat -c '%s' "$boot_progress_dir/frontend-wait.raw")" -eq 368640
+test "$(stat -c '%s' "$boot_progress_dir/boot-error.raw")" -eq 368640
+generate_update_progress() {
+    name=$1
+    percent=$2
+    message=$3
+    error=${4:-no}
+    error_arg=
+    [ "$error" != yes ] || error_arg=--error
+    python3 "$repo_root/scripts/generate-bubble-fb-marker.py" \
+        --message "$message" --percent "$percent" $error_arg \
+        "$shared_boot_logo" "$update_progress_dir/$name.raw"
+    test "$(stat -c '%s' "$update_progress_dir/$name.raw")" -eq 1228800
+}
+generate_update_progress update_verify 15 'VERIFYING UPDATE'
+generate_update_progress update_runtime 45 'INSTALLING UPDATE'
+generate_update_progress update_finalize 85 'FINALIZING UPDATE'
+generate_update_progress update_rollback 35 'ROLLING BACK UPDATE'
+generate_update_progress update_error 0 'UPDATE ERROR - CHECK LOG' yes
 printf '%s\n' '4.19.193-g5a07852a55cf-dirty' > "$rootfs/etc/plumos-kernel-abi"
 printf '%s\n' "$version" > "$rootfs/etc/plumos-system-version"
 install -m 0644 "$repo_root/LICENSE" "$rootfs/usr/share/licenses/plumOS-MIT.txt"
@@ -152,7 +180,15 @@ for required in sbin/init usr/lib/systemd/systemd bin/busybox \
     etc/shadow etc/firmware/fw_bcmdhd.bin etc/firmware/fw_bcm43438a1.bin \
     etc/firmware/nvram.txt etc/firmware/nvram_ap6212a.txt \
     lib/modules/4.19.193-g5a07852a55cf-dirty/kernel/drivers/net/wireless/rockchip_wlan/rkwifi/bcmdhd/bcmdhd.ko \
-    usr/share/plumos/bubble-s33-xrgb8888.raw dev proc sys flash storage; do
+    usr/share/plumos/bubble-s33-xrgb8888.raw \
+    usr/share/plumos/boot-progress/frontend-wait.raw \
+    usr/share/plumos/boot-progress/boot-error.raw \
+    usr/share/plumos/update-progress/update_verify.raw \
+    usr/share/plumos/update-progress/update_runtime.raw \
+    usr/share/plumos/update-progress/update_finalize.raw \
+    usr/share/plumos/update-progress/update_rollback.raw \
+    usr/share/plumos/update-progress/update_error.raw \
+    dev proc sys flash storage; do
     grep -q "squashfs-root/$required" "$listing"
 done
 test "$(stat -c '%s' "$rootfs/usr/share/plumos/bubble-s33-xrgb8888.raw")" -eq 1228800

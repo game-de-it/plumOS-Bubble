@@ -102,17 +102,20 @@ clean normal startup and recovery startup:
 
 - terminal shutdown/reboot writes paired p3/p4 clean markers, syncs, explicitly
   unmounts p4, then remounts p3 and p1 read-only;
-- external initramfs accepts the fast path only when provisioning is complete,
-  both clean markers exist, p4 is ready, and fixed geometry/type/label checks
-  pass;
-- accepted clean startup skips `e2fsck`, `resize2fs`, and `fsck.fat`;
-- missing markers retain the existing synchronous repair/resume path;
+- external initramfs accepts the normal path whenever provisioning is complete
+  and fixed geometry/type/label checks pass;
+- completed startup skips `e2fsck`, `resize2fs`, and `fsck.fat` regardless of
+  clean-marker state; FAT repair is a user-directed host action;
+- only incomplete first provisioning or its authorized resume path may run the
+  synchronous resize/repair tools;
 - both markers are consumed before mutable storage is handed to System so a
-  crash cannot reuse stale clean state.
+  crash cannot reuse stale clean-shutdown evidence.
 
 Host fixtures cover first provisioning, interrupted provisioning, normal
 repair/resume, clean fast-path geometry validation, marker creation and p4
-unmount ordering. Physical deployment and the next clean reboot are pending.
+unmount ordering. Long first-provision/update work receives visible progress;
+normal boot remains the common plumOS logo followed directly by FE. Physical
+deployment and the next normal reboot are pending.
 
 The first transition deployment exposed a boot-contract defect before external
 initramfs entry. The replacement initramfs was 4,034,371 bytes, 444 bytes larger
@@ -121,8 +124,34 @@ the old `initrdsize=0x3d8d87` to `booti`. U-Boot displayed the vendor Bubble
 logo, but the truncated gzip never reached the plumOS logo or `S21`. The
 instrumented external-initramfs boot script now assigns `initrdsize` from
 U-Boot's `${filesize}` immediately after a successful load. Offline p1 repair
-and physical boot acceptance remain pending; this failed boot is not counted as
-clean-fast-path acceptance.
+was applied and read back with active slot A. The following boot reached
+`S40_FRONTEND_SUPERVISOR_READY`, associated Wi-Fi, and started the frontend
+renderer loop, but the panel remained on the common plumOS logo. This boot is
+not counted as normal-path acceptance.
+
+The forced power-off after that observation left p3 ext4 with a corrupted
+orphan list and allocation-summary mismatches. Read-only inspection identified
+the two unlinked inodes as replaced executable images rather than mutable user
+data: an old 2,108,608-byte static BusyBox and an old 265,456-byte frontend.
+Both inode payloads, an ext4 metadata image, and the active configuration were
+copied to the host before repair. The installed frontend binary still matched
+its managed checksum
+`fd181d901f2cd09be448faa5b6b325885e8d2b96b08aee60a0701c91f1e3577f`.
+
+Offline `e2fsck` cleared only those orphan records, repaired their bitmap and
+summary differences, and a subsequent forced read-only five-pass check returned
+zero. `debugfs` then reported `Filesystem state: clean`, 1,152,257 free blocks,
+and 505,731 free inodes. The preserved configuration hashes remained:
+
+- frontend settings: `cb900f198b08006c0f2c1fd739729a36007713944dde5847e22d14f9ab075bec`;
+- system settings: `043c0c97ebb22cabed0106fed336e8c26c3f10f7eee8d0aa97f8bfa87daf7348`;
+- Wi-Fi configuration: `fece399eff59eb721dff8aa2e5cc3342a72375cfd8556af408d08def4fc6cae3`.
+
+The latest `frontend-frame-stats.log` showed a successful initial render and
+the expected 5-second TOP status refresh cadence (`0.2 fps` while idle); it did
+not show a busy rendering loop. The next physical boot therefore remains the
+gate for panel handoff, the 10-second delayed progress notice, and normal-path
+timing after the ext4 repair.
 
 ## Remaining metadata work
 

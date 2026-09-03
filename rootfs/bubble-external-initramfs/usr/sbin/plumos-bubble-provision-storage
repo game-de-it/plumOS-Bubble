@@ -16,6 +16,7 @@ MKFS_FAT=${PLUMOS_PROVISION_MKFS_FAT:-/usr/sbin/mkfs.fat}
 FSCK_FAT=${PLUMOS_PROVISION_FSCK_FAT:-/usr/sbin/fsck.fat}
 SYS_BLOCK_ROOT=${PLUMOS_PROVISION_SYS_BLOCK_ROOT:-/sys/class/block}
 STATE_MOUNT=${PLUMOS_PROVISION_STATE_MOUNT:-/run/plumos-provision-state}
+PROGRESS_ROOT=${PLUMOS_PROGRESS_ROOT:-/usr/share/plumos/boot-progress}
 
 DISK=${PLUMOS_PROVISION_DISK:?missing physical disk}
 P1=${PLUMOS_PROVISION_P1:?missing p1}
@@ -23,7 +24,7 @@ P2=${PLUMOS_PROVISION_P2:?missing p2}
 P3=${PLUMOS_PROVISION_P3:?missing p3}
 P4=${PLUMOS_PROVISION_P4:-${DISK}p4}
 AUTHORIZED=${PLUMOS_BUBBLE_STORAGE_AUTHORIZED:-no}
-FAST_BOOT=${PLUMOS_PROVISION_FAST_BOOT:-no}
+PROVISIONING_COMPLETE=${PLUMOS_PROVISIONING_COMPLETE:-no}
 
 boot_start=32768
 boot_sectors=1048576
@@ -40,6 +41,14 @@ intent_path=plumos/provision/p4-create-authorized
 
 log() {
     printf 'plumos-bubble-provision=%s\n' "$*"
+}
+
+show_progress() {
+    frame=$PROGRESS_ROOT/$1.raw
+    if [ -c /dev/fb0 ] && [ -r "$frame" ]; then
+        "$BB" dd if="$frame" of=/dev/fb0 bs=2560 seek=336 conv=notrunc \
+            2>/dev/null || true
+    fi
 }
 
 fail() {
@@ -95,12 +104,14 @@ blkid_value() {
 }
 
 fsck_ext4() {
+    show_progress "$1"
     "$E2FSCK" -pf "$P3"
     rc=$?
     case "$rc" in 0|1) ;; *) fail E24B "e2fsck rc=$rc" ;; esac
 }
 
 fsck_fat() {
+    show_progress provision-p4-check
     "$FSCK_FAT" -a "$P4"
     rc=$?
     case "$rc" in 0|1) ;; *) fail E24D "fsck.fat rc=$rc" ;; esac
@@ -170,15 +181,14 @@ if [ "$p3_sectors" = "$runtime_seed_sectors" ] && [ -b "$P4" ]; then
 fi
 log "stage=S24_LAYOUT_AUTHORIZED disk_sectors=$(block_value size "$DISK") p3_sectors=$p3_sectors"
 
-# The initramfs requests this path only after mounting p3 and p4 read-only and
-# finding both clean-shutdown markers plus the completed provisioning markers.
-# Keep geometry/type/label validation here so the request cannot bypass the
-# fixed Bubble storage contract. Normal or unclean boots retain the full
-# repair/resume path below.
-if [ "$FAST_BOOT" = yes ]; then
+# Once provisioning is complete, normal and unclean boots only validate the
+# fixed geometry/type/label contract. They never run filesystem repair. A
+# missing clean-shutdown marker is evidence for a user-directed host scan, not
+# authorization to mutate ext4 or FAT during every boot.
+if [ "$PROVISIONING_COMPLETE" = yes ]; then
     [ "$p3_sectors" = "$runtime_target_sectors" ] ||
-        fail E24A FAST_BOOT_P3_SIZE_MISMATCH
-    [ -b "$P4" ] || fail E24C FAST_BOOT_P4_MISSING
+        fail E24A COMPLETED_BOOT_P3_SIZE_MISMATCH
+    [ -b "$P4" ] || fail E24C COMPLETED_BOOT_P4_MISSING
     p4_actual_start=$(block_value start "$P4")
     [ "$p4_actual_start" = "$userdata_start" ] ||
         fail E24C "P4_START_MISMATCH:$p4_actual_start"
@@ -188,10 +198,10 @@ if [ "$FAST_BOOT" = yes ]; then
     p4_label=$(blkid_value LABEL "$P4")
     [ "$p4_type" = vfat ] || fail E24D "P4_TYPE_UNEXPECTED:$p4_type"
     [ "$p4_label" = PLUMOS ] || fail E24D "P4_LABEL_UNEXPECTED:$p4_label"
-    log 'stage=S24A_P3_PARTITION_ALREADY_EXPANDED mode=clean-fast-boot'
-    log 'stage=S24B_P3_FILESYSTEM_READY mode=clean-fast-boot'
-    log "stage=S24D_P4_READY sectors=$(block_value size "$P4") mode=clean-fast-boot"
-    log 'result=ok mode=clean-fast-boot'
+    log 'stage=S24A_P3_PARTITION_ALREADY_EXPANDED mode=completed-no-repair'
+    log 'stage=S24B_P3_FILESYSTEM_CHECK_SKIPPED mode=completed-no-repair'
+    log "stage=S24D_P4_CHECK_SKIPPED sectors=$(block_value size "$P4") mode=completed-no-repair"
+    log 'result=ok mode=completed-no-repair'
     exit 0
 fi
 
@@ -207,13 +217,15 @@ else
     log 'stage=S24A_P3_PARTITION_ALREADY_EXPANDED'
 fi
 
-fsck_ext4
+fsck_ext4 provision-p3-check
+show_progress provision-p3-resize
 "$RESIZE2FS" "$P3" || fail E24B P3_FILESYSTEM_RESIZE_FAILED
-fsck_ext4
+fsck_ext4 provision-p3-recheck
 log 'stage=S24B_P3_FILESYSTEM_READY'
 
 format_p4=0
 if [ ! -b "$P4" ]; then
+    show_progress provision-p4-create
     write_p4_intent
     "$PARTED" -s -a optimal "$DISK" unit s \
         mkpart primary fat32 "${userdata_start}s" 100% ||

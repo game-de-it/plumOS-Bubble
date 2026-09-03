@@ -68,6 +68,27 @@ test "$(sha256sum "$shared_boot_logo" | cut -d' ' -f1)" = \
     6b4be39f18289bffe0a9ea65c11f0d479fd12946bd67154ae7332350df795fa8
 python3 "$repo_root/scripts/generate-bubble-fb-marker.py" \
     "$shared_boot_logo" "$rootfs/usr/share/plumos/plumos-640x480-xrgb8888.raw"
+progress_dir=$rootfs/usr/share/plumos/boot-progress
+mkdir -p "$progress_dir"
+generate_progress() {
+    name=$1
+    percent=$2
+    message=$3
+    error=${4:-no}
+    error_arg=
+    [ "$error" != yes ] || error_arg=--error
+    python3 "$repo_root/scripts/generate-bubble-fb-marker.py" \
+        --message "$message" --percent "$percent" --crop-y 336 $error_arg \
+        "$shared_boot_logo" "$progress_dir/$name.raw"
+    test "$(stat -c '%s' "$progress_dir/$name.raw")" -eq 368640
+}
+generate_progress provision-start 10 'PREPARING STORAGE'
+generate_progress provision-p3-check 20 'CHECKING SYSTEM STORAGE'
+generate_progress provision-p3-resize 35 'EXPANDING SYSTEM STORAGE'
+generate_progress provision-p3-recheck 50 'VERIFYING SYSTEM STORAGE'
+generate_progress provision-p4-create 65 'CREATING USER STORAGE'
+generate_progress provision-p4-check 75 'CHECKING USER STORAGE'
+generate_progress boot-error 0 'BOOT ERROR - CHECK LOG' yes
 
 find "$rootfs" -exec touch -h -d "@$source_epoch" {} +
 archive=$payload/initramfs-plumos-bubble-external-probe.cpio.gz
@@ -86,8 +107,8 @@ kernel_release=4.19.193-g5a07852a55cf-dirty
 purpose=authorized-first-boot-storage-provisioning-and-system-ab-boundary
 partition_mutation=authorized-p3-expand-to-8192MiB-and-p4-create
 runtime_writes=p3-managed-state-and-p4-user-contract
-normal_boot=paired-clean-shutdown-markers-skip-filesystem-repair
-recovery_boot=missing-clean-marker-runs-filesystem-repair-and-provision-resume
+normal_boot=completed-layout-validation-without-filesystem-repair
+recovery_boot=only-incomplete-provisioning-runs-repair-and-resume
 stages=S21-S29,S24A-S24D,E23-E29,E24A-E24D
 boot_source=p1-file
 p2_boot_source=not-yet-proven

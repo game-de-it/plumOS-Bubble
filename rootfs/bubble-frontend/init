@@ -5,6 +5,7 @@ bb=/bin/busybox
 PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export PATH HOME=/root HOSTNAME=plumos-bubble
 network_stage_fat=1
+progress_root=/usr/share/plumos/boot-progress
 
 mounted() {
     $bb grep -qs " $1 " /proc/mounts 2>/dev/null
@@ -17,6 +18,21 @@ log() {
     if [ -d /storage/plumos/logs ] && [ -w /storage/plumos/logs ]; then
         printf '%s\n' "$message" >>/storage/plumos/logs/minimal-init.log 2>/dev/null || true
     fi
+}
+
+show_progress() {
+    frame=$progress_root/$1.raw
+    if [ -c /dev/fb0 ] && [ -r "$frame" ]; then
+        $bb dd if="$frame" of=/dev/fb0 bs=2560 seek=336 conv=notrunc \
+            2>/dev/null || true
+    fi
+}
+
+frontend_slow_notice() {
+    $bb sleep 10
+    [ ! -e /tmp/plumos-fe-ready ] || exit 0
+    show_progress frontend-wait
+    log 'stage=S42_FRONTEND_SLOW visible_progress=shown threshold_seconds=10'
 }
 
 fat_value() {
@@ -188,14 +204,14 @@ finalize_power_action() {
     $bb rm -f "$request"
     $bb sync
     if mounted /storage/user; then
-        log 'stage=E90_USER_STORAGE_STILL_MOUNTED clean-fast-boot=disabled'
+        log 'stage=E90_USER_STORAGE_STILL_MOUNTED clean-shutdown-proof=invalid'
         $bb rm -f "$clean_marker" 2>/dev/null || true
     fi
     if $bb mount -o remount,ro /storage 2>/dev/null; then
         printf 'plumos-bubble-init=stage=S91_STORAGE_READ_ONLY action=%s\n' \
             "$action" >/dev/console 2>/dev/null || true
     else
-        log 'stage=E91_STORAGE_READ_ONLY_FAILED clean-fast-boot=disabled'
+        log 'stage=E91_STORAGE_READ_ONLY_FAILED clean-shutdown-proof=invalid'
         $bb rm -f "$clean_marker" 2>/dev/null || true
         $bb sync
     fi
@@ -284,6 +300,7 @@ if [ ! -f /storage/plumos/manifest.json ] || \
    [ ! -f /storage/plumos/checksums.sha256 ]; then
     log 'stage=E39_APP_LAYER_METADATA_MISSING'
     fat_stage E39_APP_LAYER_METADATA_MISSING
+    show_progress boot-error
     exec $bb sh
 fi
 for required in \
@@ -293,12 +310,14 @@ for required in \
     if [ ! -s "$required" ]; then
         log "stage=E39_FRONTEND_REQUIRED_FILE_MISSING path=$required"
         fat_stage E39_FRONTEND_REQUIRED_FILE_MISSING
+        show_progress boot-error
         exec $bb sh
     fi
 done
 if [ ! -x /storage/plumos/bin/plumos-frontend-launch ]; then
     log 'stage=E39_FRONTEND_LAUNCHER_NOT_EXECUTABLE'
     fat_stage E39_FRONTEND_LAUNCHER_NOT_EXECUTABLE
+    show_progress boot-error
     exec $bb sh
 fi
 log 'stage=S39_APP_LAYER_METADATA_READY verification=build-update-deploy'
@@ -314,8 +333,13 @@ fat_stage S40_FRONTEND_SUPERVISOR_READY
 restart_count=0
 while :; do
     log "stage=S41_FRONTEND_START attempt=$restart_count"
+    $bb rm -f /tmp/plumos-fe-ready
+    frontend_slow_notice &
+    progress_pid=$!
     /bin/busybox sh /storage/plumos/bin/plumos-frontend-launch
     rc=$?
+    $bb kill "$progress_pid" 2>/dev/null || true
+    wait "$progress_pid" 2>/dev/null || true
     power_request=$($bb cat /run/plumos/power-action/request 2>/dev/null || true)
     case "$power_request" in
         reboot|shutdown) finalize_power_action "$power_request" ;;
@@ -326,6 +350,7 @@ while :; do
     if [ "$restart_count" -ge 5 ]; then
         log 'stage=E81_FRONTEND_RESTART_LIMIT_RECOVERY_CONSOLE'
         fat_stage E81_FRONTEND_RESTART_LIMIT_RECOVERY_CONSOLE
+        show_progress boot-error
         exec $bb sh
     fi
     $bb sleep 2
