@@ -148,8 +148,10 @@ start_recovery_network() {
         -r "$host_key" -p 22 -K 30 -I 300 \
         >>/run/dropbear/dropbear.log 2>&1; then
         log "stage=S38_RECOVERY_SSH_READY ip=$address port=22"
-        fat_value network-address.txt "$address"
-        fat_stage S38_RECOVERY_SSH_READY
+        if [ "$network_stage_fat" -eq 1 ]; then
+            fat_value network-address.txt "$address"
+            fat_stage S38_RECOVERY_SSH_READY
+        fi
     else
         network_stage E38_SSH_START_FAILED
     fi

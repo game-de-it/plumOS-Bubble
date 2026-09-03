@@ -17,6 +17,7 @@ grep -q '/storage/plumos/components/frontend/checksums.sha256' "$init"
 grep -q "stage=S34_RECOVERY_NETWORK_BACKGROUND_DISPATCHED" "$init"
 grep -q '^start_recovery_network_background &$' "$init"
 ! grep -qx 'start_recovery_network' "$init"
+test "$(grep -Fc '[ "$network_stage_fat" -eq 1 ]' "$init")" -eq 1
 grep -q '^app_layer_verification=full-at-build-update-deploy,boot-critical-metadata-only$' \
     "$builder"
 grep -q '^recovery_network_start=background-before-frontend$' "$builder"
