@@ -6,7 +6,8 @@ Date: 2026-09-04 JST
 
 This validation covers source `d082d9c` on the running GKD Bubble. It verifies
 the four frontend-visible network services, SD2 visibility through their normal
-client routes, and the frontend Reboot route. It does not authorize a release.
+client routes, and the frontend Reboot and Shutdown routes. It does not
+authorize a release.
 
 ## Failure and correction
 
@@ -72,9 +73,24 @@ mounted `//root@192.168.10.101/SDCARD` and listed the same SD2 tree through SMB.
 All four service-status backends reported running and matched their live
 processes.
 
+## Physical shutdown acceptance
+
+The user next selected Shutdown from the normal frontend. The frontend recorded
+`status=shutdown complete poweroff`; the helper unbound both SD2 content mounts,
+unmounted SD2 and p4, wrote the clean markers, and handed `action=shutdown` to
+PID 1. The device powered off and was started again with the physical power
+button.
+
+The following cold boot again recorded
+`previous_shutdown=clean automatic_repair=no`, verified slot A, restored the
+frontend on its first supervisor attempt, mounted p4 read-write, and mounted SD2
+and its ROM/BIOS binds read-only. The pending power request was absent. SSH,
+FTP, SFTP, and Samba all returned to running state. A fresh macOS client test
+listed the SD2 ROM tree through FTP and SFTP and directly mounted the Samba
+`SDCARD` share.
+
 ## Remaining gate
 
-The normal frontend Shutdown route still requires a physical power-off followed
-by another power-on/readback. Charger transitions and suspend/resume remain in
-`BUB-P4-P03`. The known pre-existing SD2 FAT dirty observation remains warning
-only; startup did not scan or repair the card.
+Reboot and Shutdown are accepted. Charger transitions and suspend/resume remain
+in `BUB-P4-P03`. The known pre-existing SD2 FAT dirty observation remains
+warning only; startup did not scan or repair the card.

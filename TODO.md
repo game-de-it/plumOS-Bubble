@@ -181,7 +181,9 @@
   - source `d082d9c`で同一pending power requestを成功として再利用するよう修正し、FE Rebootを
     実機確認した。操作logの`reboot requested`、SD2 unbind、p4 unmount、clean marker書込み、
     PID 1への委譲、次bootの`previous_shutdown=clean automatic_repair=no`、FE初回復帰まで合格。
-    FE Shutdown、charger接続前後、suspend/resumeは未確認のためopenを維持する。
+    続くFE Shutdownも`shutdown complete poweroff`、SD2/p4 clean unmount、電源断、再投入後の
+    clean判定、FEと4 network serviceの復帰まで合格。charger接続前後とsuspend/resumeは
+    未確認のためopenを維持する。
 - [ ] `BUB-P4-P04` power action後にFAT/ext4がcleanであることを次boot/read-only fs checkで確認する。
   - terminal shutdown/rebootでp3/p4 clean markerを書いてsyncし、p4を明示unmountしてから
     p3をread-only化する実装を追加。marker作成/unmount順はhost fixture合格。markerは
