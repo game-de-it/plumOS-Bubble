@@ -6,6 +6,12 @@ RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 LOG=${PLUMOS_POWER_ACTION_LOG:-$PLUMOS_ROOT/logs/power-action.log}
 SD2_MOUNT=${PLUMOS_SD2_MOUNT:-/run/media/sd2}
+USER_MOUNT=${PLUMOS_USER_MOUNT:-/storage/user}
+CLEAN_P3_MARKER=${PLUMOS_CLEAN_P3_MARKER:-$PLUMOS_ROOT/provision/clean-shutdown}
+CLEAN_P4_MARKER=${PLUMOS_CLEAN_P4_MARKER:-$USER_MOUNT/.plumos-clean-shutdown}
+MOUNTS_FILE=${PLUMOS_MOUNTS_FILE:-/proc/mounts}
+POWER_REQUEST=${PLUMOS_POWER_REQUEST:-$RUNTIME_ROOT/power-action/request}
+NETWORK_SERVICES=${PLUMOS_NETWORK_SERVICES:-$PLUMOS_ROOT/bin/plumos-network-services}
 ACTION=shutdown
 POWER_OFF=0
 DRY_RUN=0
@@ -48,13 +54,14 @@ if [ "$ACTION" = sleep ]; then
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
-    printf 'result=dry-run action=%s poweroff=%s sd2=%s\n' "$ACTION" "$POWER_OFF" "$SD2_MOUNT"
+    printf 'result=dry-run action=%s poweroff=%s sd2=%s user=%s\n' \
+        "$ACTION" "$POWER_OFF" "$SD2_MOUNT" "$USER_MOUNT"
     exit 0
 fi
 
 log "stage=begin action=$ACTION poweroff=$POWER_OFF"
 "$BB" sync
-if "$BB" grep -qs " $SD2_MOUNT " /proc/mounts 2>/dev/null; then
+if "$BB" grep -qs " $SD2_MOUNT " "$MOUNTS_FILE" 2>/dev/null; then
     "$BB" umount "$SD2_MOUNT" 2>/dev/null || log 'stage=sd2-unmount result=failed'
 fi
 "$BB" sync
@@ -65,10 +72,61 @@ if [ "$ACTION" = shutdown ] && [ "$POWER_OFF" -eq 0 ]; then
 fi
 
 log "stage=terminal action=$ACTION"
-"$BB" mount -o remount,ro /storage 2>/dev/null || true
-"$BB" mount -o remount,ro /flash 2>/dev/null || true
-"$BB" sync
-if [ "$ACTION" = reboot ]; then
-    exec "$BB" reboot -f
+clean_markers=0
+"$BB" mkdir -p "${POWER_REQUEST%/*}" 2>/dev/null || {
+    log 'result=error stage=power-request-directory'
+    exit 1
+}
+printf '%s\n' "$ACTION" >"$POWER_REQUEST.next.$$" || {
+    log 'result=error stage=power-request-stage'
+    exit 1
+}
+if [ -x "$NETWORK_SERVICES" ]; then
+    "$BB" sh "$NETWORK_SERVICES" quiesce >/dev/null 2>&1 ||
+        log 'stage=network-quiesce result=failed'
 fi
-exec "$BB" poweroff -f
+if "$BB" grep -qs " $USER_MOUNT " "$MOUNTS_FILE" 2>/dev/null; then
+    if "$BB" mkdir -p "${CLEAN_P3_MARKER%/*}" 2>/dev/null &&
+        "$BB" touch "$CLEAN_P3_MARKER" "$CLEAN_P4_MARKER" 2>/dev/null; then
+        "$BB" sync
+        markers_written=1
+    else
+        markers_written=0
+        "$BB" rm -f "$CLEAN_P3_MARKER" "$CLEAN_P4_MARKER" 2>/dev/null || true
+        log 'stage=clean-markers result=failed'
+    fi
+    if [ "$markers_written" -eq 1 ] &&
+        "$BB" umount "$USER_MOUNT" 2>/dev/null; then
+        user_unmounted=1
+    else
+        user_unmounted=0
+    fi
+    if [ "$user_unmounted" -eq 1 ] && [ "$markers_written" -eq 1 ]; then
+        clean_markers=1
+        log 'stage=user-unmount result=ok clean-markers=written'
+    elif [ "$markers_written" -eq 0 ]; then
+        log 'stage=user-unmount result=skipped clean-markers=unavailable'
+    else
+        "$BB" rm -f "$CLEAN_P3_MARKER" "$CLEAN_P4_MARKER" 2>/dev/null || true
+        "$BB" sync
+        log 'stage=user-unmount result=failed clean-markers=removed'
+    fi
+else
+    "$BB" rm -f "$CLEAN_P3_MARKER" 2>/dev/null || true
+    log 'stage=user-unmount result=not-mounted clean-markers=disabled'
+fi
+if [ "$clean_markers" -ne 1 ]; then
+    "$BB" rm -f "$POWER_REQUEST.next.$$" 2>/dev/null || true
+    "$BB" sync
+    log 'result=error stage=user-storage-not-clean'
+    exit 1
+fi
+"$BB" sync
+if ! "$BB" mv -f "$POWER_REQUEST.next.$$" "$POWER_REQUEST"; then
+    "$BB" rm -f "$CLEAN_P3_MARKER" 2>/dev/null || true
+    "$BB" sync
+    log 'result=error stage=power-request-commit'
+    exit 1
+fi
+log "result=requested action=$ACTION owner=pid1"
+exit 0

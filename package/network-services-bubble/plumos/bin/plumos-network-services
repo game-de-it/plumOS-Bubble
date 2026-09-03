@@ -266,6 +266,15 @@ run_one() {
 
 action=${1:-}
 service=${2:-}
+if [ "$action" = quiesce ]; then
+    # Terminal power actions must close every persistent log descriptor without
+    # changing the user's enabled/disabled service preferences.
+    stop_pid "$FTP_PID" tcpsvd
+    stop_pid "$SFTP_PID" dropbear
+    stop_pid "$SMBD_PID" smbd
+    stop_pid "$SSH_PID" dropbear
+    exit 0
+fi
 if [ "$action" = start-enabled ]; then
     result=0
     for candidate in ftp sftp samba; do

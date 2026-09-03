@@ -70,6 +70,10 @@
     FE ready約12秒を実測した。Wi-Fi完了はFE開始を阻害せず、最終FAT markerは`S40`を保持、
     current bootの`stage=E`は0件、full app-layer hashはboot中に再実行されていない。
     詳細は`docs/validation/2026-09-03-bubble-fast-boot-physical.md`。warm boot比較は未実施。
+  - 同bootでexternal initramfsが完了済みp3/p4にも`e2fsck -pf`、`resize2fs`、
+    `fsck.fat -a`を再実行し、p4 dirty bitを修復していたことを検出。V90S同様のpaired
+    clean-shutdown marker fast pathを実装し、clean時は3処理をskip、marker欠落時だけ従来の
+    recovery/resumeを実行するhost fixtureに合格。実機deploy後のclean reboot計測を残す。
 - [ ] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
 - [x] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
   - AArch64 static BusyBox、stock handoff互換entrypoint、FAT/ext4/console/kmsg stage、
@@ -164,6 +168,9 @@
 - [ ] `BUB-P4-P02` battery/charger node、capacity、charging状態、volume/power keyをhelperへ閉じ込める。
 - [ ] `BUB-P4-P03` normal shutdown/reboot、charger接続前後、cold boot、suspend/resumeを実機確認する。
 - [ ] `BUB-P4-P04` power action後にFAT/ext4がcleanであることを次boot/read-only fs checkで確認する。
+  - terminal shutdown/rebootでp3/p4 clean markerを書いてsyncし、p4を明示unmountしてから
+    p3をread-only化する実装を追加。marker作成/unmount順とclean fast bootはhost fixture合格、
+    実機power actionと次bootでのmarker消費・fsck skip確認を残す。
 
 ### Network/USB/storage
 

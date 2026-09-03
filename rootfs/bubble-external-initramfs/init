@@ -15,6 +15,7 @@ runtime_target_sectors=16777216
 
 console_log=/run/plumos-external-initramfs.log
 runtime_mount=/mnt/plumos-runtime
+user_inspect_mount=/mnt/plumos-user-inspect
 flash_mount=/mnt/plumos-flash
 matching_device=
 runtime_device=
@@ -57,6 +58,7 @@ fail() {
     persist_console_log
     $bb sync
     mounted "$flash_mount" && $bb umount "$flash_mount" 2>/dev/null || true
+    mounted "$user_inspect_mount" && $bb umount "$user_inspect_mount" 2>/dev/null || true
     mounted "$runtime_mount/user" && $bb umount "$runtime_mount/user" 2>/dev/null || true
     mounted /mnt/plumos-system/flash && \
         $bb umount /mnt/plumos-system/flash 2>/dev/null || true
@@ -109,7 +111,7 @@ verify_file() {
 }
 
 $bb mkdir -p /proc /sys /dev /dev/pts /run /tmp /root \
-    "$flash_mount" "$runtime_mount" /mnt/plumos-system
+    "$flash_mount" "$runtime_mount" "$user_inspect_mount" /mnt/plumos-system
 mounted /proc || $bb mount -t proc proc /proc || exec $bb sh
 mounted /sys || $bb mount -t sysfs sysfs /sys || exec $bb sh
 mounted /dev || $bb mount -t devtmpfs devtmpfs /dev || exec $bb sh
@@ -175,6 +177,17 @@ if [ -f "$runtime_mount/plumos/provision/complete" ]; then
 else
     provisioning_was_complete=no
 fi
+clean_fast_boot=no
+if [ "$provisioning_was_complete" = yes ] &&
+    [ -f "$runtime_mount/plumos/provision/clean-shutdown" ] &&
+    [ -b "$user_device" ] &&
+    $bb mount -t vfat -o ro "$user_device" "$user_inspect_mount" 2>/dev/null; then
+    if [ -f "$user_inspect_mount/.plumos-ready" ] &&
+        [ -f "$user_inspect_mount/.plumos-clean-shutdown" ]; then
+        clean_fast_boot=yes
+    fi
+    $bb umount "$user_inspect_mount" || fail E25 P4_PREAUTH_UNMOUNT_FAILED
+fi
 $bb umount "$runtime_mount" || fail E25 P3_PREAUTH_UNMOUNT_FAILED
 $bb umount "$flash_mount" || fail E25 P1_PREAUTH_UNMOUNT_FAILED
 log 'stage=S25_STORAGE_MUTATION_AUTHORIZED'
@@ -186,6 +199,7 @@ PLUMOS_PROVISION_P1="$flash_device" \
 PLUMOS_PROVISION_P2="$matching_device" \
 PLUMOS_PROVISION_P3="$runtime_device" \
 PLUMOS_PROVISION_P4="$user_device" \
+PLUMOS_PROVISION_FAST_BOOT="$clean_fast_boot" \
     /usr/sbin/plumos-bubble-provision-storage >"$provision_log" 2>&1
 provision_rc=$?
 $bb cat "$provision_log" >/dev/console 2>/dev/null || true
@@ -199,6 +213,8 @@ $bb mount -t ext4 -o rw,noatime "$runtime_device" "$runtime_mount" || \
 $bb mkdir -p "$runtime_mount/user"
 $bb mount -t vfat -o rw,noatime "$user_device" "$runtime_mount/user" || \
     fail E25 P4_MOUNT_FAILED
+$bb rm -f "$runtime_mount/plumos/provision/clean-shutdown" \
+    "$runtime_mount/user/.plumos-clean-shutdown"
 $bb mkdir -p "$runtime_mount/plumos/logs" "$runtime_mount/plumos/provision"
 if [ "$provisioning_was_complete" = yes ]; then
     persistent_log=$runtime_mount/plumos/logs/last-boot.log

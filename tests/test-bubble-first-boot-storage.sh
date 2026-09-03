@@ -108,6 +108,18 @@ run_provisioner() {
         "$PROVISIONER"
 }
 
+run_fast_provisioner() {
+    PLUMOS_BUBBLE_STORAGE_AUTHORIZED=yes \
+    PLUMOS_PROVISION_FAST_BOOT=yes \
+    PLUMOS_PROVISION_DISK="$ACTIVE_LOOP" \
+    PLUMOS_PROVISION_P1="${ACTIVE_LOOP}p1" \
+    PLUMOS_PROVISION_P2="${ACTIVE_LOOP}p2" \
+    PLUMOS_PROVISION_P3="${ACTIVE_LOOP}p3" \
+    PLUMOS_PROVISION_P4="${ACTIVE_LOOP}p4" \
+    PLUMOS_PROVISION_STATE_MOUNT="$WORK/state-mount" \
+        "$PROVISIONER"
+}
+
 run_expect_success() {
     local log_file=$1
     if ! run_provisioner >"$log_file" 2>&1; then
@@ -143,6 +155,9 @@ assert_final_geometry
 [[ $p3_uuid == "$(blkid -s UUID -o value "${ACTIVE_LOOP}p3")" ]]
 [[ $p4_uuid == "$(blkid -s UUID -o value "${ACTIVE_LOOP}p4")" ]]
 [[ $table_before == "$(sfdisk -d "$ACTIVE_LOOP")" ]]
+run_fast_provisioner >"$WORK/seed-fast.log" 2>&1
+grep -q 'result=ok mode=clean-fast-boot' "$WORK/seed-fast.log"
+grep -q 'stage=S24B_P3_FILESYSTEM_READY mode=clean-fast-boot' "$WORK/seed-fast.log"
 detach_image
 
 # Resume after the p3 partition entry changed but before resize2fs ran.

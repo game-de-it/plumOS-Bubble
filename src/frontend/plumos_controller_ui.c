@@ -12308,6 +12308,9 @@ static int run_power_action(struct ui_state *ui, const char *action, int powerof
       snprintf(ui->status, sizeof(ui->status), "shutdown complete%s",
                poweroff ? " poweroff" : " (no poweroff)");
     }
+    if (terminal_action && !dry_run_enabled) {
+      ui->exit_requested = 1;
+    }
     if (terminal_action && dry_run_enabled) {
       ui->screen = previous_screen;
       ui->power_action[0] = '\0';

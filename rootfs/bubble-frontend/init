@@ -180,6 +180,35 @@ capture_snapshot() {
     } >/storage/plumos/logs/frontend-system-snapshot.txt 2>/dev/null || true
 }
 
+finalize_power_action() {
+    action=$1
+    request=/run/plumos/power-action/request
+    clean_marker=/storage/plumos/provision/clean-shutdown
+    log "stage=S90_POWER_FINALIZE_BEGIN action=$action"
+    $bb rm -f "$request"
+    $bb sync
+    if mounted /storage/user; then
+        log 'stage=E90_USER_STORAGE_STILL_MOUNTED clean-fast-boot=disabled'
+        $bb rm -f "$clean_marker" 2>/dev/null || true
+    fi
+    if $bb mount -o remount,ro /storage 2>/dev/null; then
+        printf 'plumos-bubble-init=stage=S91_STORAGE_READ_ONLY action=%s\n' \
+            "$action" >/dev/console 2>/dev/null || true
+    else
+        log 'stage=E91_STORAGE_READ_ONLY_FAILED clean-fast-boot=disabled'
+        $bb rm -f "$clean_marker" 2>/dev/null || true
+        $bb sync
+    fi
+    $bb mount -o remount,ro /flash 2>/dev/null || true
+    $bb sync
+    case "$action" in
+        reboot) exec $bb reboot -f ;;
+        shutdown) exec $bb poweroff -f ;;
+    esac
+    log 'stage=E92_POWER_BACKEND_RETURNED'
+    return 1
+}
+
 start_recovery_network_background() {
     network_stage_fat=0
     start_recovery_network
@@ -287,6 +316,10 @@ while :; do
     log "stage=S41_FRONTEND_START attempt=$restart_count"
     /bin/busybox sh /storage/plumos/bin/plumos-frontend-launch
     rc=$?
+    power_request=$($bb cat /run/plumos/power-action/request 2>/dev/null || true)
+    case "$power_request" in
+        reboot|shutdown) finalize_power_action "$power_request" ;;
+    esac
     log "stage=E80_FRONTEND_EXIT rc=$rc attempt=$restart_count"
     capture_snapshot
     restart_count=$((restart_count + 1))

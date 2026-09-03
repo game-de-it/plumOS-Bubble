@@ -117,6 +117,50 @@ grep -q 'would restore sa: config/standalone/ppsspp/ppsspp/PSP/SYSTEM/ppsspp.ini
 PLUMOS_ROOT="$tmp/root" PLUMOS_RUNTIME_ROOT="$tmp/run" \
     sh "$package/bin/plumos-safe-shutdown" --reboot --dry-run >"$tmp/power.log"
 grep -q 'result=dry-run action=reboot' "$tmp/power.log"
+grep -q 'user=/storage/user' "$tmp/power.log"
+grep -q 'clean-shutdown' "$package/bin/plumos-safe-shutdown"
+
+mkdir -p "$tmp/power-root/provision" "$tmp/power-user" "$tmp/power-runtime"
+printf '/dev/testp4 %s vfat rw 0 0\n' "$tmp/power-user" >"$tmp/mounts"
+cat >"$tmp/fake-busybox" <<'EOF'
+#!/bin/sh
+command_name=$1
+shift
+case "$command_name" in
+    mount|umount|sync|reboot|poweroff)
+        printf '%s %s\n' "$command_name" "$*" >>"$PLUMOS_TEST_POWER_CALLS"
+        exit 0
+        ;;
+    *) exec "$command_name" "$@" ;;
+esac
+EOF
+chmod +x "$tmp/fake-busybox"
+PLUMOS_ROOT="$tmp/power-root" \
+PLUMOS_RUNTIME_ROOT="$tmp/power-runtime" \
+PLUMOS_USER_MOUNT="$tmp/power-user" \
+PLUMOS_MOUNTS_FILE="$tmp/mounts" \
+PLUMOS_BUSYBOX="$tmp/fake-busybox" \
+PLUMOS_TEST_POWER_CALLS="$tmp/power-calls.log" \
+PLUMOS_NETWORK_SERVICES=/nonexistent \
+PLUMOS_POWER_REQUEST="$tmp/power-request" \
+    sh "$package/bin/plumos-safe-shutdown" --reboot
+[[ -f "$tmp/power-root/provision/clean-shutdown" ]]
+[[ -f "$tmp/power-user/.plumos-clean-shutdown" ]]
+grep -q "^umount $tmp/power-user$" "$tmp/power-calls.log"
+grep -qx reboot "$tmp/power-request"
+! grep -Eq '^(reboot|poweroff) ' "$tmp/power-calls.log"
+grep -q 'finalize_power_action' "$repo_root/rootfs/bubble-frontend/init"
+grep -q 'ui->exit_requested = 1' "$repo_root/src/frontend/plumos_controller_ui.c"
+
+network_script="$repo_root/package/network-services-bubble/plumos/bin/plumos-network-services"
+grep -q 'if \[ "$action" = quiesce \]' "$network_script"
+mkdir -p "$tmp/network-root/config/network"
+printf 'ssh_enabled=1\nftp_enabled=1\n' >"$tmp/network-root/config/network/services.conf"
+services_before=$(sha256sum "$tmp/network-root/config/network/services.conf" | awk '{print $1}')
+PLUMOS_ROOT="$tmp/network-root" PLUMOS_RUNTIME_ROOT="$tmp/network-run" \
+    sh "$network_script" quiesce
+services_after=$(sha256sum "$tmp/network-root/config/network/services.conf" | awk '{print $1}')
+[[ $services_before == "$services_after" ]]
 
 network_package="$repo_root/package/network-services-bubble/plumos"
 sh -n "$network_package/bin/plumos-network-services"

@@ -88,6 +88,32 @@ The following mutable files retained their pre-deployment SHA-256 values:
 its prior dirty evidence and was mounted read-only at `/run/media/sd2`; no
 automatic repair was attempted by the System startup path.
 
+The earlier external-initramfs path was a separate exception: even after
+provisioning had completed it reran `e2fsck -pf`, `resize2fs`, and
+`fsck.fat -a` on every boot. On this boot, p4 had its dirty bit removed by that
+path before System startup. This is not part of `plumos-storage-health observe`
+and is not accepted as the normal boot policy. The follow-up clean-shutdown
+fast path is recorded below and still requires a physical reboot gate.
+
+## Follow-up clean storage fast path
+
+Source after this physical observation adds the V90S-style distinction between
+clean normal startup and recovery startup:
+
+- terminal shutdown/reboot writes paired p3/p4 clean markers, syncs, explicitly
+  unmounts p4, then remounts p3 and p1 read-only;
+- external initramfs accepts the fast path only when provisioning is complete,
+  both clean markers exist, p4 is ready, and fixed geometry/type/label checks
+  pass;
+- accepted clean startup skips `e2fsck`, `resize2fs`, and `fsck.fat`;
+- missing markers retain the existing synchronous repair/resume path;
+- both markers are consumed before mutable storage is handed to System so a
+  crash cannot reuse stale clean state.
+
+Host fixtures cover first provisioning, interrupted provisioning, normal
+repair/resume, clean fast-path geometry validation, marker creation and p4
+unmount ordering. Physical deployment and the next clean reboot are pending.
+
 ## Remaining metadata work
 
 The seed-level `/flash/System/SYSTEM.manifest` and

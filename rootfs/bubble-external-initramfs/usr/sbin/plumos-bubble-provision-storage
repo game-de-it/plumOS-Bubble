@@ -23,6 +23,7 @@ P2=${PLUMOS_PROVISION_P2:?missing p2}
 P3=${PLUMOS_PROVISION_P3:?missing p3}
 P4=${PLUMOS_PROVISION_P4:-${DISK}p4}
 AUTHORIZED=${PLUMOS_BUBBLE_STORAGE_AUTHORIZED:-no}
+FAST_BOOT=${PLUMOS_PROVISION_FAST_BOOT:-no}
 
 boot_start=32768
 boot_sectors=1048576
@@ -168,6 +169,31 @@ if [ "$p3_sectors" = "$runtime_seed_sectors" ] && [ -b "$P4" ]; then
     fail E24 P4_PRESENT_BEFORE_P3_EXPANSION
 fi
 log "stage=S24_LAYOUT_AUTHORIZED disk_sectors=$(block_value size "$DISK") p3_sectors=$p3_sectors"
+
+# The initramfs requests this path only after mounting p3 and p4 read-only and
+# finding both clean-shutdown markers plus the completed provisioning markers.
+# Keep geometry/type/label validation here so the request cannot bypass the
+# fixed Bubble storage contract. Normal or unclean boots retain the full
+# repair/resume path below.
+if [ "$FAST_BOOT" = yes ]; then
+    [ "$p3_sectors" = "$runtime_target_sectors" ] ||
+        fail E24A FAST_BOOT_P3_SIZE_MISMATCH
+    [ -b "$P4" ] || fail E24C FAST_BOOT_P4_MISSING
+    p4_actual_start=$(block_value start "$P4")
+    [ "$p4_actual_start" = "$userdata_start" ] ||
+        fail E24C "P4_START_MISMATCH:$p4_actual_start"
+    [ "$(block_value size "$P4")" -ge "$p4_minimum_sectors" ] ||
+        fail E24C P4_TOO_SMALL
+    p4_type=$(blkid_value TYPE "$P4")
+    p4_label=$(blkid_value LABEL "$P4")
+    [ "$p4_type" = vfat ] || fail E24D "P4_TYPE_UNEXPECTED:$p4_type"
+    [ "$p4_label" = PLUMOS ] || fail E24D "P4_LABEL_UNEXPECTED:$p4_label"
+    log 'stage=S24A_P3_PARTITION_ALREADY_EXPANDED mode=clean-fast-boot'
+    log 'stage=S24B_P3_FILESYSTEM_READY mode=clean-fast-boot'
+    log "stage=S24D_P4_READY sectors=$(block_value size "$P4") mode=clean-fast-boot"
+    log 'result=ok mode=clean-fast-boot'
+    exit 0
+fi
 
 if [ "$p3_sectors" = "$runtime_seed_sectors" ]; then
     "$PARTED" -s "$DISK" unit s resizepart 3 "${runtime_target_end}s" ||
