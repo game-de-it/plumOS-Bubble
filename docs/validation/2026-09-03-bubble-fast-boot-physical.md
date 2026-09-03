@@ -204,6 +204,29 @@ remained read-only, and the current kernel log contained no ext4 or block I/O
 error. Because the prior shutdown was forced, p4 emitted the expected
 improper-unmount warning; the boot did not repair it automatically.
 
+## Clean-shutdown follow-up boot
+
+The frontend Shutdown route then recorded
+`user-unmount result=ok clean-markers=written` and handed the final power action
+to PID 1. On the next power-on, both p3 and p4 markers were present, the
+external initramfs recorded `previous_shutdown=clean automatic_repair=no`, and
+both markers were consumed before System startup. The boot again selected slot
+B and used `completed-no-repair`.
+
+This boot was faster than the post-repair transition boot: System entry was at
+3.55 seconds, frontend launch at 4.28 seconds, Wi-Fi/SSH completion at 7.96
+seconds, and the frontend ready marker at 9 seconds by boot-time/mtime
+comparison. `S42_FRONTEND_SLOW` remained absent because the frontend met its
+10-second-from-launch deadline. The three mutable configuration hashes were
+unchanged and the current kernel log contained zero ext4 or block I/O errors.
+
+The app-level clean-shutdown contract passed, but p4 still reported one
+`Volume was not properly unmounted` warning. This is the dirty flag inherited
+from the earlier forced power-off; a later clean unmount does not clear that
+pre-existing condition. In accordance with the normal-boot policy, neither
+startup performed a FAT repair. `BUB-P4-P04` therefore remains open until a
+user-directed offline FAT scan/repair and another clean shutdown/readback gate.
+
 ## Remaining metadata work
 
 The seed-level `/flash/System/SYSTEM.manifest` and

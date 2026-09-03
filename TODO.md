@@ -182,7 +182,10 @@
   - terminal shutdown/rebootでp3/p4 clean markerを書いてsyncし、p4を明示unmountしてから
     p3をread-only化する実装を追加。marker作成/unmount順はhost fixture合格。markerは
     clean-shutdown proofに使うが起動時修復のtriggerにはせず、完了済みlayoutでは常にfsckを
-    skipする。実機power actionと次bootでのmarker消費確認を残す。
+    skipする。FE Shutdownで`user-unmount result=ok`、次bootの`previous_shutdown=clean`、
+    marker消費、ext4/kernel error 0は実機合格。過去の強制電源断で残ったp4 FAT dirty flagは
+    clean unmountだけでは消えず、方針どおり自動修復していない。ユーザー主導offline scan後の
+    FAT read-only再検査を残す。
 
 ### Network/USB/storage
 
