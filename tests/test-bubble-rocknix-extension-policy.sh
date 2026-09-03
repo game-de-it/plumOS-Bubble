@@ -32,4 +32,4 @@ if PLUMOS_BUBBLE_SYSTEMS_JSON="$systems" \
 fi
 
 printf '%s\n' \
-  'bubble_rocknix_extension_policy=result-ok systems=98 reference=123 exclusions=30'
+  'bubble_rocknix_extension_policy=result-ok systems=98 reference=139 exclusions=30'

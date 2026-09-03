@@ -1,10 +1,12 @@
 {
-  "version": 1,
+  "version": 2,
   "reference": {
-    "name": "ROCKNIX EmulationStation system catalog snapshot used by plumOS A30",
-    "source_path": "plumOS-A30/artifacts/reference/es_systems.cfg",
-    "sha256": "ce4246759b8dcf2a571a60c9ebab9c7849e0ef19b63adf1682747bbc74a5f332",
-    "system_count": 123,
+    "name": "ROCKNIX emulator extension catalog",
+    "source_url": "https://github.com/ROCKNIX/distribution/tree/552674316206d815df7e6d755a4e307db2862005/config/emulators",
+    "source_commit": "552674316206d815df7e6d755a4e307db2862005",
+    "source_path": "config/emulators/*.conf",
+    "canonical_sha256": "ccc8959d791e99a3fde28586b8405b4c2252e19e5c189c004f006e9c905b9258",
+    "system_count": 139,
     "policy": "Every reference extension is required or has an explicit exclusion reason."
   },
   "systems": [
@@ -871,12 +873,18 @@
         "ports"
       ],
       "reference_extensions": [
-        "sh"
+        "sh",
+        "appimage"
       ],
       "required_extensions": [
         "sh"
       ],
-      "excluded_extensions": []
+      "excluded_extensions": [
+        {
+          "extension": "appimage",
+          "reason": "bubble_portmaster_route_only_accepts_top_level_sh_launchers"
+        }
+      ]
     },
     {
       "system_id": "msx",
@@ -943,7 +951,8 @@
         "thd",
         "nhd",
         "hdd",
-        "hdn"
+        "hdn",
+        "cmd"
       ],
       "required_extensions": [
         "d98",
@@ -960,7 +969,8 @@
         "thd",
         "nhd",
         "hdd",
-        "hdn"
+        "hdn",
+        "cmd"
       ],
       "excluded_extensions": []
     },
@@ -1159,9 +1169,16 @@
         "doom"
       ],
       "reference_extensions": [
-        "doom"
+        "doom",
+        "iwad",
+        "pwad",
+        "wad"
       ],
-      "required_extensions": [],
+      "required_extensions": [
+        "iwad",
+        "pwad",
+        "wad"
+      ],
       "excluded_extensions": [
         {
           "extension": "doom",
@@ -1171,25 +1188,11 @@
     },
     {
       "system_id": "pyxel",
-      "state": "mapped",
-      "rocknix_ids": [
-        "pyxel"
-      ],
-      "reference_extensions": [
-        "py",
-        "pyxapp",
-        "edit"
-      ],
-      "required_extensions": [
-        "py",
-        "pyxapp"
-      ],
-      "excluded_extensions": [
-        {
-          "extension": "edit",
-          "reason": "bubble_pyxel_launcher_does_not_support_this_extension"
-        }
-      ]
+      "state": "not_in_reference",
+      "rocknix_ids": [],
+      "reference_extensions": [],
+      "required_extensions": [],
+      "excluded_extensions": []
     },
     {
       "system_id": "2048",

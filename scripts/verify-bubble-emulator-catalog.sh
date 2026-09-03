@@ -34,9 +34,10 @@ jq -e '
 ' "$systems" >/dev/null
 
 jq -e '
-  .version == 1 and
-  .reference.sha256 == "ce4246759b8dcf2a571a60c9ebab9c7849e0ef19b63adf1682747bbc74a5f332" and
-  .reference.system_count == 123 and
+  .version == 2 and
+  .reference.source_commit == "552674316206d815df7e6d755a4e307db2862005" and
+  .reference.canonical_sha256 == "ccc8959d791e99a3fde28586b8405b4c2252e19e5c189c004f006e9c905b9258" and
+  .reference.system_count == 139 and
   ([.systems[].system_id] | length) ==
     ([.systems[].system_id] | unique | length) and
   all(.systems[];
