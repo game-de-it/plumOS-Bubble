@@ -37,8 +37,12 @@ rm -f "$root/network-services/ssh/libexec/sftp-server.bubble-build" \
 for wrapper in "$root/network-services/ssh/libexec/sftp-server" \
     "$root/network-services/samba/sbin/smbd" \
     "$root/network-services/samba/sbin/nmbd"; do
-    sed -i.bubble-build '1s|.*|#!/bin/sh|; s#${PLUMOS_ROOT}/bin/busybox#/bin/busybox#g' "$wrapper"
+    sed -i.bubble-build \
+        '1s|.*|#!/bin/sh|; s#${PLUMOS_ROOT}/bin/busybox#/bin/busybox#g; s#/mnt/SDCARD/plumos#/storage/plumos#g' \
+        "$wrapper"
     rm -f "$wrapper.bubble-build"
+    grep -Fq 'PLUMOS_ROOT:-/storage/plumos' "$wrapper"
+    ! grep -Fq '/mnt/SDCARD/plumos' "$wrapper"
 done
 
 cat >"$root/components/network-services/manifest.json" <<EOF
