@@ -2,6 +2,16 @@
 set -euo pipefail
 
 ROOT_DIR="${ROOT_DIR:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
+TOOLS_IMAGE="${PLUMOS_BUBBLE_TOOLS_IMAGE:-plumos-bubble-tools:dev}"
+if [[ ${1:-} != --inside ]]; then
+    docker image inspect "$TOOLS_IMAGE" >/dev/null 2>&1 ||
+        "$ROOT_DIR/scripts/build-bubble-tools-image.sh"
+    exec docker run --rm --platform linux/arm64 \
+        -e SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-}" \
+        -e PLUMOS_BUBBLE_VERSION="${PLUMOS_BUBBLE_VERSION:-0.1.0-dev}" \
+        -v "$ROOT_DIR:/work" -w /work "$TOOLS_IMAGE" \
+        ./scripts/build-pyxel-bubble.sh --inside
+fi
 TARGET_DIR="${TARGET_DIR:-$ROOT_DIR/output/pyxel/bubble}"
 LOCK_FILE="${PLUMOS_BUBBLE_PYXEL_LOCK:-$ROOT_DIR/package/pyxel-bubble/requirements.lock.txt}"
 DEFAULT_REQUIREMENTS="${PLUMOS_BUBBLE_PYXEL_REQUIREMENTS:-$ROOT_DIR/package/pyxel-bubble/requirements.txt}"
