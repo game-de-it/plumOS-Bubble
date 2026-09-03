@@ -158,3 +158,13 @@ full catalog order, hidden thumbnail order and hidden legacy order.
 A cross-series hardcoded-settings id audit found no Bubble-only settings row.
 Every Bubble START item is visible in at least one other plumOS series, so the
 working Performance route and the eight-entry common START contract remain.
+
+Source `a887dda` was deployed as a six-managed-file delta. The device-side
+frontend component verified all 158 files and the complete app layer verified
+all 12,373 files. The Bubble text renderer then showed exactly Scraping, File
+Manager, Music Player, RetroArch, Pyxel Setup, PortMaster and Update PortMaster;
+none of the three hidden thumbnail labels appeared. The current system,
+frontend and network-service settings retained their pre-deployment SHA-256
+values. The normal frontend returned renderer-ready as exactly one process and
+volume remained 0. The scoped rollback and verified deployment archive are at
+`/storage/plumos/backups/deploy-6a72940-before-a887dda`.

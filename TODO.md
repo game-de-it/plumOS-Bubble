@@ -206,6 +206,12 @@
     SSH=スタート、FTP/SFTP/Samba=ストップ、ADB=利用不可、およびFTP起動時のスタートへの
     動的切替をtext rendererで確認した。表示とNW Serviceトグルは自動起動設定ではなく実processを
     基準にする。全12,373 managed file hashと既存service/system/frontend設定hashは不変・合格。
+    Apps可視性監査ではA30/MF/MMF/V90S v2/XU20/Pixel2の現行sourceと計39 release tag、
+    MF実機画面を照合した。Thumbnail Plan/Fetch/Resultsは全系列で実装済みだが非表示であり、
+    Bubbleだけが表示していたためsource `a887dda`で非表示へ復元した。旧式settings/network catalog
+    entryも他系列同様に非表示化し、内部実装とcoverageは保持。Bubble固有の設定rowは0件、STARTの
+    各項目は他系列にも存在するため維持した。実機Apps 7項目、全12,373 managed file、設定hash、
+    renderer-ready FE 1 processが合格。
     boot/kernel/DTB/System matching-setは正式A/B slot完成までfull-image更新として分離する。
     host contract/buildは合格。実LCDでの各画面、設定反映、reboot/shutdown後のclean mountを残す。
 - [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
