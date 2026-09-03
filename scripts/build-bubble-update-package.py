@@ -38,6 +38,7 @@ MANAGED_ROOTS = {
     "network-services",
     "music",
     "picoarch",
+    "retroarch",
     "samba",
     "share",
     "ssh",

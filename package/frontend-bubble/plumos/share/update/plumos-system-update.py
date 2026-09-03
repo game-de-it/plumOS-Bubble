@@ -44,7 +44,8 @@ METADATA_LAST = {"VERSION", "manifest.json", "checksums.sha256"}
 MANAGED_ROOTS = {
     "apps", "bin", "components", "cores", "emulator", "factory-defaults",
     "fonts", "frontend", "gnu", "info", "lib", "licenses", "media", "network-services",
-    "music", "picoarch", "samba", "share", "ssh", "standalone", "themes",
+    "music", "picoarch", "retroarch", "samba", "share", "ssh", "standalone",
+    "themes",
 }
 MANAGED_ROOT_FILES = {"COMPAT_VENDOR", "MOUNT_PATH", "RUNTIME_ABI", *METADATA_LAST}
 MANAGED_CONFIG_PREFIXES = (
