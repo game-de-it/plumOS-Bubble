@@ -50,6 +50,7 @@ def instrument(source: str, external_initramfs: bool = False) -> str:
             result,
             "load ${devtype} ${devnum} ${ramdisk_addr_r} ${prefix}${initrdimg}\n",
             "if load ${devtype} ${devnum} ${ramdisk_addr_r} ${prefix}${initrdimg}; then\n"
+            "\tsetenv initrdsize ${filesize}\n"
             + marker("S12")
             + "else\n"
             + marker("E12")

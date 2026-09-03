@@ -114,6 +114,16 @@ Host fixtures cover first provisioning, interrupted provisioning, normal
 repair/resume, clean fast-path geometry validation, marker creation and p4
 unmount ordering. Physical deployment and the next clean reboot are pending.
 
+The first transition deployment exposed a boot-contract defect before external
+initramfs entry. The replacement initramfs was 4,034,371 bytes, 444 bytes larger
+than the prior 4,033,927-byte file, while the installed `uEnv.txt` still passed
+the old `initrdsize=0x3d8d87` to `booti`. U-Boot displayed the vendor Bubble
+logo, but the truncated gzip never reached the plumOS logo or `S21`. The
+instrumented external-initramfs boot script now assigns `initrdsize` from
+U-Boot's `${filesize}` immediately after a successful load. Offline p1 repair
+and physical boot acceptance remain pending; this failed boot is not counted as
+clean-fast-path acceptance.
+
 ## Remaining metadata work
 
 The seed-level `/flash/System/SYSTEM.manifest` and

@@ -87,6 +87,8 @@ for stage in S10 S11 S12 E12 S13 E13 S14 E14 S15 S19 E20; do
 done
 grep -q '^if load .*ramdisk_addr_r.*initrdimg' \
     "$test_dir/external-instrumented/boot.cmd"
+grep -q '^\tsetenv initrdsize ${filesize}$' \
+    "$test_dir/external-instrumented/boot.cmd"
 ! grep -q 'fatwrite' "$test_dir/external-instrumented/boot.cmd"
 test "$(grep -c 'diskutil unmountDisk "\$target"' \
     "$repo_root/scripts/write-bubble-seed-image-macos.sh")" -ge 3

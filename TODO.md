@@ -73,7 +73,10 @@
   - 同bootでexternal initramfsが完了済みp3/p4にも`e2fsck -pf`、`resize2fs`、
     `fsck.fat -a`を再実行し、p4 dirty bitを修復していたことを検出。V90S同様のpaired
     clean-shutdown marker fast pathを実装し、clean時は3処理をskip、marker欠落時だけ従来の
-    recovery/resumeを実行するhost fixtureに合格。実機deploy後のclean reboot計測を残す。
+    recovery/resumeを実行するhost fixtureに合格。実機deploy後の移行bootでは、更新した
+    initramfsの実サイズを既存`uEnv.txt`の旧`initrdsize`が切り詰め、plumOS entry前で停止。
+    U-Boot load成功直後に`${filesize}`を採用する修正を追加し、SD上のboot script修復と
+    clean reboot計測を残す。
 - [ ] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
 - [x] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
   - AArch64 static BusyBox、stock handoff互換entrypoint、FAT/ext4/console/kmsg stage、
