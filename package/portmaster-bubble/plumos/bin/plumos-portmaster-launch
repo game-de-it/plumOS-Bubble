@@ -169,18 +169,21 @@ export SDL_AUDIODRIVER="alsa"
 export SDL_GAMECONTROLLERCONFIG_FILE="${RUN_ROOT}/gamecontrollerdb.txt"
 export SDL_GAMECONTROLLERCONFIG="$(cat "$SDL_GAMECONTROLLERCONFIG_FILE")"
 export SDL_VIDEO_KMSDRM_DEVICE_INDEX="${SDL_VIDEO_KMSDRM_DEVICE_INDEX:-0}"
-export SDL_VIDEO_EGL_DRIVER="${SDL_VIDEO_EGL_DRIVER:-${PLUMOS_ROOT}/apps/pyxel/lib/libEGL.so.1}"
-export SDL_VIDEO_GL_DRIVER="${SDL_VIDEO_GL_DRIVER:-${PLUMOS_ROOT}/apps/pyxel/lib/libGLESv2.so.2}"
-export LIBGL_DRIVERS_PATH="${PLUMOS_ROOT}/apps/pyxel/dri"
-export __EGL_VENDOR_LIBRARY_FILENAMES="${__EGL_VENDOR_LIBRARY_FILENAMES:-${PLUMOS_ROOT}/apps/pyxel/egl_vendor.d/50_mesa.json}"
-export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
-export MESA_LOADER_DRIVER_OVERRIDE="${MESA_LOADER_DRIVER_OVERRIDE:-kms_swrast}"
-export MESA_SHADER_CACHE_DISABLE="${MESA_SHADER_CACHE_DISABLE:-true}"
+mali_library="${PLUMOS_ROOT}/emulator/lib/libmali.so.1"
+[ -c /dev/mali0 ] && [ -r "$mali_library" ] || {
+  printf 'plumos-portmaster-launch: Bubble Mali hardware runtime is unavailable\n' >&2
+  exit 1
+}
+export SDL_VIDEO_EGL_DRIVER="${SDL_VIDEO_EGL_DRIVER:-$mali_library}"
+export SDL_VIDEO_GL_DRIVER="${SDL_VIDEO_GL_DRIVER:-$mali_library}"
+unset LIBGL_ALWAYS_SOFTWARE MESA_LOADER_DRIVER_OVERRIDE \
+  LIBGL_DRIVERS_PATH __EGL_VENDOR_LIBRARY_FILENAMES
 mkdir -p "$HOME" "$XDG_CACHE_HOME" "$HM_PORTS_DIR"
 
 printf '\n[%s] launch version=%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
   "$(cat "${PM_DIR}/version" 2>/dev/null || printf unknown)" \
   "$(printf '%s' "$audio_status" | tr '\n' ' ')" >> "$LOG_FILE"
+printf 'renderer=mali-g52-gles2 software_fallback=false\n' >>"$LOG_FILE"
 
 "$BB" sh "${PLUMOS_ROOT}/bin/plumos-python-bubble" \
   "${ADAPTER_DIR}/plumos_portmaster_bootstrap.py" "$@" >> "$LOG_FILE" 2>&1 &

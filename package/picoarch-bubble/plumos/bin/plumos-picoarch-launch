@@ -12,6 +12,10 @@ CONTENT=${2:-}
 PICOARCH=$PLUMOS_ROOT/picoarch/bin/picoarch
 CORE=$PLUMOS_ROOT/cores/${CORE_ID}_libretro.so
 LOG=$PLUMOS_ROOT/logs/picoarch-${SYSTEM_ID}-${CORE_ID}.log
+CPU_CONTROL=$PLUMOS_ROOT/bin/plumos-cpu-control
+CPU_POLICY=${PLUMOS_PICOARCH_CPU_POLICY:-ondemand}
+CPU_SNAPSHOT=$RUNTIME_ROOT/picoarch/cpu-governors.$$
+CPU_SNAPSHOT_ACTIVE=0
 
 [ "$#" -eq 2 ] || {
     echo 'plumos-picoarch-launch: core and content are required' >&2
@@ -37,6 +41,10 @@ esac
     echo 'plumos-picoarch-launch: runtime, core, or content is missing' >&2
     exit 1
 }
+case "$CPU_POLICY" in
+    interactive|performance|ondemand|schedutil|conservative) ;;
+    *) echo "plumos-picoarch-launch: invalid CPU policy: $CPU_POLICY" >&2; exit 2 ;;
+esac
 
 $BB mkdir -p "$PLUMOS_ROOT/logs" "$PLUMOS_ROOT/state/picoarch/$SYSTEM_ID" \
     "$PLUMOS_ROOT/saves/$SYSTEM_ID" "$RUNTIME_ROOT/picoarch"
@@ -61,6 +69,12 @@ printf 'picoarch=stage-P10 system=%s core=%s\n' "$SYSTEM_ID" "$CORE_ID" \
     >>"$PLUMOS_ROOT/logs/session.log"
 child=
 stop_rc=
+restore_cpu_policy() {
+    if [ "$CPU_SNAPSHOT_ACTIVE" -eq 1 ]; then
+        "$BB" sh "$CPU_CONTROL" restore "$CPU_SNAPSHOT" >/dev/null 2>&1 || true
+        CPU_SNAPSHOT_ACTIVE=0
+    fi
+}
 stop_child() {
     signal_rc=$1
     stop_rc=$signal_rc
@@ -72,10 +86,23 @@ stop_child() {
         count=$((count + 1))
     done
     kill -KILL "$child" 2>/dev/null || true
+    restore_cpu_policy
 }
 trap 'stop_child 129' HUP
 trap 'stop_child 130' INT
 trap 'stop_child 143' TERM
+if [ -x "$CPU_CONTROL" ] &&
+    "$BB" sh "$CPU_CONTROL" snapshot "$CPU_SNAPSHOT"; then
+    CPU_SNAPSHOT_ACTIVE=1
+    "$BB" sh "$CPU_CONTROL" apply "$CPU_POLICY" || {
+        restore_cpu_policy
+        echo "plumos-picoarch-launch: cannot apply CPU policy: $CPU_POLICY" >&2
+        exit 1
+    }
+else
+    echo 'plumos-picoarch-launch: CPU policy control unavailable' >&2
+    exit 1
+fi
 set +e
 HOME="$PLUMOS_ROOT/state/picoarch/$SYSTEM_ID" \
 PLUMOS_PICOARCH_SYSTEM="$SYSTEM_ID" \
@@ -97,6 +124,7 @@ if [ -n "$stop_rc" ]; then
     rc=$stop_rc
 fi
 trap - HUP INT TERM
+restore_cpu_policy
 printf 'picoarch=stage-P19 system=%s core=%s rc=%s\n' \
     "$SYSTEM_ID" "$CORE_ID" "$rc" >>"$PLUMOS_ROOT/logs/session.log"
 $BB sync

@@ -81,6 +81,8 @@ cat >"$component/manifest.json" <<EOF
   "input": "retrogame_joypad",
   "input_mapping": "bubble-physical-labels",
   "library_scope": "frontend/lib",
+  "cpu_backend": "bin/plumos-cpu-control",
+  "cpu_policies": ["interactive", "performance", "ondemand", "schedutil", "conservative"],
   "reference_port": "plumOS-MF@0095017c39226ad1c22bf8df852202673075936d"
 }
 EOF

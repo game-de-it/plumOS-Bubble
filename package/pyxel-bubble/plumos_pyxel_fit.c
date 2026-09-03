@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 typedef unsigned int GLuint;
 typedef int GLint;
@@ -12,6 +13,7 @@ typedef void *(*SDLGLGetProcAddress)(const char *name);
 typedef int (*SDLGLSetAttribute)(int attr, int value);
 typedef void *(*SDLGLCreateContext)(SDL_Window *window);
 typedef int (*SDLGLMakeCurrent)(SDL_Window *window, void *context);
+typedef void (*SDLGLSwapWindow)(SDL_Window *window);
 typedef const char *(*SDLGetError)(void);
 typedef SDL_Window *(*SDLCreateWindow)(const char *title, int x, int y,
                                        int width, int height,
@@ -38,6 +40,7 @@ static SDLGLGetProcAddress real_sdl_gl_get_proc_address;
 static SDLGLSetAttribute real_sdl_gl_set_attribute;
 static SDLGLCreateContext real_sdl_gl_create_context;
 static SDLGLMakeCurrent real_sdl_gl_make_current;
+static SDLGLSwapWindow real_sdl_gl_swap_window;
 static SDLGetError real_sdl_get_error;
 static void *gles_handle;
 static SDLCreateWindow real_sdl_create_window;
@@ -51,6 +54,9 @@ static int fit_enabled = -1;
 static float output_width = 640.0f;
 static float output_height = 480.0f;
 static int fit_reported;
+static int frame_stats_enabled = -1;
+static unsigned long frame_stats_swaps;
+static struct timespec frame_stats_started;
 
 enum {
     SDL_GL_CONTEXT_MAJOR_VERSION = 17,
@@ -182,6 +188,41 @@ void *SDL_GL_CreateContext(SDL_Window *window)
                 ? real_sdl_get_error()
                 : "");
     return context;
+}
+
+void SDL_GL_SwapWindow(SDL_Window *window)
+{
+    struct timespec now;
+    double elapsed;
+
+    if (!real_sdl_gl_swap_window) {
+        real_sdl_gl_swap_window =
+            (SDLGLSwapWindow)dlsym(RTLD_NEXT, "SDL_GL_SwapWindow");
+    }
+    if (!real_sdl_gl_swap_window) {
+        return;
+    }
+    real_sdl_gl_swap_window(window);
+    if (frame_stats_enabled < 0) {
+        frame_stats_enabled = env_enabled("PLUMOS_PYXEL_FRAME_STATS", 0);
+        if (frame_stats_enabled) {
+            clock_gettime(CLOCK_MONOTONIC, &frame_stats_started);
+        }
+    }
+    if (!frame_stats_enabled) {
+        return;
+    }
+    ++frame_stats_swaps;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    elapsed = (double)(now.tv_sec - frame_stats_started.tv_sec) +
+              (double)(now.tv_nsec - frame_stats_started.tv_nsec) / 1000000000.0;
+    if (elapsed >= 5.0) {
+        fprintf(stderr,
+                "plumos-pyxel-frame: swaps=%lu elapsed=%.3f fps=%.3f\n",
+                frame_stats_swaps, elapsed, frame_stats_swaps / elapsed);
+        frame_stats_swaps = 0;
+        frame_stats_started = now;
+    }
 }
 
 static struct program_state *program_state(GLuint program, int create)

@@ -6,6 +6,10 @@ PLUMOS_ROM_ROOT=${PLUMOS_ROM_ROOT:-/storage/Roms}
 PLUMOS_BIOS_ROOT=${PLUMOS_BIOS_ROOT:-/storage/BIOS}
 RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+cpu_control=$PLUMOS_ROOT/bin/plumos-cpu-control
+cpu_policy=ondemand
+cpu_snapshot=
+cpu_snapshot_active=0
 system=
 core=
 rom=
@@ -14,11 +18,16 @@ while [ "$#" -gt 0 ]; do
         --system) system=$2; shift 2 ;;
         --core) core=$2; shift 2 ;;
         --rom) rom=$2; shift 2 ;;
-        --cpu|--audio|--audio-latency|--safe-exit) shift 2 ;;
+        --cpu) cpu_policy=$2; shift 2 ;;
+        --audio|--audio-latency|--safe-exit) shift 2 ;;
         --auto-state) shift ;;
         *) echo "plumos-retroarch-launch: unknown argument: $1" >&2; exit 2 ;;
     esac
 done
+case "$cpu_policy" in
+    interactive|performance|ondemand|schedutil|conservative) ;;
+    *) echo "invalid CPU policy: $cpu_policy" >&2; exit 2 ;;
+esac
 case "$system" in
     ''|*[!A-Za-z0-9._-]*) echo 'invalid system id' >&2; exit 2 ;;
 esac
@@ -61,6 +70,20 @@ export XDG_CONFIG_HOME="$PLUMOS_ROOT/config"
 core_id=${core##*/}
 core_id=${core_id%_libretro.so}
 append_config="$RUNTIME_ROOT/retroarch/launch.$$.cfg"
+cpu_snapshot="$RUNTIME_ROOT/retroarch/cpu-governors.$$"
+if [ -x "$cpu_control" ] &&
+    "$BB" sh "$cpu_control" snapshot "$cpu_snapshot"; then
+    cpu_snapshot_active=1
+    "$BB" sh "$cpu_control" apply "$cpu_policy" || {
+        "$BB" sh "$cpu_control" restore "$cpu_snapshot" >/dev/null 2>&1 || true
+        cpu_snapshot_active=0
+        echo "cannot apply CPU policy: $cpu_policy" >&2
+        exit 1
+    }
+else
+    echo 'CPU policy control unavailable' >&2
+    exit 1
+fi
 case "$core_id" in
     flycast|flycast_xtreme|km_duckswanstation_xtreme_amped|\
     mupen64plus_next|parallel_n64|yabasanshiro)
@@ -106,6 +129,10 @@ printf '%s\n' 'log_to_file = "false"' >>"$append_config"
 retroarch_pid=
 cleanup() {
     [ -z "$append_config" ] || $BB rm -f "$append_config"
+    if [ "$cpu_snapshot_active" -eq 1 ]; then
+        "$BB" sh "$cpu_control" restore "$cpu_snapshot" >/dev/null 2>&1 || true
+        cpu_snapshot_active=0
+    fi
 }
 terminate_retroarch() {
     signal_rc=$1

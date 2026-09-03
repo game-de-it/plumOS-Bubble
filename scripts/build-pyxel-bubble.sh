@@ -5,7 +5,6 @@ ROOT_DIR="${ROOT_DIR:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
 TARGET_DIR="${TARGET_DIR:-$ROOT_DIR/output/pyxel/bubble}"
 LOCK_FILE="${PLUMOS_BUBBLE_PYXEL_LOCK:-$ROOT_DIR/package/pyxel-bubble/requirements.lock.txt}"
 DEFAULT_REQUIREMENTS="${PLUMOS_BUBBLE_PYXEL_REQUIREMENTS:-$ROOT_DIR/package/pyxel-bubble/requirements.txt}"
-EGL_VENDOR_FILE="$ROOT_DIR/package/pyxel-bubble/egl_vendor.d/50_mesa.json"
 FIT_SOURCE="$ROOT_DIR/package/pyxel-bubble/plumos_pyxel_fit.c"
 PYTHON_VERSION="${PLUMOS_BUBBLE_PYTHON_VERSION:-3.11}"
 PYTHON_BIN="${PLUMOS_BUBBLE_PYTHON_BIN:-/usr/bin/python3.11}"
@@ -114,8 +113,6 @@ build_sdl() {
 [ -r "$LOCK_FILE" ] || fail "Pyxel lock file is missing: $LOCK_FILE"
 [ -r "$DEFAULT_REQUIREMENTS" ] ||
     fail "Pyxel default requirements are missing: $DEFAULT_REQUIREMENTS"
-[ -r "$EGL_VENDOR_FILE" ] ||
-    fail "Mesa EGL vendor definition is missing: $EGL_VENDOR_FILE"
 [ -r "$FIT_SOURCE" ] ||
     fail "Pyxel display fit source is missing: $FIT_SOURCE"
 fetch_sdl
@@ -129,8 +126,7 @@ PYXEL_SITE="$PYXEL_ROOT/site"
 PYXEL_LIB="$PYXEL_ROOT/lib"
 mkdir -p \
     "$PYTHON_ROOT/bin" "$PYTHON_ROOT/lib" "$PYTHON_SITE" \
-    "$PYXEL_SITE" "$PYXEL_LIB" "$PYXEL_ROOT/dri" \
-    "$PYXEL_ROOT/egl_vendor.d" \
+    "$PYXEL_SITE" "$PYXEL_LIB" \
     "$TARGET_DIR/plumos/bin" \
     "$TARGET_DIR/plumos/components/pyxel" \
     "$TARGET_DIR/plumos/share/pyxel" \
@@ -173,8 +169,6 @@ install -m 0644 "$DEFAULT_REQUIREMENTS" \
     "$TARGET_DIR/plumos/share/pyxel/requirements.txt"
 install -m 0644 "$LOCK_FILE" \
     "$TARGET_DIR/plumos/share/pyxel/requirements.lock.txt"
-install -m 0644 "$EGL_VENDOR_FILE" \
-    "$PYXEL_ROOT/egl_vendor.d/50_mesa.json"
 install -m 0644 /etc/ssl/certs/ca-certificates.crt \
     "$PYTHON_ROOT/ca-certificates.crt"
 
@@ -196,22 +190,13 @@ done < <(
         ' sh {} +
 )
 
-mesa_driver="/usr/lib/aarch64-linux-gnu/dri/kms_swrast_dri.so"
-[ -r "$mesa_driver" ] || fail "Mesa KMS software driver is missing: $mesa_driver"
-install -m 0644 "$mesa_driver" "$PYXEL_ROOT/dri/kms_swrast_dri.so"
-copy_dependency_tree "$mesa_driver" "$PYXEL_LIB"
 custom_sdl="$(find "$SDL_BUILD_ROOT/stage/usr/lib" -type f \
     -name 'libSDL2-2.0.so.*' -print | sort | tail -n 1)"
 [ -n "$custom_sdl" ] || fail "custom SDL2 library was not produced"
 install -m 0644 "$custom_sdl" "$PYXEL_LIB/libSDL2-2.0.so.0"
 "$STRIP" --strip-unneeded "$PYXEL_LIB/libSDL2-2.0.so.0"
 copy_dependency_tree "$custom_sdl" "$PYXEL_LIB"
-for library in \
-    libEGL.so.1 \
-    libEGL_mesa.so.0 \
-    libGLESv2.so.2 \
-    libGLdispatch.so.0 \
-    libgbm.so.1; do
+for library in libgbm.so.1; do
     [ ! -e "$PYXEL_LIB/$library" ] || continue
     source="$(find_target_lib "$library" || true)"
     [ -n "$source" ] || fail "Pyxel display library is missing: $library"
@@ -291,8 +276,44 @@ BASE_SITE="$PYXEL_ROOT/site"
 FIT_LIBRARY="${PLUMOS_PYXEL_FIT_LIBRARY:-$PYXEL_ROOT/lib/plumos-pyxel-fit.so}"
 MALI_LIBRARY="${PLUMOS_PYXEL_MALI_LIBRARY:-$PLUMOS_ROOT/emulator/lib/libmali.so.1}"
 LOG_DIR="${PLUMOS_PYXEL_LOG_DIR:-$PLUMOS_ROOT/logs/pyxel}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+CPU_CONTROL="$PLUMOS_ROOT/bin/plumos-cpu-control"
+CPU_POLICY="${PLUMOS_PYXEL_CPU_POLICY:-ondemand}"
+CPU_SNAPSHOT="$RUNTIME_ROOT/pyxel/cpu-governors.$$"
+CPU_SNAPSHOT_ACTIVE=0
+PYXEL_PID=""
 [ -x "$BB" ] || BB=/bin/busybox
-mkdir -p "$LOG_DIR" 2>/dev/null || true
+mkdir -p "$LOG_DIR" "$RUNTIME_ROOT/pyxel" 2>/dev/null || true
+
+restore_cpu_policy() {
+  if [ "$CPU_SNAPSHOT_ACTIVE" -eq 1 ]; then
+    "$BB" sh "$CPU_CONTROL" restore "$CPU_SNAPSHOT" >/dev/null 2>&1 || true
+    CPU_SNAPSHOT_ACTIVE=0
+  fi
+}
+
+cleanup_pyxel() {
+  signal_rc="${1:-0}"
+  if [ -n "$PYXEL_PID" ] && kill -0 "$PYXEL_PID" 2>/dev/null; then
+    kill -TERM "$PYXEL_PID" 2>/dev/null || true
+    count=0
+    while kill -0 "$PYXEL_PID" 2>/dev/null && [ "$count" -lt 50 ]; do
+      "$BB" usleep 100000
+      count=$((count + 1))
+    done
+    kill -0 "$PYXEL_PID" 2>/dev/null && kill -KILL "$PYXEL_PID" 2>/dev/null || true
+    wait "$PYXEL_PID" 2>/dev/null || true
+  fi
+  PYXEL_PID=""
+  restore_cpu_policy
+  trap - EXIT HUP INT TERM
+  [ "$signal_rc" -eq 0 ] || exit "$signal_rc"
+}
+
+trap 'cleanup_pyxel 0' EXIT
+trap 'cleanup_pyxel 129' HUP
+trap 'cleanup_pyxel 130' INT
+trap 'cleanup_pyxel 143' TERM
 
 AUDIO_OUTPUT="$PLUMOS_ROOT/bin/plumos-audio-output"
 if [ -x "$AUDIO_OUTPUT" ]; then
@@ -323,26 +344,20 @@ export SDL_AUDIODRIVER="${SDL_AUDIODRIVER:-alsa}"
 [ ! -d "$PLUMOS_ROOT/lib/alsa-lib" ] ||
   export ALSA_PLUGIN_DIR="${ALSA_PLUGIN_DIR:-$PLUMOS_ROOT/lib/alsa-lib}"
 export SDL_VIDEO_KMSDRM_DEVICE_INDEX="${SDL_VIDEO_KMSDRM_DEVICE_INDEX:-0}"
-if [ -r "$MALI_LIBRARY" ]; then
-  # RK3566's stock driver is one stateful mega-DSO. Loading copied EGL and
-  # GLES aliases as different files creates two driver states: SDL reports a
-  # context, but glGetString(GL_VERSION) returns NULL. Use the exact same DSO
-  # for EGL, GLES and the fit adapter's symbol lookup.
-  export PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib${PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH:+:$PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH}"
-  export SDL_VIDEO_EGL_DRIVER="${SDL_VIDEO_EGL_DRIVER:-$MALI_LIBRARY}"
-  export SDL_VIDEO_GL_DRIVER="${SDL_VIDEO_GL_DRIVER:-$MALI_LIBRARY}"
-  export PLUMOS_PYXEL_GLES_LIBRARY="${PLUMOS_PYXEL_GLES_LIBRARY:-$MALI_LIBRARY}"
-  unset LIBGL_ALWAYS_SOFTWARE MESA_LOADER_DRIVER_OVERRIDE \
-    __EGL_VENDOR_LIBRARY_FILENAMES
-else
-  export SDL_VIDEO_EGL_DRIVER="${SDL_VIDEO_EGL_DRIVER:-$PYXEL_ROOT/lib/libEGL.so.1}"
-  export SDL_VIDEO_GL_DRIVER="${SDL_VIDEO_GL_DRIVER:-$PYXEL_ROOT/lib/libGLESv2.so.2}"
-  export LIBGL_DRIVERS_PATH="${LIBGL_DRIVERS_PATH:-$PYXEL_ROOT/dri}"
-  export __EGL_VENDOR_LIBRARY_FILENAMES="${__EGL_VENDOR_LIBRARY_FILENAMES:-$PYXEL_ROOT/egl_vendor.d/50_mesa.json}"
-  export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
-  export MESA_LOADER_DRIVER_OVERRIDE="${MESA_LOADER_DRIVER_OVERRIDE:-kms_swrast}"
-fi
-export MESA_SHADER_CACHE_DISABLE="${MESA_SHADER_CACHE_DISABLE:-true}"
+[ -c /dev/mali0 ] && [ -r "$MALI_LIBRARY" ] || {
+  printf 'stage=P62_VIDEO result=failed renderer=mali-g52 reason=hardware-runtime-missing\n' >>"$LOG_DIR/runtime.log"
+  printf 'plumos-pyxel-bubble-launch: Bubble Mali hardware runtime is unavailable\n' >&2
+  exit 1
+}
+# RK3566's stock driver is one stateful mega-DSO. Loading copied EGL and GLES
+# aliases as different files creates two driver states. Use the exact same DSO
+# for EGL, GLES and the fit adapter, and never fall back to Mesa software GL.
+export PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib${PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH:+:$PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH}"
+export SDL_VIDEO_EGL_DRIVER="${SDL_VIDEO_EGL_DRIVER:-$MALI_LIBRARY}"
+export SDL_VIDEO_GL_DRIVER="${SDL_VIDEO_GL_DRIVER:-$MALI_LIBRARY}"
+export PLUMOS_PYXEL_GLES_LIBRARY="${PLUMOS_PYXEL_GLES_LIBRARY:-$MALI_LIBRARY}"
+unset LIBGL_ALWAYS_SOFTWARE MESA_LOADER_DRIVER_OVERRIDE \
+  LIBGL_DRIVERS_PATH __EGL_VENDOR_LIBRARY_FILENAMES
 export SDL_GAMECONTROLLERCONFIG="${SDL_GAMECONTROLLERCONFIG:-190000004b4800000111000000010000,retrogame_joypad,a:b1,b:b0,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,back:b8,start:b9,guide:b17,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a3,righty:a4,platform:Linux,}"
 if [ -r "$FIT_LIBRARY" ] && [ "${PLUMOS_PYXEL_FIT:-1}" != "0" ]; then
   export PLUMOS_PYXEL_FIT=1
@@ -351,7 +366,42 @@ if [ -r "$FIT_LIBRARY" ] && [ "${PLUMOS_PYXEL_FIT:-1}" != "0" ]; then
   export PLUMOS_BUBBLE_PYTHON_LD_PRELOAD="$FIT_LIBRARY${PLUMOS_BUBBLE_PYTHON_LD_PRELOAD:+:$PLUMOS_BUBBLE_PYTHON_LD_PRELOAD}"
 fi
 
-exec "$BB" sh "$PLUMOS_ROOT/bin/plumos-python-bubble" "$@" >>"$LOG_DIR/runtime.log" 2>&1
+case "$CPU_POLICY" in
+  interactive|performance|ondemand|schedutil|conservative) ;;
+  *)
+    printf 'plumos-pyxel-bubble-launch: invalid CPU policy: %s\n' "$CPU_POLICY" >&2
+    exit 2
+    ;;
+esac
+if [ -x "$CPU_CONTROL" ] &&
+   "$BB" sh "$CPU_CONTROL" snapshot "$CPU_SNAPSHOT"; then
+  CPU_SNAPSHOT_ACTIVE=1
+  if "$BB" sh "$CPU_CONTROL" apply "$CPU_POLICY"; then
+    printf 'stage=P63_CPU result=ok requested=%s active=%s\n' "$CPU_POLICY" \
+      "$(cat /sys/devices/system/cpu/cpufreq/policy0/scaling_governor 2>/dev/null || printf unknown)" \
+      >>"$LOG_DIR/runtime.log"
+  else
+    printf 'stage=P63_CPU result=failed requested=%s\n' "$CPU_POLICY" \
+      >>"$LOG_DIR/runtime.log"
+    restore_cpu_policy
+    exit 1
+  fi
+else
+  printf 'stage=P63_CPU result=failed reason=control-unavailable\n' \
+    >>"$LOG_DIR/runtime.log"
+  exit 1
+fi
+
+set +e
+"$BB" sh "$PLUMOS_ROOT/bin/plumos-python-bubble" "$@" >>"$LOG_DIR/runtime.log" 2>&1 &
+PYXEL_PID=$!
+wait "$PYXEL_PID"
+rc=$?
+PYXEL_PID=""
+set -e
+restore_cpu_policy
+trap - EXIT HUP INT TERM
+exit "$rc"
 EOF
 
 cat >"$TARGET_DIR/plumos/bin/plumos-pyxel-setup" <<'EOF'
@@ -507,7 +557,12 @@ cat >"$TARGET_DIR/plumos/components/pyxel/manifest.json" <<EOF
   "sdl2": "$SDL_VERSION",
   "requirements_sha256": "$lock_sha256",
   "generated_at": "$generated_at",
-  "display": "SDL2 KMSDRM with Mesa kms_swrast and aspect-fit",
+  "display": "SDL2 KMSDRM with Bubble Mali-G52 GLES2 and aspect-fit",
+  "hardware_required": true,
+  "software_fallback": false,
+  "external_gpu_runtime": ["emulator/lib/libmali.so.1", "/dev/mali0"],
+  "cpu_backend": "bin/plumos-cpu-control",
+  "default_cpu_policy": "ondemand",
   "audio": "SDL2 ALSA direct-hw or managed router",
   "input": "retrogame_joypad"
 }
@@ -520,7 +575,8 @@ sdl2=$SDL_VERSION
 requirements_sha256=$lock_sha256
 baseline=$PYXEL_SITE
 user_site=/storage/plumos/state/pyxel-site
-display=SDL2 KMSDRM Mesa kms_swrast aspect-fit
+display=SDL2 KMSDRM Bubble Mali-G52 GLES2 aspect-fit
+software_fallback=false
 audio=ALSA direct-hw or managed router
 EOF
 (

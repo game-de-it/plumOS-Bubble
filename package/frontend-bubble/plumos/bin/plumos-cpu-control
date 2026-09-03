@@ -1,0 +1,153 @@
+#!/bin/sh
+set -u
+
+CPUFREQ_ROOT="${PLUMOS_CPUFREQ_ROOT:-/sys/devices/system/cpu/cpufreq}"
+THERMAL_ROOT="${PLUMOS_THERMAL_ROOT:-/sys/class/thermal}"
+RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"
+DEFAULT_SNAPSHOT="$RUNTIME_ROOT/cpu/governors.snapshot"
+
+usage() {
+  printf '%s\n' \
+    'Usage: plumos-cpu-control status|available|apply GOVERNOR' \
+    '       plumos-cpu-control snapshot [FILE]|restore [FILE]'
+}
+
+policy_dirs() {
+  for policy in "$CPUFREQ_ROOT"/policy*; do
+    [ -d "$policy" ] || continue
+    name="${policy##*/}"
+    number="${name#policy}"
+    case "$number" in ""|*[!0-9]*) continue ;; esac
+    printf '%s\n' "$policy"
+  done
+}
+
+read_one() {
+  if [ -r "$1" ]; then
+    sed -n '1p' "$1"
+  else
+    printf '%s\n' N/A
+  fi
+}
+
+governor_available() {
+  policy="$1"
+  governor="$2"
+  [ -r "$policy/scaling_available_governors" ] &&
+    grep -qw "$governor" "$policy/scaling_available_governors"
+}
+
+validate_governor_for_all() {
+  governor="$1"
+  found=0
+  for policy in $(policy_dirs); do
+    found=1
+    [ -w "$policy/scaling_governor" ] || return 1
+    governor_available "$policy" "$governor" || return 1
+  done
+  [ "$found" -eq 1 ]
+}
+
+apply_governor() {
+  governor="$1"
+  validate_governor_for_all "$governor" || return 1
+  for policy in $(policy_dirs); do
+    printf '%s\n' "$governor" >"$policy/scaling_governor" || return 1
+  done
+}
+
+format_millicelsius() {
+  value="$1"
+  case "$value" in
+    -*) sign=-; value="${value#-}" ;;
+    *) sign= ;;
+  esac
+  case "$value" in ""|*[!0-9]*) printf '%s\n' N/A; return ;; esac
+  printf '%s%s.%s\n' "$sign" "$((value / 1000))" "$(((value % 1000) / 100))"
+}
+
+status() {
+  found=0
+  for policy in $(policy_dirs); do
+    found=1
+    name="${policy##*/}"
+    printf 'policy=%s' "$name"
+    printf ' cpus=%s' "$(read_one "$policy/affected_cpus")"
+    printf ' governor=%s' "$(read_one "$policy/scaling_governor")"
+    printf ' current_khz=%s' "$(read_one "$policy/scaling_cur_freq")"
+    printf ' min_khz=%s' "$(read_one "$policy/scaling_min_freq")"
+    printf ' max_khz=%s\n' "$(read_one "$policy/scaling_max_freq")"
+    printf 'available_governors=%s ' "$name"
+    read_one "$policy/scaling_available_governors"
+    printf 'available_frequencies_khz=%s ' "$name"
+    read_one "$policy/scaling_available_frequencies"
+  done
+  [ "$found" -eq 1 ] || printf 'policy=N/A\n'
+
+  for zone in "$THERMAL_ROOT"/thermal_zone*; do
+    [ -d "$zone" ] || continue
+    name="${zone##*/}"
+    temperature="$(read_one "$zone/temp")"
+    printf 'thermal=%s type=%s temp_millic=%s temp_c=%s policy=%s\n' \
+      "$name" "$(read_one "$zone/type")" "$temperature" \
+      "$(format_millicelsius "$temperature")" "$(read_one "$zone/policy")"
+  done
+}
+
+snapshot() {
+  target="${1:-$DEFAULT_SNAPSHOT}"
+  found=0
+  mkdir -p "${target%/*}" || return 1
+  tmp="$target.tmp.$$"
+  : >"$tmp" || return 1
+  for policy in $(policy_dirs); do
+    found=1
+    governor="$(read_one "$policy/scaling_governor")"
+    [ "$governor" != N/A ] || { rm -f "$tmp"; return 1; }
+    printf '%s %s\n' "${policy##*/}" "$governor" >>"$tmp" || {
+      rm -f "$tmp"
+      return 1
+    }
+  done
+  [ "$found" -eq 1 ] || { rm -f "$tmp"; return 1; }
+  mv -f "$tmp" "$target"
+}
+
+restore() {
+  target="${1:-$DEFAULT_SNAPSHOT}"
+  [ -r "$target" ] || return 1
+
+  while read -r name governor extra; do
+    [ -n "${name:-}" ] && [ -n "${governor:-}" ] && [ -z "${extra:-}" ] ||
+      return 1
+    case "$name" in policy*) ;; *) return 1 ;; esac
+    number="${name#policy}"
+    case "$number" in ""|*[!0-9]*) return 1 ;; esac
+    policy="$CPUFREQ_ROOT/$name"
+    [ -d "$policy" ] && [ -w "$policy/scaling_governor" ] || return 1
+    governor_available "$policy" "$governor" || return 1
+  done <"$target"
+
+  while read -r name governor; do
+    printf '%s\n' "$governor" >"$CPUFREQ_ROOT/$name/scaling_governor" || return 1
+  done <"$target"
+  rm -f "$target"
+}
+
+case "${1:-}" in
+  status) status ;;
+  available)
+    for policy in $(policy_dirs); do
+      printf '%s ' "${policy##*/}"
+      read_one "$policy/scaling_available_governors"
+    done
+    ;;
+  apply)
+    [ "$#" -eq 2 ] || { usage >&2; exit 2; }
+    apply_governor "$2"
+    ;;
+  snapshot) snapshot "${2:-$DEFAULT_SNAPSHOT}" ;;
+  restore) restore "${2:-$DEFAULT_SNAPSHOT}" ;;
+  -h|--help|help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

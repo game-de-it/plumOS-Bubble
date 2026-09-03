@@ -15,6 +15,13 @@ grep -Fq 'PLUMOS_BUBBLE_PYTHON_LD_PRELOAD' "$builder"
 grep -Fq 'PLUMOS_PYXEL_MALI_LIBRARY' "$builder"
 grep -Fq 'PLUMOS_PYXEL_GLES_LIBRARY' "$builder"
 grep -Fq 'Use the exact same DSO' "$builder"
+grep -Fq 'software_fallback": false' "$builder"
+grep -Fq 'Bubble Mali hardware runtime is unavailable' "$builder"
+grep -Fq 'PLUMOS_PYXEL_FRAME_STATS' "$repo_root/package/pyxel-bubble/plumos_pyxel_fit.c"
+if grep -Eq 'kms_swrast|LIBGL_ALWAYS_SOFTWARE=.*1' "$builder"; then
+    printf 'Bubble Pyxel must not package or select a software GL fallback\n' >&2
+    exit 1
+fi
 if grep -Fq 'export LD_LIBRARY_PATH="$PYXEL_ROOT/lib:$PYTHON_ROOT/lib:/usr/lib"' "$builder"; then
     printf 'Bubble Pyxel launcher must not expose the glibc runtime to stock BusyBox\n' >&2
     exit 1

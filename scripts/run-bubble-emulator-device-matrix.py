@@ -56,6 +56,24 @@ STANDALONE_LOGS = {
     "openbor": f"{ROOT}/logs/openbor-standalone.log",
 }
 
+MALI_RETROARCH_CORES = {
+    "flycast", "flycast_xtreme", "km_duckswanstation_xtreme_amped",
+    "mupen64plus_next", "parallel_n64", "yabasanshiro",
+}
+MALI_STANDALONES = {"pcsx_rearmed", "yabasanshiro", "ppsspp", "openbor"}
+
+
+def renderer_expectation(profile: str) -> str:
+    if profile.startswith("pyxel:"):
+        return "mali_required"
+    if profile.startswith("retroarch:") and profile.split(":", 1)[1] in MALI_RETROARCH_CORES:
+        return "mali_required"
+    if profile.startswith("standalone:") and profile.split(":", 1)[1] in MALI_STANDALONES:
+        return "mali_required"
+    if profile.startswith(("retroarch:", "picoarch:")):
+        return "cpu_framebuffer_no_software_gl"
+    return "route_owned_no_forced_software_gl"
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -248,6 +266,8 @@ alive=no
 kill -0 "$pid" 2>/dev/null && alive=yes
 drm=""
 audio=""
+mali=""
+software_gl=""
 for p in /proc/[0-9]*; do
     test -d "$p/fd" || continue
     for f in "$p"/fd/*; do
@@ -255,6 +275,10 @@ for p in /proc/[0-9]*; do
         test "$target" = /dev/dri/card0 && drm="$drm${p##*/},"
         test "$target" = /dev/snd/pcmC0D0p && audio="$audio${p##*/},"
     done
+    if test -r "$p/maps"; then
+        grep -q 'libmali' "$p/maps" 2>/dev/null && mali="$mali${p##*/},"
+        grep -Eq 'kms_swrast|swrast_dri|libLLVM' "$p/maps" 2>/dev/null && software_gl="$software_gl${p##*/},"
+    fi
 done
 pcm=$(sed -n 's/^state: //p' /proc/asound/card0/pcm0p/sub0/status 2>/dev/null || true)
 remaining=$((SECONDS - probe))
@@ -283,7 +307,7 @@ sleep 1
 for p in $(printf '%s' "$left" | /bin/busybox tr ',' ' '); do
     kill -KILL "$p" 2>/dev/null || true
 done
-printf '__META__ alive=%s drm=%s audio=%s pcm=%s rc=%s leftovers=%s preexisting=%s\n' "$alive" "${drm:-none}" "${audio:-none}" "${pcm:-closed}" "$rc" "${left:-none}" "${preexisting:-none}"
+printf '__META__ alive=%s drm=%s audio=%s mali=%s software_gl=%s pcm=%s rc=%s leftovers=%s preexisting=%s\n' "$alive" "${drm:-none}" "${audio:-none}" "${mali:-none}" "${software_gl:-none}" "${pcm:-closed}" "$rc" "${left:-none}" "${preexisting:-none}"
 printf '__RUNTIME_LOG__\n'
 if test -f "$RLOG"; then tail -c +$((before + 1)) "$RLOG" | tail -120; fi
 printf '__WRAPPER_LOG__\n'; tail -80 "$WRAP" 2>/dev/null || true
@@ -292,7 +316,7 @@ printf '__WRAPPER_LOG__\n'; tail -80 "$WRAP" 2>/dev/null || true
 
 def parse_meta(output: str) -> dict:
     line = next((line for line in output.splitlines() if line.startswith("__META__ ")), "")
-    return dict(re.findall(r"(alive|drm|audio|pcm|rc|leftovers|preexisting)=([^ ]*)", line))
+    return dict(re.findall(r"(alive|drm|audio|mali|software_gl|pcm|rc|leftovers|preexisting)=([^ ]*)", line))
 
 
 def main() -> int:
@@ -329,6 +353,7 @@ def main() -> int:
                 "system": system["id"], "profile": profile, "content": content,
                 "content_source": content_source, "command": command, "runtime_log": log,
                 "seconds": seconds,
+                "renderer_expectation": renderer_expectation(profile),
                 "status": (
                     "unsupported" if reason and reason.startswith("visible_unsupported_")
                     else "planned" if command and not reason else "not_run"
@@ -384,10 +409,29 @@ def main() -> int:
             # route. A route that was alive at the early probe but then exits
             # with its own failure code must not be reported as started.
             bounded_exit = meta.get("rc") in {"0", "137", "143"}
-            record["status"] = "started" if alive and drm and clean and bounded_exit else "failed"
+            software_gl = meta.get("software_gl") not in {None, "", "none"}
+            mali = meta.get("mali") not in {None, "", "none"}
+            renderer_ok = not software_gl and (
+                record["renderer_expectation"] != "mali_required" or mali
+            )
+            record["renderer_contract"] = (
+                "failed_software_gl_loaded" if software_gl
+                else "failed_mali_not_loaded" if not renderer_ok
+                else "mali_loaded" if mali
+                else "no_software_gl_loaded"
+            )
+            record["status"] = (
+                "started" if alive and drm and clean and bounded_exit and renderer_ok
+                else "failed"
+            )
             record["display_contract"] = "retroarch_drm" if any("Bubble display-contract" in line for line in display_lines) else "pyxel_fit" if any("plumos-pyxel-fit:" in line for line in display_lines) else "runtime_only"
             record["audio_contract"] = "pcm_running" if meta.get("pcm") == "RUNNING" else "not_observed"
-            print(f"[{index:03d}/{len(planned):03d}] {record['system']} {record['profile']} status={record['status']} drm={meta.get('drm','?')} pcm={meta.get('pcm','?')}", flush=True)
+            print(
+                f"[{index:03d}/{len(planned):03d}] {record['system']} {record['profile']} "
+                f"status={record['status']} drm={meta.get('drm','?')} pcm={meta.get('pcm','?')} "
+                f"renderer={record['renderer_contract']}",
+                flush=True,
+            )
             out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     finally:
         device.run("/bin/sh -s", input_text=TEARDOWN, check=False)
