@@ -74,6 +74,20 @@ standalone routes and the frontend keep their existing defaults.
 The SSH harness stopped the frontend repeatedly and consumed the early init
 four-attempt frontend restart limit. After logs were captured, `sync` followed
 by a forced reboot restored the normal frontend. This is a harness lifecycle
-limitation, not a normal one-game FE route. Post-reboot acceptance requires one
-frontend process, `ondemand`, volume zero, no stale game process, and valid
-managed checksums.
+limitation, not a normal one-game FE route.
+
+The hardware-rendering and CPU-policy layer was deployed as source `29a3fa0`;
+its complete managed rollback archive is
+`state/update-rollback/605f133-to-29a3fa0-20260903T122000JST.tar`, SHA-256
+`d6c976b72ff275e2bc1d968dc478dbb701e17260d6af6fa1f3361656edb6b4a0`.
+The Pyxel performance default was then deployed as source `cf99f17`, with
+rollback archive
+`state/update-rollback/29a3fa0-to-cf99f17-20260903T124000JST.tar`, SHA-256
+`5187ab6c4bd0e600a0b705fa6cb64e8b427cc4aba3d2336b0de1092c9cd5f45e`.
+Both deployments passed staged hashes before switching. The final Pyxel
+component and all 4,947 app-layer checksums passed on the device.
+
+Final readback found source `cf99f17`, one frontend process (PID 441), all CPU
+policies restored to `ondemand`, persisted volume `0`, ALSA softvol values
+`0,0`, no PFS Python process and no non-frontend DRM owner. No release was
+published.
