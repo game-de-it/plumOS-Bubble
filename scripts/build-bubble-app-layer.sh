@@ -8,6 +8,7 @@ if [[ ${1:-} != --inside ]]; then
         "$repo_root/scripts/build-bubble-frontend.sh"
         "$repo_root/scripts/build-nextcommander-bubble.sh"
         "$repo_root/scripts/build-music-player-bubble.sh"
+        "$repo_root/scripts/build-network-services-bubble.sh"
         "$repo_root/scripts/build-bubble-retroarch.sh"
         "$repo_root/scripts/build-libretro-core-catalog-bubble.sh" \
             --filter all --concurrency "${PLUMOS_BUBBLE_CORE_CONCURRENCY:-2}"
@@ -35,6 +36,10 @@ if [[ ${1:-} != --inside ]]; then
             exit 1
         }
     done
+    [[ -d "$repo_root/output/network-services/bubble/plumos" ]] || {
+        printf 'error: network-services input is missing\n' >&2
+        exit 1
+    }
     exec docker run --rm --platform linux/arm64 \
         -e SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-}" \
         -e PLUMOS_BUBBLE_VERSION="${PLUMOS_BUBBLE_VERSION:-0.1.0-dev}" \
@@ -55,6 +60,7 @@ mkdir -p "$root"
 cp -a "$repo_root/output/frontend/bubble/plumos/." "$root/"
 cp -a "$repo_root/output/nextcommander/bubble/plumos/." "$root/"
 cp -a "$repo_root/output/music-player/bubble/plumos/." "$root/"
+cp -a "$repo_root/output/network-services/bubble/plumos/." "$root/"
 cp -a "$repo_root/output/retroarch/bubble/plumos/." "$root/"
 cp -a "$repo_root/output/libretro-cores/bubble-all/plumos/." "$root/"
 cp -a "$repo_root/output/picoarch/bubble/plumos/." "$root/"
@@ -63,13 +69,15 @@ cp -a "$repo_root/output/pyxel/bubble/plumos/." "$root/"
 cp -a "$repo_root/output/portmaster/bubble/plumos/." "$root/"
 mkdir -p "$root/config/frontend" "$root/config/system" "$root/config/retroarch" \
     "$root/state/frontend" "$root/logs" "$root/saves" "$root/states"
+printf 'bubble-stockos-r1\n' >"$root/COMPAT_VENDOR"
+printf '1\n' >"$root/RUNTIME_ABI"
 
 for json in "$root"/config/frontend/*.json "$root"/factory-defaults/*/*.json \
     "$root"/components/*/manifest.json; do jq -e . "$json" >/dev/null; done
 PLUMOS_BUBBLE_APP_ROOT="$root" \
     "$repo_root/scripts/verify-bubble-emulator-catalog.sh"
 for component in \
-    frontend nextcommander music-player retroarch libretro-cores picoarch standalone pyxel portmaster; do
+    frontend nextcommander music-player network-services retroarch libretro-cores picoarch standalone pyxel portmaster; do
     (cd "$root" && sha256sum -c "components/$component/checksums.sha256")
 done
 LD_LIBRARY_PATH="$root/emulator/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
@@ -85,7 +93,7 @@ cat >"$root/manifest.json" <<EOF
   "version": "$version",
   "source_ref": "$source_ref",
   "source_date_epoch": $epoch,
-  "managed_components": ["frontend", "nextcommander", "music-player", "retroarch", "libretro-cores", "picoarch", "standalone", "pyxel", "portmaster"],
+  "managed_components": ["frontend", "nextcommander", "music-player", "network-services", "retroarch", "libretro-cores", "picoarch", "standalone", "pyxel", "portmaster"],
   "frontend": "cpu-drm-dumb-buffer",
   "retroarch": "software-plain-drm-rgui-and-hardware-kms-egl-gles-xmb-ozone",
   "core_baseline": "all-114-source-records",

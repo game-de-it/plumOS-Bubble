@@ -189,9 +189,17 @@
 - [ ] `BUB-P5-02` FEのinput、audio、brightness/volume、power menu ownershipをBubble helperへ接続する。
   - 共通STARTをUI / System / Network / Performance / Apps / Help / Reboot /
     Shutdownの8項目へ揃え、Bubbleで欠落していたPerformance導線を復元した。
-    brightness、Wi-Fi、SSH、time/RTC、factory reset、safe reboot/shutdown helperを実装し、
-    lid/color/luminationおよび未搭載network serviceは項目を保持して`未対応`表示にした。
-    System UpdateはMFと同じ手動SD更新導線を維持し、将来のA/B updaterとは分離した。
+    brightness、Wi-Fi、SSH、time/RTC、factory reset、safe reboot/shutdown helperを実装した。
+    Rockchip DSIのbrightness/contrast/hue/saturation DRM propertyを実機で変更・readback・復元し、
+    lumination/colorを実バックエンドへ接続した。PicoArch resetも既定envの復元へ接続した。
+    FTP/SFTP/Sambaは分離stageで起動し、macOS clientから同一fileをreadback後に停止まで合格。
+    lidはDT/input/interruptにsensorがなく、ADBはstock kernelがgadgetをmodule化している一方で
+    対応module/UDCが存在しないため、虚偽の成功扱いにはせずhardware-blocked表示を維持する。
+    System Updateは`/storage/user/updates`の署名済みRuntime packageを検証・予約し、安全再起動後に
+    managed fileだけをjournal付きで適用する。DRM FE ready未確認の次bootでは全pathをrollbackし、
+    active config/save/state/log/ROM/BIOS/credential/PortMaster installed stateを更新対象外にした。
+    Ed25519署名、2回のapply/rollback、health確定、managed delete、設定保全をhost fixtureで確認。
+    boot/kernel/DTB/System matching-setは正式A/B slot完成までfull-image更新として分離する。
     host contract/buildは合格。実LCDでの各画面、設定反映、reboot/shutdown後のclean mountを残す。
 - [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
   - RetroArch v1.22.2とQuickNES `058d665`をAArch64 containerからbuildし、
@@ -309,9 +317,13 @@
 ## P7: update, lifecycle and release
 
 - [ ] `BUB-P7-01` signed package、downgrade拒否、System A/B、app-layer journal/rollbackを実装する。
+  - Bubble RuntimeのEd25519署名、source/vendor/ABI照合、journal/rollback、FE ready health gateは実装・
+    host fixture合格。version順序に基づくdowngrade拒否とboot/System A/Bを残す。
 - [ ] `BUB-P7-02` boot/kernel/DTB/module/System matching-set updateとrecoveryを設計・実機検証する。
 - [ ] `BUB-P7-03` normal、tamper、disk full、中断、bad slot、health failure、old version updateを試験する。
-- [ ] `BUB-P7-04` factory defaultとactive user configを分離し、update/factory reset policyを確定する。
+- [x] `BUB-P7-04` factory defaultとactive user configを分離し、update/factory reset policyを確定する。
+  - Runtime update inventoryはfactory-defaultsと静的frontend/standalone configだけを管理し、active
+    config/save/state/log/user media/credentialを除外。factory resetは明示選択されたcategoryだけ復元する。
 - [ ] `BUB-P7-05` clean cloneからimageを再現し、source completeness、license、secret/ROM/BIOS混入gateを通す。
 - [ ] `BUB-P7-06` SD write/readback、cold boot 3回、warm reboot、rollback、全hardware acceptanceを完了する。
 - [ ] `BUB-P7-07` release candidateを利用者が物理確認し、未解決項目を明示する。

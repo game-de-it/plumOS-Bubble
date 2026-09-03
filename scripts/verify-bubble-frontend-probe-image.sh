@@ -120,7 +120,7 @@ debugfs -R 'cat /plumos/external-initramfs-probe.manifest' \
     "$verify/runtime.ext4" 2>/dev/null > "$verify/runtime.manifest"
 grep -q '^format=plumos-bubble-full-stack-runtime-validation-v2$' "$verify/runtime.manifest"
 grep -q '^authorized=yes$' "$verify/runtime.manifest"
-grep -q '^app_layer=frontend,retroarch,libretro-cores,picoarch,standalone,pyxel,portmaster$' "$verify/runtime.manifest"
+grep -q '^app_layer=frontend,nextcommander,music-player,network-services,retroarch,libretro-cores,picoarch,standalone,pyxel,portmaster$' "$verify/runtime.manifest"
 grep -q '^partition_expansion=p3-seed-2304MiB-to-8192MiB$' "$verify/runtime.manifest"
 grep -q '^p4_creation=first-boot-fat32-PLUMOS$' "$verify/runtime.manifest"
 if [ "$personalized" = yes ]; then
@@ -149,7 +149,7 @@ mkdir -p "$verify/app-layer"
 debugfs -R "rdump /plumos $verify/app-layer" "$verify/runtime.ext4" >/dev/null 2>&1
 app=$verify/app-layer/plumos
 (cd "$app" && sha256sum -c checksums.sha256)
-for component in frontend nextcommander music-player retroarch libretro-cores picoarch standalone pyxel portmaster; do
+for component in frontend nextcommander music-player network-services retroarch libretro-cores picoarch standalone pyxel portmaster; do
     (cd "$app" && sha256sum -c "components/$component/checksums.sha256")
 done
 jq -e '.device == "bubble" and .user_media_included == false and

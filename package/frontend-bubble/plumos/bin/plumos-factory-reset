@@ -82,7 +82,7 @@ restore_ra() {
 }
 
 restore_pico() {
-    restore_tree pico "$FACTORY_ROOT/picoarch" "$PLUMOS_ROOT/config/picoarch"
+    restore_tree pico "$FACTORY_ROOT/picoarch" "$PLUMOS_ROOT"
 }
 
 restore_sa() {

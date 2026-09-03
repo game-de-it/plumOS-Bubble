@@ -207,7 +207,8 @@ V90S_OUT="$VENDOR_ROOT/output/picoarch/v90s"
 
 rm -rf "$OUT_ROOT"
 mkdir -p "$PLUMOS_DIR/picoarch/bin" "$PLUMOS_DIR/picoarch/lib" \
-    "$PLUMOS_DIR/bin" "$PLUMOS_DIR/components/picoarch" "$PLUMOS_DIR/licenses"
+    "$PLUMOS_DIR/bin" "$PLUMOS_DIR/components/picoarch" "$PLUMOS_DIR/licenses" \
+    "$PLUMOS_DIR/factory-defaults/picoarch/config/standalone"
 install -m 0755 "$V90S_OUT/picoarch/bin/picoarch" \
     "$PLUMOS_DIR/picoarch/bin/picoarch"
 install -m 0644 "$V90S_OUT"/picoarch/lib/* "$PLUMOS_DIR/picoarch/lib/"
@@ -217,6 +218,9 @@ strip --strip-unneeded "$PLUMOS_DIR/picoarch/lib/libSDL2-2.0.so.0"
 install -m 0755 \
     "$ROOT_DIR/package/picoarch-bubble/plumos/bin/plumos-picoarch-launch" \
     "$PLUMOS_DIR/bin/plumos-picoarch-launch"
+install -m 0644 \
+    "$ROOT_DIR/package/picoarch-bubble/plumos/factory-defaults/picoarch/config/standalone/picoarch.env" \
+    "$PLUMOS_DIR/factory-defaults/picoarch/config/standalone/picoarch.env"
 install -m 0644 "$V90S_OUT/licenses/picoarch-LICENSE" \
     "$PLUMOS_DIR/licenses/picoarch-LICENSE"
 install -m 0644 "$V90S_OUT/licenses/sdl12-compat-LICENSE.txt" \
@@ -237,7 +241,7 @@ EOF
 
 (
     cd "$PLUMOS_DIR"
-    find bin picoarch licenses components/picoarch -type f \
+    find bin picoarch licenses factory-defaults/picoarch components/picoarch -type f \
         ! -path 'components/picoarch/checksums.sha256' \
         -print |
         sort |

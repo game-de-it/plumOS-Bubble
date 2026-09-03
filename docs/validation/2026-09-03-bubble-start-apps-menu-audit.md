@@ -32,12 +32,31 @@ differences were copied into Bubble.
 - Performance is connected to `plumos-cpu-control`.
 - System now has Bubble backlight, time/RTC, factory reset, storage, volume and
   safe power helpers.
-- Network now has AP6330/wpa_supplicant control and Dropbear SSH control.
-- Lid suspend, display color/lumination, PicoArch reset, FTP,
-  SFTP, Samba and ADB remain visible as unsupported until a real Bubble backend
-  exists.
-- System Update follows the current MF manual-SD update contract while the
-  Bubble A/B system-slot updater remains tracked under `BUB-P3-03`/`P3-05`.
+- Network now has AP6330/wpa_supplicant control, shell SSH on port 22, BusyBox
+  FTP on port 21, a dedicated Dropbear/OpenSSH SFTP route on port 2222, and an
+  authenticated Samba `SDCARD` share on port 445.
+- Display lumination and display color use the Bubble Rockchip DSI connector's
+  native 0..100 `brightness`, `contrast`, `hue`, and `saturation` DRM
+  properties. The frontend owns the DRM master and applies values through that
+  exact fd, including startup restoration.
+- PicoArch reset now restores a packaged Bubble default environment rather than
+  showing a placeholder.
+- System Update scans `/storage/user/updates` for the newest compatible signed
+  Bubble Runtime package, verifies its Ed25519 signature and ABI/vendor/source
+  constraints, records the request, and reboots through the normal safe-power
+  helper. Early frontend startup applies managed files with a per-path journal
+  and rollback copy; the transaction is accepted only after the DRM frontend
+  writes its renderer-ready proof. A subsequent boot before that proof restores
+  the previous Runtime. Active settings, saves, states, logs, ROMs, BIOS,
+  credentials and installed PortMaster state are outside its managed inventory.
+- Lid suspend remains visible but hardware-blocked: the runtime DT, input
+  inventory and interrupt inventory expose no lid/hall sensor. USB ADB remains
+  visible but hardware/kernel-blocked: the stock kernel config builds the DWC3
+  gadget stack as modules, but the image contains none of those modules and
+  therefore exposes no UDC. Neither item is reported as working.
+- Boot/kernel/DTB/System replacement remains a full-image operation until the
+  matching-set and A/B slot work tracked under `BUB-P3-03`/`P3-05` is complete;
+  the functional START route deliberately accepts Runtime packages only.
 - Scraping, Thumbnail Plan and Fetch Thumbnails use the common policy-aware
   scraper with Bubble's 98-system catalog and SD2 media roots.
 - File Manager is a Bubble build of NextCommander with the recorded physical
@@ -47,15 +66,31 @@ differences were copied into Bubble.
 
 The machine-readable contract is
 `config/frontend/start-menu-coverage.json`. It records order, implementation
-state, unsupported reason/TODO, and empty Bubble-only arrays.
+state, hardware-blocked reason/TODO, and empty Bubble-only arrays.
 
 ## Host verification
 
 - Shell syntax checks: passed.
+- Signed Runtime update fixture: Ed25519 verification, two transactional applies,
+  frontend health confirmation, two boot-before-health rollbacks, managed file
+  deletion, and active-setting preservation passed.
 - START/Apps JSON order and Bubble-only assertion: passed.
 - Factory reset and safe-power dry-run fixtures: passed.
 - AArch64 frontend build and component checksums: passed.
 - Text renderer: START reports 8 entries and Apps reports 10 implemented entries.
+- Bubble DRM probe: active DSI connector has all four 0..100 properties.
+- New frontend device test: 40/60/70/80 was applied and read back for
+  brightness/contrast/hue/saturation, then restored to 50/50/50/50.
+- FTP device/client test: port 21 started, the isolated validation file was read
+  back with `curl`, and the service stopped cleanly.
+- SFTP device/client test: port 2222 started, password authentication succeeded,
+  the same file was read back with the macOS SFTP client, and the service stopped.
+- Samba device/client test: port 445 started, macOS mounted `SDCARD`, read back
+  the isolated file with the same SHA-256, unmounted, and the service stopped.
+- File Manager and Music Player remained alive with DRM/input ownership; Music
+  Player also held the expected PCM fds. Both were terminated by the bounded
+  validation harness rather than crashing.
 
-Physical LCD navigation and device-helper behavior remain a separate device
-acceptance step. No release or publication is authorized by this audit.
+Physical LCD navigation, PortMaster GUI, reboot/shutdown media cleanliness, and
+the two hardware-blocked routes remain separate acceptance items. No release or
+publication is authorized by this audit.

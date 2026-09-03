@@ -139,6 +139,56 @@ struct plumos_fbdev_renderer {
 };
 
 #ifdef PLUMOS_FBDEV_ENABLE_DRM
+static int __attribute__((unused)) plumos_fbdev_drm_connector_property(
+    int fd, uint32_t connector_id, const char *name, int write_value,
+    uint64_t *value) {
+  drmModeObjectProperties *properties;
+  uint32_t index;
+  int result = 0;
+
+  if (fd < 0 || connector_id == 0 || !name || !name[0]) {
+    return 0;
+  }
+  properties = drmModeObjectGetProperties(fd, connector_id,
+                                           DRM_MODE_OBJECT_CONNECTOR);
+  if (!properties) {
+    return 0;
+  }
+  for (index = 0; index < properties->count_props; ++index) {
+    drmModePropertyRes *property =
+        drmModeGetProperty(fd, properties->props[index]);
+    if (!property) {
+      continue;
+    }
+    if (strcmp(property->name, name) == 0) {
+      if (write_value) {
+        result = value &&
+                 drmModeConnectorSetProperty(fd, connector_id,
+                                             property->prop_id, *value) == 0;
+      } else {
+        if (value) {
+          *value = properties->prop_values[index];
+        }
+        result = 1;
+      }
+      drmModeFreeProperty(property);
+      break;
+    }
+    drmModeFreeProperty(property);
+  }
+  drmModeFreeObjectProperties(properties);
+  return result;
+}
+
+static int __attribute__((unused)) plumos_fbdev_drm_set_connector_property(
+    struct plumos_fbdev_renderer *r, const char *name, uint64_t value) {
+  return r && r->drm_active &&
+         plumos_fbdev_drm_connector_property(r->drm_fd, r->drm_connector_id,
+                                             name, 1, &value);
+}
+#endif
+
+#ifdef PLUMOS_FBDEV_ENABLE_DRM
 static void plumos_fbdev_drm_page_flip_handler(
     int fd, unsigned int sequence, unsigned int tv_sec, unsigned int tv_usec,
     void *user_data) {

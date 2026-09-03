@@ -48,6 +48,7 @@ for name in plumos_library_scan plumos_text_ui plumos_frontend; do
 done
 install -m 0755 /usr/bin/amixer "$bin/plumos-amixer"
 install -m 0755 /usr/bin/aplay "$bin/plumos-aplay"
+install -m 0755 /usr/bin/openssl "$bin/plumos-openssl.bin"
 strip "$bin"/plumos-* 2>/dev/null || true
 chmod 0755 "$bin"/plumos-*
 
@@ -66,7 +67,7 @@ stage_libraries() {
 }
 stage_libraries "$bin/plumos-controller-ui-fbdev" "$bin/plumos-library-scan" \
     "$bin/plumos-text-ui" "$bin/plumos-frontend" "$bin/plumos-amixer" \
-    "$bin/plumos-aplay"
+    "$bin/plumos-aplay" "$bin/plumos-openssl.bin"
 
 cat >"$component/manifest.json" <<EOF
 {
@@ -86,7 +87,7 @@ cat >"$component/manifest.json" <<EOF
   "start_menu_entries": 8,
   "apps_menu_entries": 10,
   "bubble_only_menu_entries": [],
-  "settings_backends": ["display", "volume", "network", "network-services", "time-sync", "factory-reset", "storage-health", "cpu", "safe-power"],
+  "settings_backends": ["display", "volume", "network", "network-services", "time-sync", "factory-reset", "storage-health", "cpu", "safe-power", "signed-runtime-update"],
   "cpu_policies": ["interactive", "performance", "ondemand", "schedutil", "conservative"],
   "reference_port": "plumOS-MF@0095017c39226ad1c22bf8df852202673075936d"
 }
@@ -94,7 +95,8 @@ EOF
 printf '%s\n' "$version" >"$root/VERSION"
 (
     cd "$root"
-    find bin config factory-defaults fonts frontend/lib share themes -type f -print | LC_ALL=C sort |
+    find bin config factory-defaults fonts frontend/lib share themes -type f \
+        ! -path 'bin/plumos-network-services' -print | LC_ALL=C sort |
         while IFS= read -r path; do sha256sum "$path"; done
     sha256sum components/frontend/manifest.json VERSION
 ) >"$component/checksums.sha256"

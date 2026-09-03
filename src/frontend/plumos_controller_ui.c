@@ -2787,6 +2787,52 @@ static int runtime_device_is_bubble(void) {
   return device_id && strcmp(device_id, "bubble") == 0;
 }
 
+static int runtime_bubble_drm_property_available(const char *name) {
+#if defined(PLUMOS_ENABLE_FBDEV_RENDERER) && defined(PLUMOS_FBDEV_ENABLE_DRM)
+  const char *path;
+  drmModeRes *resources;
+  int fd;
+  int index;
+  int available = 0;
+
+  if (!runtime_device_is_bubble() || !name || !name[0]) {
+    return 0;
+  }
+  path = getenv("PLUMOS_DRM_DEVICE");
+  if (!path || !path[0]) {
+    path = "/dev/dri/card0";
+  }
+  fd = open(path, O_RDWR | O_CLOEXEC);
+  if (fd < 0) {
+    return 0;
+  }
+  resources = drmModeGetResources(fd);
+  if (!resources) {
+    close(fd);
+    return 0;
+  }
+  for (index = 0; index < resources->count_connectors && !available; ++index) {
+    drmModeConnector *connector =
+        drmModeGetConnector(fd, resources->connectors[index]);
+    uint64_t value = 0;
+    if (!connector) {
+      continue;
+    }
+    if (connector->connection == DRM_MODE_CONNECTED) {
+      available = plumos_fbdev_drm_connector_property(
+          fd, connector->connector_id, name, 0, &value);
+    }
+    drmModeFreeConnector(connector);
+  }
+  drmModeFreeResources(resources);
+  close(fd);
+  return available;
+#else
+  (void)name;
+  return 0;
+#endif
+}
+
 static int runtime_mmf_lcd_backend_available(void) {
   return runtime_device_is_mmf() && access(MMF_PWM_ENABLE_PATH, W_OK) == 0 &&
          access(MMF_PWM_DUTY_PATH, W_OK) == 0;
@@ -2840,21 +2886,33 @@ static int system_number_setting_runtime_available(const char *id) {
            runtime_lcd_backend_available() || runtime_mmf_lcd_backend_available();
   }
   if (strcmp(id, "system_lumination") == 0) {
+    if (runtime_bubble_drm_property_available("brightness")) {
+      return 1;
+    }
     return runtime_enhance_backend_available() ||
            runtime_mmf_enhance_backend_available() ||
            runtime_v90s_enhance_bright_available();
   }
   if (strcmp(id, "system_contrast") == 0) {
+    if (runtime_bubble_drm_property_available("contrast")) {
+      return 1;
+    }
     return runtime_enhance_backend_available() ||
            runtime_mmf_enhance_backend_available() ||
            runtime_v90s_enhance_contrast_available();
   }
   if (strcmp(id, "system_hue") == 0) {
+    if (runtime_bubble_drm_property_available("hue")) {
+      return 1;
+    }
     return runtime_enhance_backend_available() ||
            runtime_mmf_enhance_backend_available() ||
            runtime_v90s_color_temperature_available();
   }
   if (strcmp(id, "system_saturation") == 0) {
+    if (runtime_bubble_drm_property_available("saturation")) {
+      return 1;
+    }
     return runtime_enhance_backend_available() ||
            runtime_mmf_enhance_backend_available() ||
            runtime_v90s_enhance_saturation_available();
@@ -3217,6 +3275,67 @@ static int apply_runtime_v90s_display_enhance(const struct device_settings *devi
   return attempted && ok;
 }
 
+static int apply_runtime_bubble_drm_display_property(
+    struct ui_state *ui, const char *id) {
+#if defined(PLUMOS_ENABLE_FBDEV_RENDERER) && defined(PLUMOS_FBDEV_ENABLE_DRM)
+  const char *property = NULL;
+  long setting = 0;
+  long setting_max = 20;
+  uint64_t runtime_value;
+  uint64_t readback = 0;
+
+  if (!ui || !id || !runtime_device_is_bubble() || !ui->renderer_fbdev ||
+      !ui->fbdev_renderer.drm_active) {
+    return 0;
+  }
+  if (strcmp(id, "system_lumination") == 0) {
+    property = "brightness";
+    setting = ui->device.lumination;
+    setting_max = 10;
+  } else if (strcmp(id, "system_contrast") == 0) {
+    property = "contrast";
+    setting = ui->device.contrast;
+  } else if (strcmp(id, "system_hue") == 0) {
+    property = "hue";
+    setting = ui->device.hue;
+  } else if (strcmp(id, "system_saturation") == 0) {
+    property = "saturation";
+    setting = ui->device.saturation;
+  } else {
+    return 0;
+  }
+  runtime_value = (uint64_t)scale_setting_to_runtime_range(
+      setting, setting_max, 0, 100);
+  if (!plumos_fbdev_drm_set_connector_property(&ui->fbdev_renderer, property,
+                                                runtime_value) ||
+      !plumos_fbdev_drm_connector_property(
+          ui->fbdev_renderer.drm_fd, ui->fbdev_renderer.drm_connector_id,
+          property, 0, &readback)) {
+    return 0;
+  }
+  return readback == runtime_value;
+#else
+  (void)ui;
+  (void)id;
+  return 0;
+#endif
+}
+
+static int apply_runtime_bubble_drm_display_settings(struct ui_state *ui) {
+  static const char *ids[] = {"system_lumination", "system_contrast",
+                              "system_hue", "system_saturation"};
+  size_t index;
+  int ok = 1;
+
+  if (!ui || !runtime_device_is_bubble()) {
+    return 0;
+  }
+  for (index = 0; index < sizeof(ids) / sizeof(ids[0]); ++index) {
+    ok = apply_runtime_bubble_drm_display_property(ui, ids[index]) && ok;
+  }
+  return ok;
+}
+
 static void set_device_setting_number(struct device_settings *device,
                                       const char *id, long value) {
   if (!device || !id) {
@@ -3302,6 +3421,10 @@ static int apply_device_runtime_settings(const struct device_settings *device,
     if (!apply_runtime_v90s_display_enhance(device, id)) {
       ok = 0;
     }
+  } else if (needs_enhance && runtime_device_is_bubble()) {
+    /* The Bubble DRM master is owned by the renderer.  Interactive and
+     * startup application is performed with that exact fd after init. */
+    attempted = 1;
   } else if (needs_enhance && id) {
     ok = 0;
   }
@@ -6461,9 +6584,12 @@ static void add_network_service_entries(struct ui_state *ui) {
   add_bool_setting_entry(ui, "network_ssh_enabled", "SSH",
                          device->ssh_service_running);
   if (runtime_device_is_bubble()) {
-    add_unavailable_setting_entry(ui, "network_ftp_enabled", "FTP");
-    add_unavailable_setting_entry(ui, "network_sftp_enabled", "SFTP");
-    add_unavailable_setting_entry(ui, "network_samba_enabled", "Samba");
+    add_bool_setting_entry(ui, "network_ftp_enabled", "FTP",
+                           device->ftp_service_running);
+    add_bool_setting_entry(ui, "network_sftp_enabled", "SFTP",
+                           device->sftp_service_running);
+    add_bool_setting_entry(ui, "network_samba_enabled", "Samba",
+                           device->samba_service_running);
     add_unavailable_setting_entry(ui, "network_adb_enabled", "ADB");
   } else {
     add_bool_setting_entry(ui, "network_ftp_enabled", "FTP",
@@ -12199,8 +12325,50 @@ static int run_power_action(struct ui_state *ui, const char *action, int powerof
 }
 
 static int request_latest_system_update(struct ui_state *ui) {
-  set_status(ui, "Manual update: overwrite plumOS files on the SD card");
-  return 1;
+  char helper[PATH_MAX];
+  char log_dir[PATH_MAX];
+  char log_path[PATH_MAX];
+  char cmd[UI_COMMAND_MAX];
+  size_t pos = 0;
+  int rc;
+
+  if (!join_path(helper, sizeof(helper), ui->plumos_root,
+                 "bin/plumos-system-update") ||
+      !file_exists(helper)) {
+    set_status(ui, "System Update helper missing");
+    return 0;
+  }
+  if (!join_path(log_dir, sizeof(log_dir), ui->plumos_root, "logs") ||
+      !join_path(log_path, sizeof(log_path), log_dir,
+                 "frontend-system-update.log")) {
+    set_status(ui, "System Update log path too long");
+    return 0;
+  }
+  set_status(ui, "Verifying latest Bubble runtime update...");
+  render_ui(ui);
+  cmd[0] = '\0';
+  if (!append_string(cmd, sizeof(cmd), &pos, "mkdir -p ") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, log_dir) ||
+      !append_string(cmd, sizeof(cmd), &pos, "; PLUMOS_ROOT=") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->plumos_root) ||
+      !append_string(cmd, sizeof(cmd), &pos,
+                     " PLUMOS_USERDATA_ROOT=/storage/user"
+                     " PLUMOS_BOOT_ROOT=/flash ") ||
+      !append_runtime_script_invocation(cmd, sizeof(cmd), &pos, helper) ||
+      !append_string(cmd, sizeof(cmd), &pos, " request-latest >") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, log_path) ||
+      !append_string(cmd, sizeof(cmd), &pos, " 2>&1")) {
+    set_status(ui, "System Update command too long");
+    return 0;
+  }
+  rc = run_runtime_shell_command(cmd);
+  if (!system_command_succeeded(rc)) {
+    set_status(ui, "No compatible signed update; see update log");
+    return 0;
+  }
+  set_status(ui, "Update verified; restarting safely");
+  render_ui(ui);
+  return run_power_action(ui, "reboot", 0);
 }
 
 static int run_storage_health_check(struct ui_state *ui) {
@@ -13506,8 +13674,22 @@ static int save_setting_number(struct ui_state *ui, const char *id,
       return 0;
     }
     set_device_setting_number(&ui->device, id, value);
-    apply_device_runtime_settings(&ui->device, id, runtime_status,
-                                  sizeof(runtime_status));
+    if (runtime_device_is_bubble() &&
+        (strcmp(id, "system_lumination") == 0 ||
+         strcmp(id, "system_contrast") == 0 ||
+         strcmp(id, "system_hue") == 0 ||
+         strcmp(id, "system_saturation") == 0)) {
+      if (apply_runtime_bubble_drm_display_property(ui, id)) {
+        copy_string(runtime_status, sizeof(runtime_status),
+                    "Bubble DRM property applied");
+      } else {
+        copy_string(runtime_status, sizeof(runtime_status),
+                    "Bubble DRM property apply failed");
+      }
+    } else {
+      apply_device_runtime_settings(&ui->device, id, runtime_status,
+                                    sizeof(runtime_status));
+    }
     update_settings_entries_after_save(ui);
     settings_start_arrow_blink(ui, direction);
     if (runtime_status[0]) {
@@ -16383,6 +16565,9 @@ int main(int argc, char **argv) {
     if (!ui.rescue_network && !ui.power_overlay &&
         !runtime_device_is_mf()) {
       apply_device_runtime_settings(&ui.device, "system_brightness", NULL, 0);
+      if (runtime_device_is_bubble()) {
+        (void)apply_runtime_bubble_drm_display_settings(&ui);
+      }
       schedule_mmf_brightness_reapply(&ui);
     }
   }

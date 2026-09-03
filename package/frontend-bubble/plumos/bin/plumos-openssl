@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+LOADER=$PLUMOS_ROOT/apps/python/lib/ld-linux-aarch64.so.1
+OPENSSL=$PLUMOS_ROOT/bin/plumos-openssl.bin
+LIBRARY_PATH=$PLUMOS_ROOT/frontend/lib:$PLUMOS_ROOT/apps/python/lib
+
+[ -x "$LOADER" ] || exit 127
+[ -x "$OPENSSL" ] || exit 127
+exec "$LOADER" --library-path "$LIBRARY_PATH" "$OPENSSL" "$@"

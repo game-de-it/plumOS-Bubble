@@ -17,6 +17,23 @@ expected_apps='["scraping","file_manager","music_player","retroarch","pyxel_setu
 jq -e '.bubble_only_start_entries == [] and .bubble_only_apps_entries == []' "$coverage" >/dev/null
 jq -e 'all(.start_entries[]; .status == "implemented") and
     all(.apps_entries[]; .status == "implemented")' "$coverage" >/dev/null
+jq -e '[.implemented_subroutes[].path] == [
+    "system/lumination",
+    "system/display-color",
+    "system/update/runtime",
+    "system/factory-reset/picoarch",
+    "network/services/ftp",
+    "network/services/sftp",
+    "network/services/samba"
+  ] and
+  ([.unsupported_visible[].path] | index("network/services/ftp") == null) and
+  ([.unsupported_visible[].path] | index("network/services/sftp") == null) and
+  ([.unsupported_visible[].path] | index("network/services/samba") == null) and
+  ([.unsupported_visible[].path] | index("system/lumination") == null) and
+  ([.unsupported_visible[].path] | index("system/display-color") == null) and
+  ([.unsupported_visible[].path] | index("system/update/runtime") == null) and
+  ([.unsupported_visible[].path] | index("system/factory-reset/picoarch") == null)' \
+    "$coverage" >/dev/null
 
 for id in scraping file_manager music_player retroarch pyxel_setup portmaster \
     portmaster_update thumbnail-plan thumbnail-fetch thumbnail-results; do
@@ -30,7 +47,7 @@ done
 
 for helper in plumos-display-control plumos-network-control plumos-network-services \
     plumos-time-sync plumos-factory-reset plumos-safe-shutdown \
-    plumos-thumbnail-scraper; do
+    plumos-thumbnail-scraper plumos-system-update plumos-openssl; do
     sh -n "$package/bin/$helper"
 done
 
@@ -47,9 +64,11 @@ PLUMOS_BUBBLE_MAX_BRIGHTNESS="$tmp/backlight/max_brightness" \
 [[ $(cat "$tmp/backlight/brightness") == 255 ]]
 grep -q '"brightness": 10' "$tmp/root/config/system/settings.json"
 
-mkdir -p "$tmp/factory/retroarch" "$tmp/factory/standalone/ppsspp/PSP/SYSTEM" \
+mkdir -p "$tmp/factory/retroarch" "$tmp/factory/picoarch/config/standalone" \
+    "$tmp/factory/standalone/ppsspp/PSP/SYSTEM" \
     "$tmp/factory/standalone/yabasanshiro" "$tmp/factory/standalone/pcsx_rearmed"
 printf 'ra\n' >"$tmp/factory/retroarch/retroarch.cfg"
+printf 'PLUMOS_PICOARCH_EFFECT=NONE\n' >"$tmp/factory/picoarch/config/standalone/picoarch.env"
 printf 'ppsspp\n' >"$tmp/factory/standalone/ppsspp/PSP/SYSTEM/ppsspp.ini"
 printf 'controls\n' >"$tmp/factory/standalone/ppsspp/PSP/SYSTEM/controls.ini"
 printf '{}\n' >"$tmp/factory/standalone/yabasanshiro/keymapv2.json"
@@ -57,10 +76,17 @@ printf 'pcsx\n' >"$tmp/factory/standalone/pcsx_rearmed/pcsx.cfg"
 PLUMOS_ROOT="$tmp/root" PLUMOS_FACTORY_DEFAULTS_ROOT="$tmp/factory" \
     sh "$package/bin/plumos-factory-reset" all --dry-run >"$tmp/factory.log"
 grep -q 'would restore ra: config/retroarch/retroarch.cfg' "$tmp/factory.log"
+grep -q 'would restore pico: config/standalone/picoarch.env' "$tmp/factory.log"
 grep -q 'would restore sa: config/standalone/ppsspp/ppsspp/PSP/SYSTEM/ppsspp.ini' "$tmp/factory.log"
 
 PLUMOS_ROOT="$tmp/root" PLUMOS_RUNTIME_ROOT="$tmp/run" \
     sh "$package/bin/plumos-safe-shutdown" --reboot --dry-run >"$tmp/power.log"
 grep -q 'result=dry-run action=reboot' "$tmp/power.log"
+
+network_package="$repo_root/package/network-services-bubble/plumos"
+sh -n "$network_package/bin/plumos-network-services"
+PLUMOS_ROOT="$tmp/root" PLUMOS_RUNTIME_ROOT="$tmp/run" \
+    sh "$network_package/bin/plumos-network-services" status adb >"$tmp/adb.log" 2>&1 || true
+grep -q '^state=hardware_unavailable$' "$tmp/adb.log"
 
 printf 'bubble_start_menu_contract=result-ok start=8 apps=10 implemented=10 bubble_only=0\n'

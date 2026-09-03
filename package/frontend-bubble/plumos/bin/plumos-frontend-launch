@@ -6,6 +6,26 @@ RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 LOG=$PLUMOS_ROOT/logs/frontend.log
 VALIDATION_HOLD=${PLUMOS_FRONTEND_VALIDATION_HOLD:-$RUNTIME_ROOT/validation/frontend-hold}
+UPDATE=$PLUMOS_ROOT/bin/plumos-system-update
+UPDATE_LOG=$PLUMOS_ROOT/logs/system-update.log
+
+$BB mkdir -p "$PLUMOS_ROOT/logs" "$RUNTIME_ROOT/frontend"
+if [ -x "$UPDATE" ] &&
+    { [ -s "$PLUMOS_ROOT/update-state/request.json" ] ||
+      [ -s "$PLUMOS_ROOT/update-state/runtime-transaction.json" ] ||
+      [ -s "$PLUMOS_ROOT/update-state/runtime-pending.json" ]; }; then
+    printf 'frontend_update=apply-pending\n' >>"$LOG"
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_USERDATA_ROOT=/storage/user \
+        PLUMOS_BOOT_ROOT=/flash "$BB" sh "$UPDATE" apply-pending \
+        >>"$UPDATE_LOG" 2>&1 ||
+        printf 'frontend_update=apply-or-recovery-failed\n' >>"$LOG"
+fi
+
+if [ -x "$PLUMOS_ROOT/bin/plumos-network-services" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-/storage}" \
+        "$BB" sh "$PLUMOS_ROOT/bin/plumos-network-services" start-enabled \
+        >>"$PLUMOS_ROOT/logs/network-services.log" 2>&1 || true
+fi
 SCAN_TIMEOUT=${PLUMOS_LIBRARY_SCAN_TIMEOUT:-180}
 case "$SCAN_TIMEOUT" in *[!0-9]*|'') SCAN_TIMEOUT=180 ;; esac
 export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT"
@@ -110,4 +130,22 @@ if [ -x "$PLUMOS_ROOT/bin/plumos-storage-health" ]; then
         printf 'frontend_storage_health=post-scan-observe-failed\n' >>"$LOG"
 fi
 printf 'frontend_exec=stage-S42\n' >>"$LOG"
+if [ -x "$UPDATE" ] && [ -s "$PLUMOS_ROOT/update-state/runtime-pending.json" ]; then
+    $BB rm -f /tmp/plumos-fe-ready
+    (
+        attempts=0
+        while [ "$attempts" -lt 60 ]; do
+            if [ -s /tmp/plumos-fe-ready ]; then
+                PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_USERDATA_ROOT=/storage/user \
+                    PLUMOS_BOOT_ROOT=/flash "$BB" sh "$UPDATE" mark-healthy \
+                    >>"$UPDATE_LOG" 2>&1
+                exit $?
+            fi
+            attempts=$((attempts + 1))
+            $BB sleep 1
+        done
+        printf 'frontend_update=renderer-ready-timeout\n' >>"$UPDATE_LOG"
+        exit 1
+    ) &
+fi
 exec "$BB" sh "$PLUMOS_ROOT/bin/plumos-controller-ui-bubble" "$@" >>"$LOG" 2>&1

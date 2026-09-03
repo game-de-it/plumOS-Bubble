@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+PYTHON=$PLUMOS_ROOT/bin/plumos-python-bubble
+UPDATER=$PLUMOS_ROOT/share/update/plumos-system-update.py
+
+[ -x "$PYTHON" ] || {
+    printf 'error: Bubble Python runtime is missing\n' >&2
+    exit 127
+}
+[ -r "$UPDATER" ] || {
+    printf 'error: Bubble update engine is missing\n' >&2
+    exit 127
+}
+exec /bin/busybox sh "$PYTHON" "$UPDATER" "$@"

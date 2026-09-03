@@ -1,0 +1,278 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+PLUMOS_SDCARD_ROOT=${PLUMOS_SDCARD_ROOT:-/storage}
+SHARE_DIR=${PLUMOS_NETWORK_SHARE_DIR:-$PLUMOS_SDCARD_ROOT}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+RUN_DIR=${PLUMOS_NETWORK_SERVICES_RUN_DIR:-$RUNTIME_ROOT/network-services}
+CONFIG_DIR=$PLUMOS_ROOT/config/network
+SERVICES_CONF=$CONFIG_DIR/services.conf
+LOG=$PLUMOS_ROOT/logs/network-services.log
+BUSYBOX=$PLUMOS_ROOT/network-services/bin/busybox
+SFTP_SERVER=$PLUMOS_ROOT/network-services/ssh/libexec/sftp-server
+SMBD=$PLUMOS_ROOT/network-services/samba/sbin/smbd
+HOST_KEY=$PLUMOS_ROOT/ssh/dropbear_ed25519_host_key
+SSH_PID=${PLUMOS_SSH_PID_FILE:-/run/dropbear/dropbear.pid}
+SFTP_PID=$RUN_DIR/dropbear-sftp.pid
+FTP_PID=$RUN_DIR/ftp.pid
+SMBD_PID=$RUN_DIR/smbd.pid
+FTP_PORT=${PLUMOS_FTP_PORT:-21}
+SFTP_PORT=${PLUMOS_SFTP_PORT:-2222}
+
+mkdir -p "$RUN_DIR" "$CONFIG_DIR" "$PLUMOS_ROOT/logs" 2>/dev/null || true
+
+log() {
+    printf '%s service=%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || true)" "$1" "$2" >>"$LOG"
+}
+
+config_key() {
+    case $1 in
+        ssh|ftp|sftp|samba|adb) printf '%s_enabled\n' "$1" ;;
+        *) return 1 ;;
+    esac
+}
+
+enabled() {
+    key=$(config_key "$1") || return 1
+    value=$(sed -n "s/^${key}=//p" "$SERVICES_CONF" 2>/dev/null | tail -n 1)
+    [ -n "$value" ] || { [ "$1" = ssh ]; return; }
+    case $value in 1|true|on) return 0 ;; *) return 1 ;; esac
+}
+
+set_enabled() {
+    key=$(config_key "$1") || return 1
+    next=$SERVICES_CONF.next.$$
+    if [ -r "$SERVICES_CONF" ]; then
+        grep -v "^${key}=" "$SERVICES_CONF" >"$next" || true
+    else
+        : >"$next"
+    fi
+    printf '%s=%s\n' "$key" "$2" >>"$next"
+    mv -f "$next" "$SERVICES_CONF" && sync
+}
+
+pid_matches() {
+    file=$1
+    needle=$2
+    [ -s "$file" ] || return 1
+    pid=$(sed -n '1p' "$file" 2>/dev/null || true)
+    case $pid in ''|*[!0-9]*) return 1 ;; esac
+    kill -0 "$pid" 2>/dev/null || return 1
+    cmd=$(tr '\000' ' ' <"/proc/$pid/cmdline" 2>/dev/null || true)
+    case "$cmd" in *"$needle"*) return 0 ;; *) return 1 ;; esac
+}
+
+stop_pid() {
+    file=$1
+    needle=$2
+    if pid_matches "$file" "$needle"; then
+        pid=$(sed -n '1p' "$file")
+        kill -TERM "$pid" 2>/dev/null || true
+        count=0
+        while kill -0 "$pid" 2>/dev/null && [ "$count" -lt 20 ]; do
+            "$BUSYBOX" usleep 100000
+            count=$((count + 1))
+        done
+        kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null || true
+    fi
+    rm -f "$file"
+}
+
+dropbear_running() {
+    pid_matches "$SSH_PID" dropbear && return 0
+    for path in /proc/[0-9]*/cmdline; do
+        [ -r "$path" ] || continue
+        cmd=$(tr '\000' ' ' <"$path" 2>/dev/null || true)
+        case "$cmd" in *dropbear*'-p 22 '*) return 0 ;; esac
+    done
+    return 1
+}
+
+print_status() {
+    service=$1
+    state=$2
+    summary=$3
+    printf 'service=%s\nstate=%s\nsummary=%s\n' "$service" "$state" "$summary"
+    if enabled "$service"; then printf 'enabled=1\n'; else printf 'enabled=0\n'; fi
+    printf 'share_dir=%s\n' "$SHARE_DIR"
+}
+
+status_service() {
+    case $1 in
+        ssh)
+            if dropbear_running; then print_status ssh running 'SSH port 22'; return 0; fi
+            print_status ssh stopped 'SSH stopped'; return 2
+            ;;
+        ftp)
+            [ -x "$BUSYBOX" ] || { print_status ftp not_installed 'FTP runtime missing'; return 1; }
+            if pid_matches "$FTP_PID" tcpsvd; then print_status ftp running "FTP port $FTP_PORT"; return 0; fi
+            print_status ftp stopped 'FTP stopped'; return 2
+            ;;
+        sftp)
+            [ -x "$SFTP_SERVER" ] || { print_status sftp not_installed 'SFTP runtime missing'; return 1; }
+            if pid_matches "$SFTP_PID" dropbear; then print_status sftp running "SFTP port $SFTP_PORT"; return 0; fi
+            print_status sftp stopped 'SFTP stopped'; return 2
+            ;;
+        samba)
+            [ -x "$SMBD" ] || { print_status samba not_installed 'Samba runtime missing'; return 1; }
+            if pid_matches "$SMBD_PID" smbd; then print_status samba running 'Samba share SDCARD'; return 0; fi
+            print_status samba stopped 'Samba stopped'; return 2
+            ;;
+        adb)
+            print_status adb hardware_unavailable 'Bubble kernel exposes no USB device controller'; return 1
+            ;;
+    esac
+}
+
+start_ssh() {
+    set_enabled ssh 1
+    if dropbear_running; then status_service ssh; return 0; fi
+    [ -x /usr/sbin/dropbear ] && [ -x /usr/bin/dropbearkey ] || return 1
+    mkdir -p "${SSH_PID%/*}" "${HOST_KEY%/*}"
+    if [ ! -s "$HOST_KEY" ]; then
+        /usr/bin/dropbearkey -t ed25519 -f "$HOST_KEY" >>"$LOG" 2>&1 || return 1
+        chmod 0600 "$HOST_KEY"
+    fi
+    /usr/sbin/dropbear -E -P "$SSH_PID" -r "$HOST_KEY" -p 22 -K 30 -I 300 >>"$LOG" 2>&1 || return 1
+    status_service ssh
+}
+
+stop_ssh() {
+    set_enabled ssh 0
+    stop_pid "$SSH_PID" dropbear
+    status_service ssh || true
+}
+
+start_ftp() {
+    set_enabled ftp 1
+    [ -x "$BUSYBOX" ] || return 1
+    if ! pid_matches "$FTP_PID" tcpsvd; then
+        "$BUSYBOX" tcpsvd -vE -c 20 0.0.0.0 "$FTP_PORT" \
+            "$BUSYBOX" ftpd -w -A -t 300 -T 3600 "$SHARE_DIR" >>"$LOG" 2>&1 &
+        printf '%s\n' "$!" >"$FTP_PID"
+        sleep 1
+    fi
+    status_service ftp
+}
+
+stop_ftp() {
+    set_enabled ftp 0
+    stop_pid "$FTP_PID" tcpsvd
+    status_service ftp || true
+}
+
+start_sftp() {
+    set_enabled sftp 1
+    [ -x "$SFTP_SERVER" ] && [ -x /usr/sbin/dropbear ] || return 1
+    if ! pid_matches "$SFTP_PID" dropbear; then
+        mkdir -p "${HOST_KEY%/*}"
+        if [ ! -s "$HOST_KEY" ]; then
+            /usr/bin/dropbearkey -t ed25519 -f "$HOST_KEY" >>"$LOG" 2>&1 || return 1
+            chmod 0600 "$HOST_KEY"
+        fi
+        PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
+            /usr/sbin/dropbear -E -P "$SFTP_PID" -r "$HOST_KEY" \
+            -p "$SFTP_PORT" -K 30 -I 300 -c "$SFTP_SERVER" >>"$LOG" 2>&1 || return 1
+        sleep 1
+    fi
+    status_service sftp
+}
+
+stop_sftp() {
+    set_enabled sftp 0
+    stop_pid "$SFTP_PID" dropbear
+    status_service sftp || true
+}
+
+write_smb_conf() {
+    samba_run=$RUNTIME_ROOT/samba
+    mkdir -p "$samba_run/private" "$samba_run/log" "$samba_run/lock" \
+        "$samba_run/state" "$samba_run/cache" "$samba_run/ncalrpc"
+    printf 'root:0:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:4F26822B803282B051EF3A3CD7A5F58D:[U          ]:LCT-FFFFFFFF:\n' \
+        >"$samba_run/private/smbpasswd"
+    chmod 0600 "$samba_run/private/smbpasswd"
+    printf 'root = plumos\n' >"$samba_run/private/smbusers"
+    cat >"$CONFIG_DIR/smb.conf" <<EOF
+[global]
+   workgroup = WORKGROUP
+   netbios name = PLUMOS-BUBBLE
+   server string = plumOS Bubble
+   log level = 2
+   server role = standalone server
+   security = user
+   guest account = root
+   passdb backend = smbpasswd:$samba_run/private/smbpasswd
+   username map = $samba_run/private/smbusers
+   map to guest = Never
+   load printers = no
+   disable spoolss = yes
+   server min protocol = SMB2
+   smb ports = 445
+   disable netbios = yes
+   pid directory = $RUN_DIR
+   lock directory = $samba_run/lock
+   state directory = $samba_run/state
+   cache directory = $samba_run/cache
+   ncalrpc dir = $samba_run/ncalrpc
+   private dir = $samba_run/private
+   log file = $samba_run/log/samba-%m.log
+[SDCARD]
+   path = $SHARE_DIR
+   browseable = yes
+   read only = no
+   guest ok = no
+   valid users = root
+   force user = root
+   create mask = 0666
+   directory mask = 0777
+EOF
+}
+
+start_samba() {
+    set_enabled samba 1
+    [ -x "$SMBD" ] || return 1
+    if ! pid_matches "$SMBD_PID" smbd; then
+        write_smb_conf
+        PLUMOS_ROOT="$PLUMOS_ROOT" "$SMBD" -D -s "$CONFIG_DIR/smb.conf" >>"$LOG" 2>&1 || true
+        sleep 1
+    fi
+    status_service samba
+}
+
+stop_samba() {
+    set_enabled samba 0
+    stop_pid "$SMBD_PID" smbd
+    status_service samba || true
+}
+
+run_one() {
+    action=$1
+    service=$2
+    case "$action:$service" in
+        status:*) status_service "$service" ;;
+        start:ssh) start_ssh ;;
+        stop:ssh) stop_ssh ;;
+        start:ftp) start_ftp ;;
+        stop:ftp) stop_ftp ;;
+        start:sftp) start_sftp ;;
+        stop:sftp) stop_sftp ;;
+        start:samba) start_samba ;;
+        stop:samba) stop_samba ;;
+        start:adb|stop:adb) status_service adb ;;
+        *) return 2 ;;
+    esac
+}
+
+action=${1:-}
+service=${2:-}
+if [ "$action" = start-enabled ]; then
+    result=0
+    for candidate in ftp sftp samba; do
+        enabled "$candidate" || continue
+        run_one start "$candidate" || result=$?
+    done
+    exit "$result"
+fi
+case "$service" in ssh|ftp|sftp|samba|adb) ;; *) exit 2 ;; esac
+case "$action" in status|start|stop) run_one "$action" "$service" ;; *) exit 2 ;; esac
