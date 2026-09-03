@@ -315,6 +315,11 @@
     機械可読coverageとhost testは合格。各アプリの物理LCD/input/audio/終了復帰を残す。
 - [ ] `BUB-P6-05` BIOS requirement、content extension、renderer、loader/library、license、
   save/state pathをcoreごとのmachine-readable coverage manifestへ固定する。
+  - A30保存版`es_systems.cfg`を起点にしつつ、公式ROCKNIX `next`の139 system定義
+    (`5526743`)へ更新追従できる拡張子policyとsource auditを追加した。Bubble 98 systemの
+    全てをpolicyへ収録し、18 systemへ52拡張子を追加、共有directory衝突やlauncher非対応の
+    30拡張子は理由付き除外とした。実機の隔離fixtureでは52/52を認識し、ROM SD 4,745 fileは
+    read-only棚卸しのみ実施した。各実形式のcore起動確認と残りcoverage項目は継続する。
 - [ ] `BUB-P6-06` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。
 - [ ] `BUB-P6-07` app/game終了時に同一sessionだけを回収し、frontend/device ownershipを復元する。
   - SSH benchmarkがfrontendを複数回停止してPID 1の4回restart limitへ到達した。`sync`後の
