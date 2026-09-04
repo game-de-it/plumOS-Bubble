@@ -12,7 +12,7 @@ bubble_libretro_package_revision() {
             ;;
         flycast_xtreme) printf '%s\n' flycast-xtreme-openmp-runtime-v3 ;;
         easyrpg) printf '%s\n' easyrpg-runtime-v1 ;;
-        bluemsx) printf '%s\n' bluemsx-cbios-only-assets-v2 ;;
+        bluemsx) printf '%s\n' bluemsx-cbios-safe-default-v3 ;;
         vice_x64|vice_xvic) printf '%s\n' vice-no-firmware-assets-v2 ;;
         scummvm) printf '%s\n' scummvm-mf-audio-clock-v1 ;;
         parallel_n64) printf '%s\n' parallel-n64-rk3566-v1 ;;
@@ -35,6 +35,7 @@ bubble_libretro_patch_sha256() {
     local id="$1"
     local patch=""
     case "$id" in
+        bluemsx) patch=bluemsx-cbios-safe-default.patch ;;
         scummvm) patch=scummvm-libretro-audio-clock.patch ;;
         parallel_n64) patch=parallel-n64-rk3566.patch ;;
         mupen64plus_next)

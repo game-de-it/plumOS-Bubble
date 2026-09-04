@@ -1,0 +1,68 @@
+diff --git a/libretro.c b/libretro.c
+index 34db282..ea263ee 100644
+--- a/libretro.c
++++ b/libretro.c
+@@ -124,30 +124,30 @@ int get_media_type(const char* filename)
+    if(strcmp(extension, ".dsk") == 0){
+       if (is_auto)
+-         strcpy(msx_type, "MSX2+");
++         strcpy(msx_type, "MSX2+ - C-BIOS");
+       return MEDIA_TYPE_DISK;
+    }
+    else if(strcmp(extension, ".m3u") == 0){
+       if (is_auto)
+-         strcpy(msx_type, "MSX2+");
++         strcpy(msx_type, "MSX2+ - C-BIOS");
+       return MEDIA_TYPE_DISK_BUNDLE;
+    }
+    else if(strcmp(extension, ".cas") == 0){
+       if (is_auto)
+-         strcpy(msx_type, "MSX2+");
++         strcpy(msx_type, "MSX2+ - C-BIOS");
+       return MEDIA_TYPE_TAPE;
+    }
+    else if(strcmp(extension, ".rom") == 0){
+       if (is_auto)
+-         strcpy(msx_type, "MSX2+");
++         strcpy(msx_type, "MSX2+ - C-BIOS");
+       return MEDIA_TYPE_CART;
+    }
+    else if(strcmp(extension, ".mx1") == 0){
+       if (is_auto)
+-         strcpy(msx_type, "MSX2+");
++         strcpy(msx_type, "MSX - C-BIOS");
+       return MEDIA_TYPE_CART;
+    }
+    else if(strcmp(extension, ".mx2") == 0){
+       if (is_auto)
+-         strcpy(msx_type, "MSX2+");
++         strcpy(msx_type, "MSX2+ - C-BIOS");
+       return MEDIA_TYPE_CART;
+    }
+@@ -994,6 +994,12 @@ bool retro_load_game(const struct retro_game_info *info)
+    boardSetVideoAutodetect(properties->video.detectActiveMonitor);
+ 
+    emulatorStart(NULL);
++   if (emulatorGetState() != EMU_RUNNING)
++   {
++      if (log_cb)
++         log_cb(RETRO_LOG_ERROR, "%s\n", "[libretro]: machine initialization failed");
++      return false;
++   }
+    return true;
+ }
+ 
+diff --git a/libretro_core_options.h b/libretro_core_options.h
+index e988d36..26913c6 100644
+--- a/libretro_core_options.h
++++ b/libretro_core_options.h
+@@ -35,6 +35,9 @@ struct retro_core_option_definition option_defs_us[] = {
+          { "MSXturboR",   NULL },
+          { "MSX2",   NULL },
+          { "MSX2+",   NULL },
++         { "MSX - C-BIOS",   NULL },
++         { "MSX2 - C-BIOS",   NULL },
++         { "MSX2+ - C-BIOS",   NULL },
+          { "SEGA - SG-1000",   NULL },
+          { "SEGA - SC-3000",   NULL },
+          { "SEGA - SF-7000",   NULL },

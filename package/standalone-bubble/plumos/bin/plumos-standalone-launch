@@ -353,38 +353,38 @@ if [ "$emulator_id" = drastic ]; then
     runtime="$PLUMOS_ROOT/emulator/standalone/drastic"
     loader="$runtime/runtime/ld-linux-armhf.so.3"
     drastic="$runtime/drastic"
+    runner="$runtime/runner"
     config_root="$PLUMOS_ROOT/config/standalone/drastic"
     work="$config_root/work"
     log="$PLUMOS_ROOT/logs/drastic-standalone.log"
     drastic_mounts=""
-    setarch_bb=""
+    runner_pid=""
+    setarch_mode=""
 
-    [ -x "$loader" ] && [ -x "$drastic" ] &&
+    [ -x "$loader" ] && [ -x "$drastic" ] && [ -x "$runner" ] &&
+        [ -f "$runtime/runner-lib/libSDL2-2.0.so.0" ] &&
         [ -f "$runtime/lib/libSDL2-2.0.so.0" ] &&
         [ -f "$runtime/lib/libdrastic_mmap_compat.so" ] || {
         printf 'plumos-standalone-launch: DraStic runtime is missing\n' >&2
         exit 1
     }
-    [ -c /dev/miyooio ] || {
-        printf 'stage=S62_RUNTIME result=unsupported emulator=drastic reason=missing-miyooio-input-bridge\n' \
+    [ -c /dev/input/event2 ] || {
+        printf 'stage=S62_RUNTIME result=failed emulator=drastic reason=missing-event2\n' \
             >>"$route_log"
-        printf 'plumos-standalone-launch: DraStic is visible but unsupported: Bubble has no /dev/miyooio input bridge\n' >&2
+        printf 'plumos-standalone-launch: Bubble controller event device is unavailable\n' >&2
         exit 1
     }
     [ -c /dev/dri/card0 ] && [ -c /dev/mali0 ] || {
         printf 'plumos-standalone-launch: DraStic Bubble graphics devices are unavailable\n' >&2
         exit 1
     }
-    for candidate in "$BB"; do
-        [ -x "$candidate" ] || continue
-        if "$candidate" --list 2>/dev/null |
-            "$BB" grep -qx setarch; then
-            setarch_bb="$candidate"
-            break
-        fi
-    done
-    [ -n "$setarch_bb" ] || {
-        printf 'plumos-standalone-launch: setarch-capable BusyBox is missing\n' >&2
+    if "$BB" --list 2>/dev/null | "$BB" grep -qx setarch; then
+        setarch_mode=setarch
+    elif "$BB" --list 2>/dev/null | "$BB" grep -qx linux32; then
+        setarch_mode=linux32
+    fi
+    [ -n "$setarch_mode" ] || {
+        printf 'plumos-standalone-launch: ASLR-capable linux32 applet is missing\n' >&2
         exit 1
     }
 
@@ -435,6 +435,20 @@ if [ "$emulator_id" = drastic ]; then
     done
 
     restore_drastic_runtime() {
+        if [ -n "$runner_pid" ] && kill -0 "$runner_pid" 2>/dev/null; then
+            kill -TERM "$runner_pid" 2>/dev/null || true
+            runner_wait=0
+            while kill -0 "$runner_pid" 2>/dev/null &&
+                [ "$runner_wait" -lt 20 ]; do
+                "$BB" usleep 100000
+                runner_wait=$((runner_wait + 1))
+            done
+            kill -0 "$runner_pid" 2>/dev/null &&
+                kill -KILL "$runner_pid" 2>/dev/null || true
+            wait "$runner_pid" 2>/dev/null || true
+        fi
+        runner_pid=""
+        "$BB" rm -f /dev/shm/NDS_SHM /tmp/NDS_SHM
         for mount_target in $drastic_mounts; do
             "$BB" umount "$mount_target" >/dev/null 2>&1 || true
         done
@@ -458,9 +472,6 @@ if [ "$emulator_id" = drastic ]; then
     else
         "$BB" rm -f "$cpu_snapshot"
     fi
-    # DraStic reads the compatibility /dev/miyooio bridge directly. Bubble does
-    # not currently provide that bridge, so the gate above keeps this route
-    # visible without pretending that controller input has been implemented.
     if [ -x "$PLUMOS_ROOT/bin/plumos-volume-control" ]; then
         "$BB" sh "$PLUMOS_ROOT/bin/plumos-volume-control" apply >>"$log" 2>&1 || true
     fi
@@ -477,21 +488,58 @@ if [ "$emulator_id" = drastic ]; then
         drastic_mounts="$runtime/$mutable_dir $drastic_mounts"
     done
 
-    printf 'drastic_start=armhf-private-runtime content-%s\n' \
+    "$BB" rm -f /dev/shm/NDS_SHM /tmp/NDS_SHM
+    (
+        cd "$runtime"
+        LD_LIBRARY_PATH="$runtime/runner-lib:$PLUMOS_ROOT/emulator/lib:/usr/lib" \
+        SDL_VIDEO_EGL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
+        SDL_VIDEO_GL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
+        SDL_VIDEODRIVER=kmsdrm \
+        SDL_VIDEO_KMSDRM_DEVICE_INDEX=0 \
+        NDS_DEBUG_LEVEL=INFO \
+            "$runner"
+    ) >>"$log" 2>&1 &
+    runner_pid=$!
+    runner_ready=0
+    runner_wait=0
+    while [ "$runner_wait" -lt 20 ]; do
+        if [ -e /dev/shm/NDS_SHM ]; then
+            runner_ready=1
+            break
+        fi
+        kill -0 "$runner_pid" 2>/dev/null || break
+        "$BB" usleep 50000
+        runner_wait=$((runner_wait + 1))
+    done
+    [ "$runner_ready" -eq 1 ] || {
+        printf 'stage=S62_RUNTIME result=failed emulator=drastic reason=runner-not-ready\n' \
+            >>"$route_log"
+        restore_drastic_runtime
+        exit 1
+    }
+
+    printf 'drastic_start=armhf-gkd-event2-runner content-%s\n' \
         "${content##*/}" >>"$log"
     set +e
     (
         cd "$runtime"
-        SDL_VIDEODRIVER=NDS \
-        SDL_AUDIODRIVER=alsa \
-        ALSA_PLUGIN_DIR="$PLUMOS_ROOT/lib/alsa-lib-armhf" \
-        AUDIODEV="$alsa_device" \
-        NDS_DEBUG_LEVEL=INFO \
-            "$setarch_bb" setarch linux32 -R \
-            "$loader" \
-            --preload "$runtime/lib/libdrastic_mmap_compat.so" \
-            --library-path "$runtime/lib:$runtime/runtime/lib32" \
-            "$drastic" "$content"
+        export SDL_VIDEODRIVER=NDS
+        export SDL_AUDIODRIVER=alsa
+        export ALSA_PLUGIN_DIR="$PLUMOS_ROOT/lib/alsa-lib-armhf"
+        export AUDIODEV="$alsa_device"
+        if [ "$setarch_mode" = setarch ]; then
+            "$BB" setarch linux32 -R \
+                "$loader" \
+                --preload "$runtime/lib/libdrastic_mmap_compat.so" \
+                --library-path "$runtime/lib:$runtime/runtime/lib32" \
+                "$drastic" "$content"
+        else
+            "$BB" linux32 -R \
+                "$loader" \
+                --preload "$runtime/lib/libdrastic_mmap_compat.so" \
+                --library-path "$runtime/lib:$runtime/runtime/lib32" \
+                "$drastic" "$content"
+        fi
     ) >>"$log" 2>&1
     rc=$?
     set -e

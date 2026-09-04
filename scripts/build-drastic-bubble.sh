@@ -17,9 +17,10 @@ SOURCE_REF="b88e6b75963106c0bd54dfe112f860c6bdbfe593"
 SOURCE_TAG="final-china-devices"
 RELEASE_URL="https://github.com/steward-fu/nds/releases/download/final-china-devices/drastic_miyoo-flip_20251104.zip"
 RELEASE_SHA256="9e4ed98047dea0f014daea7c3530793f92f19d60073fceb9fd2a040696f66491"
-COMMON_SHA256="2ea331892fc5f7b35a9db707593d7767270d1fd2bce1ac00187850ac41b440b2"
-DETOUR_SHA256="fd4a2cf5c4e0d8650a82f7ca3af8836ec793916b67f8305b9773780e1ca3c3c1"
-SDL2_SHA256="e85539cdf71606ee7aa8bbdfb5a744ca52ab49790ab1011c45688b23a48333e3"
+COMMON_SHA256="8a9f3c3d0c6a948868385ddfea26549ad2f0873e4e21111fa674bd1a88f2e240"
+DETOUR_SHA256="36a32d3208d5948d29264e26eabe9ff487d8fd48333bb866a1a42aea6271b29d"
+SDL2_SHA256="57891c787c296fc820c4bfaf2ced3b4af0df47b0c8c50398e2bb403ec2d5eabb"
+RUNNER_SHA256="8b28bd343609321cd79ef6de0acf6ba8dc84cd36a1a8113340cc43853bda660b"
 PATCH="$ROOT_DIR/package/standalone-bubble/patches/drastic/steward-fu-nds-bubble-toolchain.patch"
 COMPAT_SOURCE="$ROOT_DIR/package/standalone-bubble/src/drastic-mmap-compat.c"
 JOBS="${JOBS:-4}"
@@ -85,19 +86,29 @@ if [ -z "$PREBUILT_LIB_ROOT" ]; then
     git -C "$SOURCE_DIR" sparse-checkout init --no-cone
     git -C "$SOURCE_DIR" sparse-checkout set \
         Makefile.base \
-        Makefile.miyoo_flip \
+        Makefile.gkd_miniplus \
         LICENSE \
-        assets/miyoo_flip \
+        alsa \
+        assets/gkd_miniplus \
         common \
         detour \
         drastic \
         inc \
+        runner \
         sdl2
     git -C "$SOURCE_DIR" checkout "$SOURCE_REF"
     git -C "$SOURCE_DIR" apply "$PATCH"
-    make -C "$SOURCE_DIR" -f Makefile.miyoo_flip -j"$JOBS" \
+    ln -sf libSDL2_image-2.0.so.0 \
+        "$SOURCE_DIR/assets/gkd_miniplus/lib/libSDL2_image.so"
+    ln -sf libSDL2_ttf-2.0.so.0 \
+        "$SOURCE_DIR/assets/gkd_miniplus/lib/libSDL2_ttf.so"
+    SDL2_CFG='--enable-video --disable-video-x11 --disable-video-vulkan --disable-video-opengl --disable-video-opengles --disable-video-opengles2 --disable-hidapi-joystick --disable-oss --disable-pulseaudio --disable-jack --disable-libsamplerate' \
+    make -C "$SOURCE_DIR" -f Makefile.gkd_miniplus -j"$JOBS" \
         TOOLCHAIN_BIN="$(dirname "$(command -v arm-linux-gnueabihf-gcc)")" \
-        NDS_INCLUDE_ROOT=/usr/include
+        NDS_INCLUDE_ROOT=/usr/include \
+        NDS_RUNNER_CROSS= \
+        NDS_RUNNER_TOOLCHAIN_BIN="$(dirname "$(command -v gcc)")" \
+        NDS_RUNNER_INCLUDE_ROOT=/usr/include
     SOURCE_LIB_ROOT="$SOURCE_DIR/drastic/lib"
 else
     SOURCE_LIB_ROOT="$PREBUILT_LIB_ROOT"
@@ -106,6 +117,7 @@ fi
 verify_sha256 "$COMMON_SHA256" "$SOURCE_LIB_ROOT/libcommon.so"
 verify_sha256 "$DETOUR_SHA256" "$SOURCE_LIB_ROOT/libdtr.so"
 verify_sha256 "$SDL2_SHA256" "$SOURCE_LIB_ROOT/libSDL2-2.0.so.0"
+verify_sha256 "$RUNNER_SHA256" "$SOURCE_DIR/drastic/runner"
 
 rm -rf "$OUT_ROOT"
 mkdir -p "$OUT_ROOT/lib" "$OUT_ROOT/runtime/lib32"
@@ -134,6 +146,7 @@ install -m 0644 "$SOURCE_LIB_ROOT/libcommon.so" "$OUT_ROOT/lib/libcommon.so"
 install -m 0644 "$SOURCE_LIB_ROOT/libdtr.so" "$OUT_ROOT/lib/libdtr.so"
 install -m 0644 "$SOURCE_LIB_ROOT/libSDL2-2.0.so.0" \
     "$OUT_ROOT/lib/libSDL2-2.0.so.0"
+install -m 0755 "$SOURCE_DIR/drastic/runner" "$OUT_ROOT/runner"
 
 if [ -n "$PREBUILT_RUNTIME_ROOT" ]; then
     rsync -a "$PREBUILT_RUNTIME_ROOT/" "$OUT_ROOT/runtime/"
@@ -208,6 +221,7 @@ cat >"$OUT_ROOT/build-manifest.json" <<EOF
     "libcommon.so": "$COMMON_SHA256",
     "libdtr.so": "$DETOUR_SHA256",
     "libSDL2-2.0.so.0": "$SDL2_SHA256",
+    "runner": "$RUNNER_SHA256",
     "libdrastic_mmap_compat.so": "$compat_sha256"
   },
   "runtime_contract": "package-local-armhf-glibc-mali",

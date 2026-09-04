@@ -349,6 +349,15 @@
     `docs/validation/2026-09-04-bubble-rom2-emulator-matrix.md`へ記録した。
   - 未実行24のうち2048はcontent不足ではなく、ROM不要coreに必要な`--no-content`をBubble
     launcherが拒否する導線未実装と確認。残る23導線はROM2全体の再探索でも対応contentなし。
+  - 残件修正で`--no-content`をlauncherへ実装し、2048とMr.Boomを実機合格にした。
+    BlueMSXは配布対象外のMSX2+ BIOSをAuto選択して初期化失敗後に解放済みCPUへ進む問題を
+    core dumpで特定。同梱C-BIOSをAuto既定にし、初期化失敗を正しく返すsource patchへ置換して、
+    MSXは同梱C-BIOS、ColecoVisionは利用者提供ROM2内BIOSでDRM/Mali/PCM進行まで合格した。
+    DraSticはMF用`/dev/miyooio`依存を除き、steward-fu/ndsのGKD MiniPlus AArch64 runnerと
+    `/dev/input/event2` bridgeへ移植し、DRM/Mali/PCM進行まで合格。実LCDの2画面layout、全入力、
+    Function1 menu、通常終了復帰を残す。これにより機械実行集計は173起動、失敗1、content不足22、
+    unsupported 0。残る失敗はFBA2012 CPS2専用coreが要求するCRC `cf94d275`がROM2の全archiveに
+    存在しないcontent-set不一致で、FBNeoとgeneric FBA2012は同じCPS2 familyで起動済み。
 - [ ] `BUB-P6-09` Bubble全物理入力を実機captureから固定し、全runtimeへ割り当てて物理確認する。
   - event0/1/2、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`から、D-pad、ABXY、
     Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。

@@ -82,9 +82,9 @@
       "todo": "BUB-P4-D05"
     },
     "retroarch:bluemsx": {
-      "state": "visible-runtime-failed-bubble-bus-error-or-segfault-before-first-frame",
-      "release_eligible": false,
-      "physical_validation": "failed-msx-clean-rom",
+      "state": "physical-bounded-launch-passed-cbios-safe-default",
+      "release_eligible": true,
+      "physical_validation": "msx-cbios-and-colecovision-user-bios-drm-audio-process-passed",
       "fallback": "retroarch:fmsx",
       "todo": "BUB-P6-08"
     },
@@ -94,9 +94,10 @@
       "todo": "BUB-P6-08"
     },
     "standalone:drastic": {
-      "state": "visible-unsupported-missing-bubble-input-bridge",
+      "state": "physical-bounded-launch-passed-gkd-miniplus-input-bridge",
       "redistribution": "unresolved",
       "release_eligible": false,
+      "physical_validation": "drm-audio-process-passed-controls-screen-exit-pending",
       "todo": "BUB-P6-03"
     }
   },

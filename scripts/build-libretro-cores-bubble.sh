@@ -365,6 +365,10 @@ while IFS='|' read -r id class repo ref subdir makefile make_args binary; do
         patch -d "$work_dir" -p1 \
             <"$ROOT_DIR/patches/libretro-cores-bubble/mupen64plus-next-mali-buffer-storage.patch"
     fi
+    if [ "$id" = "bluemsx" ]; then
+        patch -d "$work_dir" -p1 \
+            <"$ROOT_DIR/patches/libretro-cores-bubble/bluemsx-cbios-safe-default.patch"
+    fi
     if [ "$id" = "mba_mini" ]; then
         patch -d "$work_dir" -p1 \
             <"$ROOT_DIR/patches/libretro-cores-bubble/mba-mini-osd-debugger-stub.patch"

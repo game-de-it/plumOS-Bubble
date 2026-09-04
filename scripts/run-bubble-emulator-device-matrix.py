@@ -25,7 +25,10 @@ INVALID_LIVE_CONTENT = {
     "ngp": "sd2_archive_read_failed_and_no_clean_monochrome_ngp_content",
     "pokemini": "no_valid_game_content_in_provided_mac_rom_set",
 }
-NO_CONTENT_ROUTES = {("2048", "retroarch:2048")}
+NO_CONTENT_ROUTES = {
+    ("2048", "retroarch:2048"),
+    ("mrboom", "retroarch:mrboom"),
+}
 
 CONTENT_OVERRIDES = {
     "sfc": f"{VALIDATION_CONTENT}/snes/Adventures of the Rocketeer.sfc",
@@ -43,6 +46,7 @@ CONTENT_OVERRIDES = {
     "n64": f"{VALIDATION_CONTENT}/n64/AeroGauge [V1.1].z64",
     "ngpc": f"{VALIDATION_CONTENT}/ngpc/probe.ngc",
     "fbneo": f"{VALIDATION_CONTENT}/fbneo/imgfight.zip",
+    "cps2": f"{VALIDATION_CONTENT}/cps2-2010/ssf2tu.zip",
     "mame2003plus": f"{VALIDATION_CONTENT}/mame2003plus/twinbee.zip",
     "dos": f"{VALIDATION_CONTENT}/dos/probe.zip",
     "openbor": f"{VALIDATION_CONTENT}/openbor/probe.pak",
@@ -217,7 +221,15 @@ def choose_content(
 
 def route_command(system: dict, profile: str, content: str, bios_root: str) -> tuple[str | None, str | None, int]:
     sid = system["id"]
-    root = VALIDATION_CONTENT if content.startswith(VALIDATION_CONTENT + "/") else SD2
+    no_content = (sid, profile) in NO_CONTENT_ROUTES
+    if content.startswith(VALIDATION_CONTENT + "/"):
+        root = VALIDATION_CONTENT
+    elif content.startswith(SD2 + "/"):
+        root = SD2
+    elif content.startswith("/storage/user/"):
+        root = "/storage/user"
+    else:
+        root = content.rsplit("/", 1)[0]
     env = {
         "PLUMOS_ROOT": ROOT,
         "PLUMOS_ROM_ROOT": root,
@@ -226,13 +238,11 @@ def route_command(system: dict, profile: str, content: str, bios_root: str) -> t
     prefix = " ".join(f"{key}={shlex.quote(value)}" for key, value in env.items())
     if profile.startswith("retroarch:"):
         core = profile.split(":", 1)[1]
-        if core == "bluemsx":
-            env["PLUMOS_BIOS_ROOT"] = f"{ROOT}/share/libretro-system/bluemsx"
-            prefix = " ".join(f"{key}={shlex.quote(value)}" for key, value in env.items())
+        content_arg = "--no-content" if no_content else f"--rom {shlex.quote(content)}"
         command = (
             f"{prefix} /bin/busybox sh {ROOT}/bin/plumos-retroarch-launch "
             f"--system {shlex.quote(sid)} --core {ROOT}/cores/{shlex.quote(core)}_libretro.so "
-            f"--rom {shlex.quote(content)} --cpu ondemand --safe-exit false"
+            f"{content_arg} --cpu ondemand --safe-exit false"
         )
         log = f"{ROOT}/logs/retroarch-{sid}-{core}.log"
         seconds = 8 if core in {"flycast", "flycast_xtreme", "km_duckswanstation_xtreme_amped", "mupen64plus_next", "parallel_n64", "yabasanshiro"} else 5
@@ -477,19 +487,20 @@ def main() -> int:
             kind = profile.split(":", 1)[0]
             if args.only_kind and kind not in args.only_kind:
                 continue
-            content, content_source = choose_content(system, profile, live, device, content_map)
-            command, log, seconds = route_command(system, profile, content or "", bios_root) if content else (None, None, 0)
+            no_content = (system["id"], profile) in NO_CONTENT_ROUTES
+            if no_content:
+                content, content_source = "", "no_content_core"
+            else:
+                content, content_source = choose_content(system, profile, live, device, content_map)
+            command, log, seconds = (
+                route_command(system, profile, content or "", bios_root)
+                if content or no_content else (None, None, 0)
+            )
             reason = None
-            if not content:
-                reason = (
-                    "no_content_launch_not_implemented"
-                    if (system["id"], profile) in NO_CONTENT_ROUTES
-                    else content_source
-                )
+            if not content and not no_content:
+                reason = content_source
             elif profile.startswith("external:"):
                 reason = "external_script_not_run_by_bounded_emulator_harness"
-            elif system["id"] == "nds" and profile == "standalone:drastic":
-                reason = "visible_unsupported_missing_miyooio_input_bridge"
             records.append({
                 "system": system["id"], "profile": profile, "content": content,
                 "content_source": content_source, "command": command, "runtime_log": log,

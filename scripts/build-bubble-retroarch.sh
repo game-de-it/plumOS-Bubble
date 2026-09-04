@@ -24,9 +24,9 @@ root=$out/plumos
 bin=$root/bin
 lib=$root/emulator/lib
 component=$root/components/retroarch
-source_ref=$(git -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
+source_ref=$(git -c safe.directory="$repo_root" -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
 epoch=${SOURCE_DATE_EPOCH:-}
-[[ -n $epoch ]] || epoch=$(git -C "$repo_root" show -s --format=%ct HEAD)
+[[ -n $epoch ]] || epoch=$(git -c safe.directory="$repo_root" -C "$repo_root" show -s --format=%ct HEAD)
 export SOURCE_DATE_EPOCH=$epoch
 
 if [[ ! -d $work/.git ]]; then

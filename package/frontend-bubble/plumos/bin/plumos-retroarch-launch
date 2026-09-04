@@ -13,11 +13,13 @@ cpu_snapshot_active=0
 system=
 core=
 rom=
+no_content=0
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --system) system=$2; shift 2 ;;
         --core) core=$2; shift 2 ;;
         --rom) rom=$2; shift 2 ;;
+        --no-content) no_content=1; shift ;;
         --cpu) cpu_policy=$2; shift 2 ;;
         --audio|--audio-latency|--safe-exit) shift 2 ;;
         --auto-state) shift ;;
@@ -35,11 +37,19 @@ case "$core" in
     "$PLUMOS_ROOT"/cores/*_libretro.so) ;;
     *) echo 'core path escaped managed core directory' >&2; exit 2 ;;
 esac
-case "$rom" in
-    "$PLUMOS_ROM_ROOT"/*) ;;
-    *) echo 'ROM path escaped configured ROM root' >&2; exit 2 ;;
-esac
-[ -f "$core" ] && [ -f "$rom" ] || exit 1
+if { [ "$no_content" -eq 0 ] && [ -z "$rom" ]; } ||
+   { [ "$no_content" -eq 1 ] && [ -n "$rom" ]; }; then
+    echo 'exactly one of --rom or --no-content is required' >&2
+    exit 2
+fi
+if [ "$no_content" -eq 0 ]; then
+    case "$rom" in
+        "$PLUMOS_ROM_ROOT"/*) ;;
+        *) echo 'ROM path escaped configured ROM root' >&2; exit 2 ;;
+    esac
+fi
+[ -f "$core" ] || exit 1
+[ "$no_content" -eq 1 ] || [ -f "$rom" ] || exit 1
 config=$PLUMOS_ROOT/config/retroarch/retroarch-bubble.cfg
 factory=$PLUMOS_ROOT/factory-defaults/retroarch/retroarch-bubble.cfg
 $BB mkdir -p "$PLUMOS_ROOT/config/retroarch" "$PLUMOS_ROOT/logs" \
@@ -115,7 +125,21 @@ esac
 # The shared cfg keeps the V90S-compatible factory baseline, while Bubble may
 # own BIOS on SD2. Resolve that active media root per launch without rewriting
 # the user's persistent RetroArch configuration.
-printf 'system_directory = "%s"\n' "$PLUMOS_BIOS_ROOT" >>"$append_config"
+system_directory=$PLUMOS_BIOS_ROOT
+case "$core_id" in
+    bluemsx)
+        managed_system="$PLUMOS_ROOT/share/libretro-system/bluemsx"
+        if { [ ! -d "$PLUMOS_BIOS_ROOT/Databases" ] ||
+             [ ! -d "$PLUMOS_BIOS_ROOT/Machines" ]; } &&
+           [ -d "$managed_system/Databases" ] &&
+           [ -d "$managed_system/Machines" ]; then
+            system_directory=$managed_system
+        fi
+        ;;
+esac
+printf 'system_directory = "%s"\n' "$system_directory" >>"$append_config"
+[ "$no_content" -eq 0 ] || \
+    printf '%s\n' 'core_set_supports_no_game_enable = "true"' >>"$append_config"
 # Keep each bounded route's verbose log in its route-specific file.  The
 # shared plumOS cfg otherwise redirects every core into one retroarch.log,
 # which makes mechanical per-core failure and geometry attribution ambiguous.
@@ -168,7 +192,8 @@ printf 'retroarch_game=stage-S70 system=%s core=%s\n' "$system" "$core_id" >>"$P
 set +e
 set -- "$PLUMOS_ROOT/bin/retroarch" -v -c "$config"
 [ -z "$append_config" ] || set -- "$@" --appendconfig "$append_config"
-set -- "$@" -L "$core" "$rom"
+set -- "$@" -L "$core"
+[ "$no_content" -eq 1 ] || set -- "$@" "$rom"
 "$@" >>"$PLUMOS_ROOT/logs/retroarch-${system}-${core_id}.log" 2>&1 &
 retroarch_pid=$!
 wait "$retroarch_pid"

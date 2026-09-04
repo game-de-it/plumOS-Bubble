@@ -67,6 +67,7 @@ cp -a "$repo_root/output/picoarch/bubble/plumos/." "$root/"
 cp -a "$repo_root/output/standalone/bubble/plumos/." "$root/"
 cp -a "$repo_root/output/pyxel/bubble/plumos/." "$root/"
 cp -a "$repo_root/output/portmaster/bubble/plumos/." "$root/"
+find "$root" -name .DS_Store -type f -delete
 mkdir -p "$root/config/frontend" "$root/config/system" "$root/config/retroarch" \
     "$root/state/frontend" "$root/logs" "$root/saves" "$root/states"
 printf 'bubble-stockos-r1\n' >"$root/COMPAT_VENDOR"
@@ -106,12 +107,12 @@ cat >"$root/manifest.json" <<EOF
   "user_media_included": false,
   "managed_firmware_assets": ["blueMSX C-BIOS", "DraStic packaged BIOS (non-release-eligible)"],
   "publishable": false,
-  "non_publishable_reasons": ["physical route matrix pending", "captured vendor Mali license pending", "DraStic Bubble input bridge missing", "3DS has no runtime"]
+  "non_publishable_reasons": ["physical route matrix pending", "captured vendor Mali license pending", "DraStic physical acceptance pending", "3DS has no runtime"]
 }
 EOF
 (
     cd "$root"
-    find . -type f ! -path './checksums.sha256' \
+    find . -type f ! -name '.DS_Store' ! -path './checksums.sha256' \
         ! -path './config/frontend/settings.json' \
         ! -path './config/system/settings.json' \
         ! -path './config/retroarch/*' \

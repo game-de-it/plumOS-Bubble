@@ -49,6 +49,7 @@ for path in \
     "$YABASANSHIRO_BUILD/yabasanshiro" \
     "$YABASANSHIRO_BUILD/LICENSE" \
     "$DRASTIC_BUILD/drastic" \
+    "$DRASTIC_BUILD/runner" \
     "$DRASTIC_BUILD/runtime/ld-linux-armhf.so.3" \
     "$DRASTIC_BUILD/lib/libSDL2-2.0.so.0" \
     "$DRASTIC_BUILD/lib/libdrastic_mmap_compat.so" \
@@ -164,6 +165,7 @@ mkdir -p \
     "$PLUMOS_DIR/emulator/standalone/pcsx_rearmed/skin" \
     "$PLUMOS_DIR/emulator/standalone/yabasanshiro/lib" \
     "$PLUMOS_DIR/emulator/standalone/drastic" \
+    "$PLUMOS_DIR/emulator/standalone/drastic/runner-lib" \
     "$PLUMOS_DIR/emulator/standalone/ppsspp" \
     "$PLUMOS_DIR/emulator/standalone/openbor" \
     "$PLUMOS_DIR/emulator/lib" \
@@ -212,6 +214,8 @@ rsync -a \
     --exclude='upstream-release-readme.txt' \
     "$DRASTIC_BUILD/" \
     "$PLUMOS_DIR/emulator/standalone/drastic/"
+install -m 0644 "$PCSX_SDL2_BUILD/stage/usr/lib/libSDL2-2.0.so.0" \
+    "$PLUMOS_DIR/emulator/standalone/drastic/runner-lib/libSDL2-2.0.so.0"
 for loader_name in \
     libmali.so.1.9.0 libmali.so.1 libEGL.so.1 libGLESv2.so.2 libgbm.so.1; do
     install -m 0644 "$VENDOR_MALI_ARMHF" \
@@ -299,9 +303,10 @@ cat >"$PLUMOS_DIR/components/standalone/manifest.json" <<EOF
       "core_source": "closed-release-blob",
       "integration": "verified-prebuilt-armhf-sdl2-input-video",
       "runtime": "package-local-armhf",
-      "renderer": "mali-g52-gles",
-      "route_status": "visible-unsupported",
-      "blocker": "Bubble has no /dev/miyooio compatibility input bridge"
+      "renderer": "aarch64-gles-runner-with-armhf-shared-memory-producer",
+      "input": "/dev/input/event2",
+      "menu": "function1-keycode-704",
+      "route_status": "implemented-pending-device-acceptance"
     },
     {
       "id": "ppsspp",

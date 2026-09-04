@@ -136,3 +136,34 @@ bounded termination remain under stock PID 1; they own no file descriptors and
 cannot be killed, so a later normal reboot is required to reap them. The harness
 now terminates the launcher first so it can reap its emulator child before any
 process-group escalation. No release was published.
+
+## Same-day remediation
+
+The executable implementation gaps were addressed without removing any route.
+The updated latest aggregate is 173 started routes, one failed route, 22 routes
+without compatible content, and zero routes marked hardware-unsupported.
+
+- The launcher now supports no-content cores. Both 2048 and Mr.Boom passed the
+  bounded DRM/audio/process probe.
+- A BlueMSX core dump showed that `Auto` selected the stripped, non-redistributable
+  MSX2+ BIOS profile. Machine creation freed the CPU object, but the core still
+  reported a successful load and entered it on the first frame. The reproducible
+  core build now selects the packaged C-BIOS profiles and reports machine-start
+  failure instead of entering a stale CPU pointer. MSX passed with packaged C-BIOS;
+  ColecoVision passed after staging the BIOS already present in the supplied ROM2
+  set as user validation data. The proprietary Coleco BIOS was not added to the
+  app layer.
+- DraStic no longer uses the copied MF `/dev/miyooio` gate. Bubble uses the
+  steward-fu/nds GKD MiniPlus AArch64 GLES runner, `/dev/input/event2`, and an
+  ARMHF DraStic core. The bounded probe passed process lifetime, Mali/DRM ownership
+  and advancing ALSA PCM. Physical dual-screen layout, controls, Function1 menu
+  and normal exit/FE return still require observation on the handheld.
+- The supplied `ssf2tu-2010` content starts with FBNeo and generic FBA2012 when
+  exposed under its expected archive name. The dedicated FBA2012 CPS2 core still
+  requests CRC `cf94d275`; that CRC is absent from all ZIP entries under ROM2's
+  `fbneo` and `mame` trees. This is a ROM-set generation mismatch, not a remaining
+  Bubble launcher/core crash, and the dedicated route remains visible.
+
+Remediation evidence is recorded in `artifacts/device-validation/` under
+`bubble-remediation-*.json`. Persistent/runtime volume remained at zero during
+the probes. No release was published.

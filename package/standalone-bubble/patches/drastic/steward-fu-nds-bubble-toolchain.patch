@@ -15,12 +15,13 @@ diff --git a/sdl2/configure.ac b/sdl2/configure.ac
 index 7c6844a..4d121f7 100644
 --- a/sdl2/configure.ac
 +++ b/sdl2/configure.ac
-@@ -2412,7 +2412,7 @@ CheckNDSVideo()
+@@ -2412,7 +2412,8 @@ CheckNDSVideo()
          EXTRA_CFLAGS="$EXTRA_CFLAGS -I../detour"
          EXTRA_CFLAGS="$EXTRA_CFLAGS -I../common"
          EXTRA_CFLAGS="$EXTRA_CFLAGS -I../inc/sdl2"
 -        EXTRA_CFLAGS="$EXTRA_CFLAGS -I/opt/mini/arm-buildroot-linux-gnueabihf/sysroot/usr/include/SDL2"
 +        EXTRA_CFLAGS="$EXTRA_CFLAGS -I$NDS_INCLUDE_ROOT/SDL2"
++        EXTRA_LDFLAGS="$EXTRA_LDFLAGS -L../drastic/lib"
  
          EXTRA_LDFLAGS="$EXTRA_LDFLAGS -lEGL"
          EXTRA_LDFLAGS="$EXTRA_LDFLAGS -lGLESv2"
@@ -32,4 +33,104 @@ index 7c6844a..4d121f7 100644
 +        EXTRA_CFLAGS="$EXTRA_CFLAGS -I$NDS_INCLUDE_ROOT/libdrm"
  
          EXTRA_LDFLAGS="$EXTRA_LDFLAGS -ldrm -lgbm"
+
+diff --git a/runner/Makefile b/runner/Makefile
+index 45779ba..5810d3a 100644
+--- a/runner/Makefile
++++ b/runner/Makefile
+@@ -7,9 +7,8 @@ ifeq ($(MOD),gkd_pixel2)
+ endif
+ 
+ ifeq ($(MOD),gkd_miniplus)
+-export CROSS=aarch64-linux-
+-export PATH=/opt/flip/bin:$(shell echo $$PATH)
++export CROSS=$(NDS_RUNNER_CROSS)
++export PATH=$(NDS_RUNNER_TOOLCHAIN_BIN):$(shell echo $$PATH)
+ CFLAGS  += -DGKD_MINIPLUS
+-CFLAGS  += -I/opt/flip/aarch64-flip-linux-gnu/sysroot/usr/include/SDL2
+-LDFLAGS += -ljson-c
++CFLAGS  += -I$(NDS_RUNNER_INCLUDE_ROOT)/SDL2
+ endif
+@@ -44,12 +43,11 @@ TARGET   = runner
+ CFLAGS  += -DRUNNER
+ CFLAGS  += -O3
+ CFLAGS  += -I.
+ CFLAGS  += -I../common
+ LDFLAGS += -lSDL2
+-LDFLAGS += -lSDL2_image
+ LDFLAGS += -lEGL
+ LDFLAGS += -lGLESv2
+-SOURCES  = runner.c ../common/common.c
++SOURCES  = runner.c
+ 
+ .PHONY: all
+ all:
+diff --git a/runner/runner.c b/runner/runner.c
+index 689d67f..9ddf5fb 100644
+--- a/runner/runner.c
++++ b/runner/runner.c
+@@ -10,5 +10,6 @@
+ #include <unistd.h>
+ #include <signal.h>
++#include <string.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <sys/socket.h>
+@@ -17,6 +18,5 @@
+ 
+ #define SDL_DISABLE_ARM_NEON_H
+ #include <SDL.h>
+-#include <SDL_image.h>
+ #include <GLES2/gl2.h>
+ #include <SDL2/SDL.h>
+@@ -27,2 +27,22 @@
+ static const char *DEBUG_LEVEL_STR[] = { "FATAL", "ERROR", "DEBUG", "TRACE" };
++int nds_debug_level = ERROR_LEVEL;
++
++static int runner_debug_level(void)
++{
++    const char *level = getenv("NDS_DEBUG_LEVEL");
++
++    if (!level || !*level || !strcmp(level, "ERROR")) {
++        return ERROR_LEVEL;
++    }
++    if (!strcmp(level, "FATAL")) {
++        return FATAL_LEVEL;
++    }
++    if (!strcmp(level, "DEBUG")) {
++        return DEBUG_LEVEL;
++    }
++    if (!strcmp(level, "TRACE")) {
++        return TRACE_LEVEL;
++    }
++    return ERROR_LEVEL;
++}
+ 
+@@ -361,5 +381,5 @@ int main(int argc, char **argv)
+ {
+     pthread_t id = 0;
+ 
+-    nds_debug_level = get_debug_level(0);
++    nds_debug_level = runner_debug_level();
+     trace("log level \"%s\"\n", DEBUG_LEVEL_STR[nds_debug_level]);
+diff --git a/sdl2/src/video/nds/nds_event.h b/sdl2/src/video/nds/nds_event.h
+index 6e2d240..46cc8ad 100644
+--- a/sdl2/src/video/nds/nds_event.h
++++ b/sdl2/src/video/nds/nds_event.h
+@@ -240,14 +240,14 @@
+ #define DEV_KEY_CODE_R2         313
+ #define DEV_KEY_CODE_START      315
+ #define DEV_KEY_CODE_SELECT     314
+-#define DEV_KEY_CODE_MENU       316
++#define DEV_KEY_CODE_MENU       704
+ #define DEV_KEY_CODE_POWER      -1
+ #define DEV_KEY_CODE_VOL_UP     -1
+ #define DEV_KEY_CODE_VOL_DOWN   -1
+ 
+ #define DEV_KEY_CODE_SAVE       318
+ #define DEV_KEY_CODE_LOAD       317
+-#define DEV_KEY_CODE_FAST       704
++#define DEV_KEY_CODE_FAST       -1
+ #define DEV_KEY_CODE_EXIT       -1
+ #endif
  
