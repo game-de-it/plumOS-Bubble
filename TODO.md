@@ -517,6 +517,11 @@
   - 導線はAppsへ`ggfe`を追加した。既存FEは`shell:`アプリの実行前にrendererを落とすため、
     `plumos_controller_ui.c`は無改変でDRM handoffが成立する。共通項目は削除していない。
     Bubble固有項目としてmanifestの`bubble_only_menu_entries`へ記録した。
+  - source `7b208dd`のscanline spanラスタライザを実機へdeployし、連続scrollは
+    約11.0〜14.3 fps、compose平均57〜71 ms、blit約2.2 ms、present約6〜10 msだった。
+    旧版より小幅改善したが60 fpsの16.6 ms予算には未達。`-DGGFE_PROFILE`によるstage別
+    実機計測と描画量削減を継続する。詳細は
+    `docs/validation/2026-09-06-bubble-ggfe-span-raster.md`。
 - [x] GGFEの操作説明と移植リファレンスを`docs/ggfe.md`へ書く。画面上のボタン凡例は置かず、
   ドキュメントで告知する方針。他plumOS機種へ移植する際もこの文書を起点にする。
 - [ ] GGFEのコア選択UIを実装する。解決結果と各profileの`未対応`理由は既に取得できるので、
@@ -531,6 +536,10 @@
   - 先に`plumos-text-ui launch gamegear <rel>`のdry runだけ実行し、GGFEの相対パス
     規約が`load_selected_rom()`と一致するかを確認する。ここが最も可能性が高い
     失敗要因で、1コマンドで切り分けられる。
+  - validation hold下で20 ROM走査、物理D-pad、物理A、RetroArch起動、正常終了後の
+    GGFE DRM再取得まで実機合格。ただしRA終了用SELECT+STARTが、game中も開いていた
+    GGFEのevdev queueへ残り、復帰直後にGGFEも誤終了した。game起動前close・復帰後reopenを
+    実装して再試験する。60 fpsとmotionの物理acceptanceも未完了のためopenのまま残す。
 - [ ] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
   現行buildはlibpngのみリンクしており該当hitは`NO ARTWORK`板へ落ちる。
   libjpeg導入はtools imageとfrontend/lib双方の変更になるため単独で実施する。

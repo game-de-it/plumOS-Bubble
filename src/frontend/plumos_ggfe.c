@@ -1822,7 +1822,20 @@ int main(int argc, char **argv) {
     }
 
     if (launch_t > GGFE_LAUNCH_END) {
+      /* RetroArch exits with SELECT+START on Bubble.  Do not keep GGFE's
+       * evdev queue open while the child owns the controls, or that START
+       * key-down is delivered after return and immediately exits GGFE too. */
+      if (input_fd >= 0) {
+        close(input_fd);
+        input_fd = -1;
+      }
       ggfe_launch_rom(&app, &renderer, &app.entries[scroll.target]);
+      input_fd = ggfe_open_input();
+      if (input_fd < 0) {
+        ggfe_log(&app, "ggfe_input=reopen-failed\n");
+      } else {
+        ggfe_log(&app, "ggfe_input=reopened-after-launch\n");
+      }
       launch_t = -1.0f;
       last_ms = ggfe_now_ms();
       last_present_ms = last_ms;

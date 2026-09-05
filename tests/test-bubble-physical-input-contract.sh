@@ -29,6 +29,14 @@ grep -Fq '{ BTN_EAST,   IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_A }' "$pico
 grep -Fq '{ BTN_SOUTH,  IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_B }' "$pico_patch"
 grep -Fq 'case BTN_EAST: /* physical A on Bubble */' src/frontend/plumos_ggfe.c
 grep -Fq 'case BTN_SOUTH: /* physical B on Bubble */' src/frontend/plumos_ggfe.c
+grep -Fq 'ggfe_input=reopened-after-launch' src/frontend/plumos_ggfe.c
+awk '
+  /if \(launch_t > GGFE_LAUNCH_END\)/ { in_handoff=1 }
+  in_handoff && /close\(input_fd\)/ { saw_close=1 }
+  in_handoff && /ggfe_launch_rom\(/ { saw_launch=1 }
+  in_handoff && /input_fd = ggfe_open_input\(\)/ { saw_reopen=1; exit }
+  END { exit !(saw_close && saw_launch && saw_reopen) }
+' src/frontend/plumos_ggfe.c
 grep -Fq '#define GGFE_TARGET_FPS 60.0f' src/frontend/plumos_ggfe.c
 grep -Fq '#define GGFE_SCROLL_MS 360' src/frontend/plumos_ggfe.c
 grep -Fq 'ggfe_warm_labels(app, next);' src/frontend/plumos_ggfe.c
