@@ -7,6 +7,7 @@ CPUFREQ_ROOT="$TEST_ROOT/sys/devices/system/cpu/cpufreq"
 THERMAL_ROOT="$TEST_ROOT/sys/class/thermal"
 RUNTIME_ROOT="$TEST_ROOT/run/plumos"
 CPU_CONTROL="$ROOT_DIR/package/frontend-bubble/plumos/bin/plumos-cpu-control"
+GGFE_LAUNCH="$ROOT_DIR/package/frontend-bubble/plumos/bin/plumos-ggfe-launch"
 
 cleanup() {
   case "$TEST_ROOT" in
@@ -86,4 +87,140 @@ grep -q 'PLUMOS_PICOARCH_CPU_POLICY:-ondemand' \
   "$ROOT_DIR/package/picoarch-bubble/plumos/bin/plumos-picoarch-launch" ||
   fail 'PicoArch policy not wired'
 
-printf 'bubble_cpu_control=result-ok policies=retroarch,picoarch,standalone,pyxel\n'
+grep -q 'CPU_POLICY=${PLUMOS_GGFE_CPU_POLICY:-performance}' "$GGFE_LAUNCH" ||
+  fail 'GGFE policy not wired'
+grep -q 'snapshot "$CPU_SNAPSHOT"' "$GGFE_LAUNCH" ||
+  fail 'GGFE snapshot not wired'
+grep -q 'restore_cpu_policy' "$GGFE_LAUNCH" ||
+  fail 'GGFE restore not wired'
+grep -q "trap 'cleanup_ggfe 143' TERM" "$GGFE_LAUNCH" ||
+  fail 'GGFE TERM cleanup not wired'
+
+# Exercise the launcher contract with a fake CPU controller.  A non-zero child,
+# an apply failure, and TERM must all restore the pre-launch governor.
+GGFE_ROOT="$TEST_ROOT/ggfe-root"
+GGFE_RUNTIME="$TEST_ROOT/run/ggfe-test"
+GGFE_ACTIONS="$TEST_ROOT/ggfe-actions"
+GGFE_CPU_STATE="$TEST_ROOT/ggfe-cpu-state"
+GGFE_READY="$TEST_ROOT/ggfe-ready"
+FAKE_BB="$TEST_ROOT/fake-busybox"
+mkdir -p "$GGFE_ROOT/bin" "$GGFE_ROOT/logs" "$GGFE_RUNTIME"
+cp "$GGFE_LAUNCH" "$GGFE_ROOT/bin/plumos-ggfe-launch"
+
+cat >"$FAKE_BB" <<'EOF'
+#!/bin/sh
+if [ "${1:-}" = usleep ]; then
+  /usr/bin/perl -e 'select undef, undef, undef, $ARGV[0] / 1000000' "$2"
+  exit 0
+fi
+exec "$@"
+EOF
+cat >"$GGFE_ROOT/bin/plumos-cpu-control" <<'EOF'
+#!/bin/sh
+case "$1" in
+  snapshot)
+    printf 'snapshot\n' >>"$FAKE_CPU_ACTIONS"
+    cp "$FAKE_CPU_STATE" "$2"
+    ;;
+  apply)
+    printf 'apply:%s\n' "$2" >>"$FAKE_CPU_ACTIONS"
+    [ "${FAKE_APPLY_FAIL:-0}" -eq 0 ] || exit 1
+    printf '%s\n' "$2" >"$FAKE_CPU_STATE"
+    ;;
+  restore)
+    printf 'restore\n' >>"$FAKE_CPU_ACTIONS"
+    cp "$2" "$FAKE_CPU_STATE"
+    rm -f "$2"
+    ;;
+  *) exit 2 ;;
+esac
+EOF
+cat >"$GGFE_ROOT/bin/plumos-ggfe" <<'EOF'
+#!/bin/sh
+[ "$(sed -n '1p' "$FAKE_CPU_STATE")" = performance ] || exit 99
+printf 'ready\n' >"$FAKE_GGFE_READY"
+trap 'exit 0' TERM
+if [ "${FAKE_GGFE_MODE:-exit}" = wait ]; then
+  while :; do sleep 1; done
+fi
+exit "${FAKE_GGFE_RC:-7}"
+EOF
+chmod +x "$FAKE_BB" "$GGFE_ROOT/bin/plumos-cpu-control" \
+  "$GGFE_ROOT/bin/plumos-ggfe" "$GGFE_ROOT/bin/plumos-ggfe-launch"
+
+run_fake_ggfe() {
+  PLUMOS_ROOT="$GGFE_ROOT" \
+  PLUMOS_RUNTIME_ROOT="$GGFE_RUNTIME" \
+  PLUMOS_BUSYBOX="$FAKE_BB" \
+  PLUMOS_INPUT_EVENT=/dev/null \
+  PLUMOS_FRONTEND_LIB_DIR="$GGFE_ROOT/lib" \
+  FAKE_CPU_ACTIONS="$GGFE_ACTIONS" \
+  FAKE_CPU_STATE="$GGFE_CPU_STATE" \
+  FAKE_GGFE_READY="$GGFE_READY" \
+  FAKE_APPLY_FAIL="${FAKE_APPLY_FAIL:-0}" \
+  FAKE_GGFE_MODE="${FAKE_GGFE_MODE:-exit}" \
+  FAKE_GGFE_RC="${FAKE_GGFE_RC:-7}" \
+    "$FAKE_BB" sh "$GGFE_ROOT/bin/plumos-ggfe-launch"
+}
+
+printf 'ondemand\n' >"$GGFE_CPU_STATE"
+: >"$GGFE_ACTIONS"
+set +e
+FAKE_GGFE_RC=7 run_fake_ggfe
+ggfe_rc=$?
+set -e
+assert_equal 7 "$ggfe_rc" 'GGFE child status'
+assert_equal ondemand "$(sed -n '1p' "$GGFE_CPU_STATE")" \
+  'GGFE normal restore'
+assert_equal 'snapshot apply:performance restore' \
+  "$(tr '\n' ' ' <"$GGFE_ACTIONS" | sed 's/ $//')" 'GGFE normal actions'
+
+printf 'ondemand\n' >"$GGFE_CPU_STATE"
+: >"$GGFE_ACTIONS"
+set +e
+FAKE_APPLY_FAIL=1 run_fake_ggfe
+ggfe_rc=$?
+set -e
+assert_equal 1 "$ggfe_rc" 'GGFE apply failure status'
+assert_equal ondemand "$(sed -n '1p' "$GGFE_CPU_STATE")" \
+  'GGFE apply failure restore'
+assert_equal 'snapshot apply:performance restore' \
+  "$(tr '\n' ' ' <"$GGFE_ACTIONS" | sed 's/ $//')" \
+  'GGFE apply failure actions'
+
+printf 'ondemand\n' >"$GGFE_CPU_STATE"
+: >"$GGFE_ACTIONS"
+rm -f "$GGFE_READY"
+set +e
+PLUMOS_ROOT="$GGFE_ROOT" \
+PLUMOS_RUNTIME_ROOT="$GGFE_RUNTIME" \
+PLUMOS_BUSYBOX="$FAKE_BB" \
+PLUMOS_INPUT_EVENT=/dev/null \
+PLUMOS_FRONTEND_LIB_DIR="$GGFE_ROOT/lib" \
+FAKE_CPU_ACTIONS="$GGFE_ACTIONS" \
+FAKE_CPU_STATE="$GGFE_CPU_STATE" \
+FAKE_GGFE_READY="$GGFE_READY" \
+FAKE_APPLY_FAIL=0 \
+FAKE_GGFE_MODE=wait \
+FAKE_GGFE_RC=7 \
+  "$FAKE_BB" sh "$GGFE_ROOT/bin/plumos-ggfe-launch" &
+ggfe_launcher_pid=$!
+set -e
+count=0
+while [ ! -s "$GGFE_READY" ] && [ "$count" -lt 50 ]; do
+  sleep 0.1
+  count=$((count + 1))
+done
+[ -s "$GGFE_READY" ] || fail 'GGFE signal fixture did not start'
+kill -TERM "$ggfe_launcher_pid"
+set +e
+wait "$ggfe_launcher_pid"
+ggfe_rc=$?
+set -e
+assert_equal 143 "$ggfe_rc" 'GGFE TERM status'
+assert_equal ondemand "$(sed -n '1p' "$GGFE_CPU_STATE")" \
+  'GGFE TERM restore'
+assert_equal 'snapshot apply:performance restore' \
+  "$(tr '\n' ' ' <"$GGFE_ACTIONS" | sed 's/ $//')" 'GGFE TERM actions'
+
+printf 'bubble_cpu_control=result-ok policies=retroarch,picoarch,standalone,pyxel,ggfe\n'

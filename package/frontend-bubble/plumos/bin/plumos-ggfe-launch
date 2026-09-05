@@ -10,11 +10,16 @@ PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
 RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 LOG=$PLUMOS_ROOT/logs/ggfe.log
+CPU_CONTROL=$PLUMOS_ROOT/bin/plumos-cpu-control
+CPU_POLICY=${PLUMOS_GGFE_CPU_POLICY:-performance}
+CPU_SNAPSHOT=$RUNTIME_ROOT/ggfe/cpu-governors.$$
+CPU_SNAPSHOT_ACTIVE=0
+GGFE_PID=
 controller=${PLUMOS_INPUT_EVENT:-}
 [ -n "$controller" ] ||
     controller=$($BB sh "$PLUMOS_ROOT/bin/plumos-bubble-find-input" controller 2>/dev/null || true)
 
-$BB mkdir -p "$PLUMOS_ROOT/logs"
+$BB mkdir -p "$PLUMOS_ROOT/logs" "$RUNTIME_ROOT/ggfe"
 export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" PLUMOS_BUSYBOX="$BB"
 export PLUMOS_SDCARD_ROOT=${PLUMOS_SDCARD_ROOT:-/storage}
 export PLUMOS_ROM_ROOT=${PLUMOS_ROM_ROOT:-/storage/Roms}
@@ -25,6 +30,85 @@ export PLUMOS_FRONTEND_LIB_DIR=${PLUMOS_FRONTEND_LIB_DIR:-$PLUMOS_ROOT/frontend/
 export LD_LIBRARY_PATH="$PLUMOS_FRONTEND_LIB_DIR"
 [ -z "$controller" ] || export PLUMOS_INPUT_EVENT="$controller"
 
+current_cpu_policy() {
+    if [ -r /sys/devices/system/cpu/cpufreq/policy0/scaling_governor ]; then
+        $BB sed -n '1p' /sys/devices/system/cpu/cpufreq/policy0/scaling_governor
+    else
+        printf '%s\n' unknown
+    fi
+}
+
+restore_cpu_policy() {
+    [ "$CPU_SNAPSHOT_ACTIVE" -eq 1 ] || return 0
+    if "$BB" sh "$CPU_CONTROL" restore "$CPU_SNAPSHOT"; then
+        CPU_SNAPSHOT_ACTIVE=0
+        printf 'ggfe_cpu=restore result=ok active=%s\n' \
+            "$(current_cpu_policy)" >>"$LOG"
+        return 0
+    fi
+    CPU_SNAPSHOT_ACTIVE=0
+    printf 'ggfe_cpu=restore result=failed snapshot=%s\n' \
+        "$CPU_SNAPSHOT" >>"$LOG"
+    return 1
+}
+
+cleanup_ggfe() {
+    rc=${1:-0}
+    trap - EXIT HUP INT TERM
+    if [ -n "$GGFE_PID" ]; then
+        kill -TERM "$GGFE_PID" 2>/dev/null || true
+        count=0
+        while kill -0 "$GGFE_PID" 2>/dev/null && [ "$count" -lt 10 ]; do
+            "$BB" usleep 100000
+            count=$((count + 1))
+        done
+        kill -KILL "$GGFE_PID" 2>/dev/null || true
+        wait "$GGFE_PID" 2>/dev/null || true
+        GGFE_PID=
+    fi
+    restore_cpu_policy || [ "$rc" -ne 0 ] || rc=1
+    exit "$rc"
+}
+
+trap 'cleanup_ggfe $?' EXIT
+trap 'cleanup_ggfe 129' HUP
+trap 'cleanup_ggfe 130' INT
+trap 'cleanup_ggfe 143' TERM
+
+case "$CPU_POLICY" in
+    interactive|performance|ondemand|schedutil|conservative) ;;
+    *)
+        printf 'ggfe_cpu=apply result=failed reason=invalid-policy requested=%s\n' \
+            "$CPU_POLICY" >>"$LOG"
+        exit 2
+        ;;
+esac
+
+if [ -x "$CPU_CONTROL" ] &&
+   "$BB" sh "$CPU_CONTROL" snapshot "$CPU_SNAPSHOT"; then
+    CPU_SNAPSHOT_ACTIVE=1
+    if "$BB" sh "$CPU_CONTROL" apply "$CPU_POLICY"; then
+        printf 'ggfe_cpu=apply result=ok requested=%s active=%s\n' \
+            "$CPU_POLICY" "$(current_cpu_policy)" >>"$LOG"
+    else
+        printf 'ggfe_cpu=apply result=failed requested=%s\n' \
+            "$CPU_POLICY" >>"$LOG"
+        exit 1
+    fi
+else
+    printf 'ggfe_cpu=apply result=failed reason=control-unavailable\n' >>"$LOG"
+    exit 1
+fi
+
 printf 'ggfe_launch=start controller=%s\n' "${controller:-none}" >>"$LOG"
+set +e
 LD_PRELOAD="${PLUMOS_DRM_SHARE_LIBRARY:-}" \
-    exec "$PLUMOS_ROOT/bin/plumos-ggfe" >>"$LOG" 2>&1
+    "$PLUMOS_ROOT/bin/plumos-ggfe" >>"$LOG" 2>&1 &
+GGFE_PID=$!
+wait "$GGFE_PID"
+rc=$?
+GGFE_PID=
+set -e
+restore_cpu_policy || [ "$rc" -ne 0 ] || rc=1
+trap - EXIT HUP INT TERM
+exit "$rc"
