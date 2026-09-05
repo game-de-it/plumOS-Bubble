@@ -268,12 +268,18 @@ uses explicit `if`/`fail` blocks and fails correctly on both.
 
 ```
 ggfe_start=ok roms=<n>
+ggfe_renderer=ready backend=<drm|fbdev> xres=<w> yres=<h> bpp=<n> shadow=<0|1> double_buffer=<0|1>
+ggfe_frames=fps=<n> frames=<n> elapsed_ms=<n> max_frame_ms=<n> slow_frames=<n> compose_us=<avg>/<max> blit_us=<avg>/<max> present_us=<avg>/<max>
 ggfe_launch=start rom=<rel> profile=<id> source=<layer>
 ggfe_launch=unavailable rom=<rel> reason=<why>
 ggfe_launch=done status=<n>
 ggfe_renderer=reacquire-failed error=<msg>
 ggfe_exit=ok
 ```
+
+The three timing pairs are average/maximum microseconds for software scene
+composition, RGB-to-panel conversion, and DRM/fbdev presentation.  They make a
+low frame rate attributable without guessing from the CPU governor alone.
 
 ## Known limits
 

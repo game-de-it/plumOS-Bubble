@@ -1475,6 +1475,14 @@ static long long ggfe_now_ms(void) {
   return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
 }
 
+static long long ggfe_now_us(void) {
+  struct timespec ts;
+  if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+    return 0;
+  }
+  return (long long)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
+}
+
 /* Match plumOS gallery motion: one time-based smoothstep is allowed to finish,
  * while one further direction press is queued behind it.  This keeps a held
  * or rapidly tapped D-pad from snapping the interpolation origin repeatedly. */
@@ -1565,6 +1573,12 @@ int main(int argc, char **argv) {
   long long last_present_ms;
   long long stats_start_ms;
   long long stats_max_frame_ms = 0;
+  long long stats_compose_us = 0;
+  long long stats_blit_us = 0;
+  long long stats_present_us = 0;
+  long long stats_max_compose_us = 0;
+  long long stats_max_blit_us = 0;
+  long long stats_max_present_us = 0;
   unsigned long stats_frames = 0;
   unsigned long stats_slow_frames = 0;
   int running = 1;
@@ -1599,6 +1613,16 @@ int main(int argc, char **argv) {
     ggfe_app_free(&app);
     return 1;
   }
+  ggfe_log(&app,
+           "ggfe_renderer=ready backend=%s xres=%u yres=%u bpp=%d "
+           "shadow=%d double_buffer=%d\n",
+#ifdef PLUMOS_FBDEV_ENABLE_DRM
+           renderer.drm_active ? "drm" : "fbdev",
+#else
+           "fbdev",
+#endif
+           renderer.var.xres, renderer.var.yres, renderer.bytes_per_pixel * 8,
+           renderer.shadow != NULL, renderer.double_buffer);
   input_fd = ggfe_open_input();
   if (input_fd < 0) {
     ggfe_log(&app, "ggfe_input=not-found\n");
@@ -1620,6 +1644,13 @@ int main(int argc, char **argv) {
     struct pollfd pfd;
     float pos;
     int present_ok;
+    long long compose_start_us;
+    long long compose_end_us;
+    long long blit_end_us;
+    long long present_end_us;
+    long long compose_us;
+    long long blit_us;
+    long long present_us;
 
     last_ms = now;
     if (dt > 0.1f) {
@@ -1685,9 +1716,22 @@ int main(int argc, char **argv) {
       ggfe_browse_frame(pos, &frame);
     }
 
+    compose_start_us = ggfe_now_us();
     ggfe_compose(&app, &frame, background);
+    compose_end_us = ggfe_now_us();
     ggfe_blit_panel(&renderer, app.target.rgb);
+    blit_end_us = ggfe_now_us();
     present_ok = plumos_fbdev_present(&renderer);
+    present_end_us = ggfe_now_us();
+    compose_us = compose_end_us - compose_start_us;
+    blit_us = blit_end_us - compose_end_us;
+    present_us = present_end_us - blit_end_us;
+    stats_compose_us += compose_us;
+    stats_blit_us += blit_us;
+    stats_present_us += present_us;
+    if (compose_us > stats_max_compose_us) stats_max_compose_us = compose_us;
+    if (blit_us > stats_max_blit_us) stats_max_blit_us = blit_us;
+    if (present_us > stats_max_present_us) stats_max_present_us = present_us;
 
     if (present_ok) {
       long long present_ms = ggfe_now_ms();
@@ -1706,14 +1750,25 @@ int main(int argc, char **argv) {
       if (stats_elapsed >= 1000) {
         ggfe_log(&app,
                  "ggfe_frames=fps=%.2f frames=%lu elapsed_ms=%lld "
-                 "max_frame_ms=%lld slow_frames=%lu\n",
+                 "max_frame_ms=%lld slow_frames=%lu "
+                 "compose_us=%lld/%lld blit_us=%lld/%lld "
+                 "present_us=%lld/%lld\n",
                  1000.0 * (double)stats_frames / (double)stats_elapsed,
                  stats_frames, stats_elapsed, stats_max_frame_ms,
-                 stats_slow_frames);
+                 stats_slow_frames, stats_compose_us / (long long)stats_frames,
+                 stats_max_compose_us, stats_blit_us / (long long)stats_frames,
+                 stats_max_blit_us, stats_present_us / (long long)stats_frames,
+                 stats_max_present_us);
         stats_start_ms = present_ms;
         stats_frames = 0;
         stats_slow_frames = 0;
         stats_max_frame_ms = 0;
+        stats_compose_us = 0;
+        stats_blit_us = 0;
+        stats_present_us = 0;
+        stats_max_compose_us = 0;
+        stats_max_blit_us = 0;
+        stats_max_present_us = 0;
       }
     }
 
@@ -1726,6 +1781,12 @@ int main(int argc, char **argv) {
       stats_frames = 0;
       stats_slow_frames = 0;
       stats_max_frame_ms = 0;
+      stats_compose_us = 0;
+      stats_blit_us = 0;
+      stats_present_us = 0;
+      stats_max_compose_us = 0;
+      stats_max_blit_us = 0;
+      stats_max_present_us = 0;
     }
 
     {
