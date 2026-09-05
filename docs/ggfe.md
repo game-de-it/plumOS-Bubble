@@ -300,16 +300,49 @@ space, so they are stepped per pixel rather than rebuilt from barycentrics
 each time, removing six multiplies per fragment that flat triangles never
 needed.
 
-Together these took a scroll frame from 5.57 ms to 3.20 ms on the build
-machine. Shaded overdraw is 1.2x screen area, which is close to the floor for
-this scene, so further gains have to come from drawing less rather than from
-the inner loop: the closed cases contribute about 43% of compose time for a
-frosted overlay, and their hidden faces - the tray back plate behind the
-cartridge, the lid back face - are candidates.
+**One core was doing all of it.** The device has four. The frame is split into
+24 horizontal stripes which worker threads claim on demand; a thread owns
+whole scanlines of both the colour and depth buffers, so no two threads touch
+the same pixel and there is nothing to lock. Fixed bands per worker were tried
+first and scaled badly - the cartridges sit in the middle of the screen, so the
+top and bottom quarters had almost nothing to do and four cores behaved like
+two. Claiming narrow stripes balances whatever the scene looks like.
 
-Span bounds are computed with one multiply where the previous loop
-accumulated additions, so a handful of edge pixels round differently: 0.13% of
-pixels change by at most 18 levels, invisible at 24x amplification.
+Edge functions are evaluated from their equation on every scanline rather than
+carried down by addition. Six flops a row is nothing next to the pixels, and it
+makes a row depend only on its own coordinates, so **output is bit-identical
+whatever the stripe layout or thread count** - verified by comparing one-thread
+and four-thread renders.
+
+Measured on the build machine, a 300-frame scroll:
+
+| | ms/frame |
+|---|---:|
+| before | 5.57 |
+| span bounds | 3.48 |
+| stepped interpolation | 3.20 |
+| 2 threads | 2.12 |
+| 4 threads | **1.35** |
+
+Shaded overdraw is 1.2x screen area, close to the floor for this scene, so
+further gains have to come from drawing less rather than from the inner loop:
+the closed cases contribute about 43% of compose for a frosted overlay, and
+their hidden faces - the tray back plate behind the cartridge, the lid back
+face - are the candidates.
+
+GGFE also raises the CPU governor for its own lifetime and restores it on
+every exit path, the same shape the RetroArch and Pyxel launchers use. It is
+one of the few plumOS routes that is genuinely CPU bound, and ondemand was
+measured on this device reaching full clock in only a third of samples.
+
+Span bounds are computed with one multiply where the original loop accumulated
+additions, so a handful of edge pixels round differently against the pre-span
+build: 0.13% of pixels by at most 18 levels, invisible at 24x amplification.
+
+Rejected after measuring: baking the label sheen into its texture removed an
+expf per fragment but was only 5% and shifted the label's appearance, because
+clamping then moved ahead of the shade multiply. The expf now early-outs
+instead, which is free and changes nothing.
 
 Measure on the device with `ggfe_frames=` in `logs/ggfe.log`, which reports
 compose, blit and present separately. `-DGGFE_PROFILE` additionally breaks

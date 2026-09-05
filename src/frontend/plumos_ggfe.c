@@ -15,7 +15,9 @@
  */
 
 #include <errno.h>
+#include <pthread.h>
 #include <signal.h>
+#include <unistd.h>
 #include <stdarg.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
@@ -110,7 +112,9 @@ static int plumos_fbdev_load_png_rgba(const char *path, unsigned char **out,
 #define GGFE_LABEL_TEX_H 288
 #define GGFE_STRIP_W 61
 #define GGFE_LABEL_CACHE 12
-#define GGFE_MAX_DRAWS 6144
+#define GGFE_MAX_DRAWS 8192
+#define GGFE_MAX_BANDS 4
+#define GGFE_STRIPES 24
 #define GGFE_TARGET_FPS 60.0f
 #define GGFE_SCROLL_MS 360
 
@@ -135,6 +139,44 @@ struct ggfe_label_slot {
   unsigned long used;
   unsigned char *rgb;
   struct cart3d_tex tex;
+};
+
+/*
+ * Rasteriser worker pool.
+ *
+ * The device has four cores and was using one.  Each worker owns a horizontal
+ * strip of the colour and depth buffers, so no two threads touch the same
+ * pixel and there is nothing to lock; every worker walks the same draw list in
+ * the same order, so blending order is preserved and the output is identical
+ * to the single-threaded path.
+ *
+ * Threads are created once and parked on a condition variable rather than
+ * spawned per pass: at sixty frames a second the create/join cost would be
+ * paid a few hundred times a second for no reason.
+ */
+struct ggfe_pool;
+
+struct ggfe_worker {
+  struct ggfe_pool *pool;
+  pthread_t thread;
+};
+
+struct ggfe_pool {
+  struct ggfe_worker worker[GGFE_MAX_BANDS];
+  int count;
+  int started;
+  int shutdown;
+  pthread_mutex_t lock;
+  pthread_cond_t work_ready;
+  pthread_cond_t work_done;
+  unsigned long generation;
+  int pending;
+  int next_stripe; /* claimed by workers; fixed bands starve at the edges */
+  /* the job every worker runs, clipped to the stripes it claims */
+  struct cart3d_target *target;
+  const struct cart3d_draw *draws;
+  int draw_count;
+  int zwrite;
 };
 
 struct ggfe_app {
@@ -163,10 +205,151 @@ struct ggfe_app {
   struct ggfe_image header_logo; /* wordmark for the top left of the header */
   struct ggfe_text text;
 
+  struct ggfe_pool pool;
   char plumos_root[PATH_MAX];
   char theme_root[PATH_MAX];
   int log_fd;
 };
+
+/* ------------------------------------------------------------------ */
+/* rasteriser worker pool                                             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Claim stripes until the frame is done.  Fixed bands per worker looked
+ * obvious and scaled badly: the cartridges sit in the middle of the screen, so
+ * the top and bottom quarters had almost nothing to draw and four cores
+ * behaved like two.  Claiming narrow stripes on demand balances whatever the
+ * scene happens to look like.
+ */
+static void ggfe_run_stripes(struct ggfe_pool *p) {
+  for (;;) {
+    int stripe, y0, y1;
+    pthread_mutex_lock(&p->lock);
+    stripe = p->next_stripe++;
+    pthread_mutex_unlock(&p->lock);
+    if (stripe >= GGFE_STRIPES) {
+      return;
+    }
+    y0 = p->target->height * stripe / GGFE_STRIPES;
+    y1 = p->target->height * (stripe + 1) / GGFE_STRIPES;
+    cart3d_draw_list_band(p->target, p->draws, p->draw_count, p->zwrite, y0,
+                          y1);
+  }
+}
+
+static void *ggfe_worker_main(void *arg) {
+  struct ggfe_worker *w = (struct ggfe_worker *)arg;
+  struct ggfe_pool *p = w->pool;
+  unsigned long seen = 0;
+
+  for (;;) {
+    pthread_mutex_lock(&p->lock);
+    while (!p->shutdown && p->generation == seen) {
+      pthread_cond_wait(&p->work_ready, &p->lock);
+    }
+    if (p->shutdown) {
+      pthread_mutex_unlock(&p->lock);
+      return NULL;
+    }
+    seen = p->generation;
+    pthread_mutex_unlock(&p->lock);
+
+    ggfe_run_stripes(p);
+
+    pthread_mutex_lock(&p->lock);
+    if (--p->pending == 0) {
+      pthread_cond_signal(&p->work_done);
+    }
+    pthread_mutex_unlock(&p->lock);
+  }
+}
+
+static int ggfe_pool_start(struct ggfe_pool *p, int height) {
+  long online = sysconf(_SC_NPROCESSORS_ONLN);
+  int i, count = (online > 0) ? (int)online : 1;
+#ifdef GGFE_FORCE_THREADS
+  count = GGFE_FORCE_THREADS; /* used by the host harness to compare */
+#endif
+
+  memset(p, 0, sizeof(*p));
+  if (count > GGFE_MAX_BANDS) {
+    count = GGFE_MAX_BANDS;
+  }
+  p->count = count;
+  if (count <= 1) {
+    return 1; /* single core: run everything on the calling thread */
+  }
+  if (pthread_mutex_init(&p->lock, NULL) != 0 ||
+      pthread_cond_init(&p->work_ready, NULL) != 0 ||
+      pthread_cond_init(&p->work_done, NULL) != 0) {
+    p->count = 1;
+    return 1;
+  }
+  (void)height;
+  for (i = 0; i < count; i++) {
+    p->worker[i].pool = p;
+  }
+  /* band 0 runs on the calling thread, so only count-1 threads are spawned */
+  for (i = 1; i < count; i++) {
+    if (pthread_create(&p->worker[i].thread, NULL, ggfe_worker_main,
+                       &p->worker[i]) != 0) {
+      p->count = i; /* fall back to however many started */
+      break;
+    }
+    p->started++;
+  }
+  return 1;
+}
+
+static void ggfe_pool_stop(struct ggfe_pool *p) {
+  int i;
+  if (p->started <= 0) {
+    return;
+  }
+  pthread_mutex_lock(&p->lock);
+  p->shutdown = 1;
+  pthread_cond_broadcast(&p->work_ready);
+  pthread_mutex_unlock(&p->lock);
+  for (i = 1; i <= p->started; i++) {
+    pthread_join(p->worker[i].thread, NULL);
+  }
+  pthread_mutex_destroy(&p->lock);
+  pthread_cond_destroy(&p->work_ready);
+  pthread_cond_destroy(&p->work_done);
+  p->started = 0;
+}
+
+/* Rasterise one draw list across every band, blocking until all are done. */
+static void ggfe_draw_parallel(struct ggfe_pool *p, struct cart3d_target *t,
+                               const struct cart3d_draw *draws, int count,
+                               int zwrite) {
+  if (count <= 0) {
+    return;
+  }
+  if (p->started <= 0) {
+    cart3d_draw_list(t, draws, count, zwrite);
+    return;
+  }
+  pthread_mutex_lock(&p->lock);
+  p->target = t;
+  p->draws = draws;
+  p->draw_count = count;
+  p->zwrite = zwrite;
+  p->pending = p->started;
+  p->next_stripe = 0;
+  p->generation++;
+  pthread_cond_broadcast(&p->work_ready);
+  pthread_mutex_unlock(&p->lock);
+
+  ggfe_run_stripes(p);
+
+  pthread_mutex_lock(&p->lock);
+  while (p->pending > 0) {
+    pthread_cond_wait(&p->work_done, &p->lock);
+  }
+  pthread_mutex_unlock(&p->lock);
+}
 
 /* ------------------------------------------------------------------ */
 /* image helpers                                                      */
@@ -1132,11 +1315,11 @@ static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
                        z + (f->cased ? GGFE_CASE_Z : 0.0f), rx * deg, ry * deg,
                        1.0f, 1.0f);
     }
+    /* Accumulated rather than drawn per cartridge: the whole list is
+     * rasterised in one parallel pass below, and the far-to-near order the
+     * carousel emits in is what keeps the alpha-blended neighbours correct. */
     n = cart3d_emit(app->draws, n, GGFE_MAX_DRAWS / 2, &app->cart, model,
                     &app->cam, dim, alpha * amul);
-    cart3d_draw_list(&app->target, app->draws, n, 1);
-    n = 0;
-    GGFE_STAGE_END(GGFE_STAGE_CART);
 
     if (f->cased) {
       float lid_model[16], pivot[16], back[16], rot[16], tmp[16];
@@ -1167,9 +1350,10 @@ static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
     }
   }
 
+  ggfe_draw_parallel(&app->pool, &app->target, app->draws, n, 1);
   GGFE_STAGE_END(GGFE_STAGE_CART);
   cart3d_sort(glass, glass_n);
-  cart3d_draw_list(&app->target, glass, glass_n, 0);
+  ggfe_draw_parallel(&app->pool, &app->target, glass, glass_n, 0);
   GGFE_STAGE_END(GGFE_STAGE_GLASS);
 
   if (show_console) {
@@ -1276,6 +1460,7 @@ static int ggfe_app_init(struct ggfe_app *app, const char *plumos_root,
     return 0;
   }
 
+  ggfe_pool_start(&app->pool, GGFE_H);
   ggfe_load_asset(app, "logo-strip.png", &app->logo_strip);
   ggfe_load_asset(app, "header-logo.png", &app->header_logo);
 
@@ -1293,6 +1478,7 @@ static int ggfe_app_init(struct ggfe_app *app, const char *plumos_root,
 
 static void ggfe_app_free(struct ggfe_app *app) {
   int i;
+  ggfe_pool_stop(&app->pool);
   ggfe_text_free(&app->text);
   ggfe_overrides_free(&app->ggfe_overrides);
   ggfe_overrides_free(&app->plumos_overrides);
@@ -1808,6 +1994,27 @@ int main(int argc, char **argv) {
                  stats_max_compose_us, stats_blit_us / (long long)stats_frames,
                  stats_max_blit_us, stats_present_us / (long long)stats_frames,
                  stats_max_present_us);
+#ifdef GGFE_PROFILE
+        {
+          /* Attribute compose to a stage, so a slow frame does not have to be
+           * guessed at from the total. */
+          int st;
+          char line[512];
+          size_t pos = 0;
+          pos += (size_t)snprintf(line, sizeof(line), "ggfe_stages=");
+          for (st = 0; st < GGFE_STAGE_COUNT && pos < sizeof(line) - 32; st++) {
+            pos += (size_t)snprintf(line + pos, sizeof(line) - pos, "%s=%lld ",
+                                    ggfe_stage_name[st],
+                                    ggfe_stage_us[st] /
+                                        (long long)(stats_frames ? stats_frames
+                                                                 : 1));
+          }
+          snprintf(line + pos, sizeof(line) - pos, "threads=%d\n",
+                   app.pool.started + 1);
+          ggfe_log(&app, "%s", line);
+          memset(ggfe_stage_us, 0, sizeof(ggfe_stage_us));
+        }
+#endif
         stats_start_ms = present_ms;
         stats_frames = 0;
         stats_slow_frames = 0;

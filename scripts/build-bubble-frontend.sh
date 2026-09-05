@@ -54,8 +54,9 @@ gcc "${common[@]}" $png_cflags $ft_cflags $drm_cflags \
 gcc "${common[@]}" $png_cflags $ft_cflags $drm_cflags \
     -DPLUMOS_ENABLE_FBDEV_RENDERER=1 -DPLUMOS_FBDEV_ENABLE_PNG=1 \
     -DPLUMOS_FBDEV_ENABLE_FREETYPE=1 -DPLUMOS_FBDEV_ENABLE_DRM=1 \
+    -DGGFE_PROFILE=1 \
     src/frontend/plumos_ggfe.c -o "$bin/plumos-ggfe" \
-    $png_libs $ft_libs $drm_libs -lm
+    $png_libs $ft_libs $drm_libs -lm -lpthread
 gcc "${common[@]}" src/services/plumos_bubble_volume_keys.c \
     -o "$bin/plumos-volume-keys"
 gcc "${common[@]}" $drm_cflags src/services/plumos_drm_master.c \

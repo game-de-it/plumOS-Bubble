@@ -70,6 +70,8 @@ struct cart3d_draw {
   float rim;
   float depth;
   int gloss;
+  int ymin; /* screen rows this triangle can touch, for band rejection */
+  int ymax;
 };
 
 /* ------------------------------------------------------------------ */
@@ -428,6 +430,12 @@ static int cart3d_emit(struct cart3d_draw *out, int count, int capacity,
     d->shade = tint * shade;
     d->alpha = tri_alpha;
     d->depth = (d->s[0][2] + d->s[1][2] + d->s[2][2]) / 3.0f;
+    {
+      float lo = fminf(d->s[0][1], fminf(d->s[1][1], d->s[2][1]));
+      float hi = fmaxf(d->s[0][1], fmaxf(d->s[1][1], d->s[2][1]));
+      d->ymin = (int)floorf(lo);
+      d->ymax = (int)ceilf(hi);
+    }
     /* Grazing angles brighten translucent plastic, as frosted edges do. */
     if (tri_alpha < 0.999f) {
       float f = 1.0f - fabsf(n[2]);
@@ -493,13 +501,22 @@ static void cart3d_sample(const struct cart3d_tex *tex, float u, float v,
   }
 }
 
-static void cart3d_raster(struct cart3d_target *t, const struct cart3d_draw *d,
-                          int zwrite) {
+/*
+ * Rasterise one triangle, optionally restricted to the scanlines [band_y0,
+ * band_y1).  Banding is how the frame is split across cores: a thread owns a
+ * horizontal strip of both the colour and depth buffers, so no two threads
+ * ever touch the same pixel and no locking is needed.  Each thread walks the
+ * same draw list in the same order, so blending order is preserved and the
+ * output is identical to the single-threaded path.
+ */
+static void cart3d_raster_band(struct cart3d_target *t,
+                               const struct cart3d_draw *d, int zwrite,
+                               int band_y0, int band_y1) {
   float x0 = d->s[0][0], y0 = d->s[0][1];
   float x1 = d->s[1][0], y1 = d->s[1][1];
   float x2 = d->s[2][0], y2 = d->s[2][1];
   float area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
-  float inv_area, dw0dx, dw1dx, dw2dx, dw0dy, dw1dy, dw2dy;
+  float inv_area, dw0dx, dw1dx, dw2dx;
   float row0, row1, row2;
   float s0iw = d->s[0][2], s1iw = d->s[1][2], s2iw = d->s[2][2];
   float u0 = 0.0f, u1 = 0.0f, u2 = 0.0f, v0 = 0.0f, v1 = 0.0f, v2 = 0.0f;
@@ -517,9 +534,9 @@ static void cart3d_raster(struct cart3d_target *t, const struct cart3d_draw *d,
   miny = (int)floorf(fminf(y0, fminf(y1, y2)));
   maxy = (int)ceilf(fmaxf(y0, fmaxf(y1, y2)));
   if (minx < 0) minx = 0;
-  if (miny < 0) miny = 0;
+  if (miny < band_y0) miny = band_y0;
   if (maxx > t->width - 1) maxx = t->width - 1;
-  if (maxy > t->height - 1) maxy = t->height - 1;
+  if (maxy > band_y1 - 1) maxy = band_y1 - 1;
   if (minx > maxx || miny > maxy) {
     return;
   }
@@ -527,9 +544,6 @@ static void cart3d_raster(struct cart3d_target *t, const struct cart3d_draw *d,
   dw0dx = -(y2 - y1);
   dw1dx = -(y0 - y2);
   dw2dx = -(y1 - y0);
-  dw0dy = (x2 - x1);
-  dw1dy = (x0 - x2);
-  dw2dy = (x1 - x0);
   diwdx = (dw0dx * s0iw + dw1dx * s1iw + dw2dx * s2iw) * inv_area;
   if (d->tex) {
     u0 = d->uv[0][0] * s0iw;
@@ -542,14 +556,20 @@ static void cart3d_raster(struct cart3d_target *t, const struct cart3d_draw *d,
     dvwdx = (dw0dx * v0 + dw1dx * v1 + dw2dx * v2) * inv_area;
   }
 
-  {
-    float px = (float)minx + 0.5f, py = (float)miny + 0.5f;
-    row0 = (x2 - x1) * (py - y1) - (y2 - y1) * (px - x1);
-    row1 = (x0 - x2) * (py - y2) - (y0 - y2) * (px - x2);
-    row2 = (x1 - x0) * (py - y0) - (y1 - y0) * (px - x0);
-  }
-
   for (y = miny; y <= maxy; y++) {
+    /*
+     * Evaluated from the edge equation on every scanline rather than carried
+     * down by addition.  Six flops a row is nothing next to the pixels, and
+     * it makes a row's result depend only on its own coordinates - so
+     * splitting the frame into stripes across cores cannot change a single
+     * pixel, whatever the stripe layout or the thread count.
+     */
+    {
+      float px = (float)minx + 0.5f, py = (float)y + 0.5f;
+      row0 = (x2 - x1) * (py - y1) - (y2 - y1) * (px - x1);
+      row1 = (x0 - x2) * (py - y2) - (y0 - y2) * (px - x2);
+      row2 = (x1 - x0) * (py - y0) - (y1 - y0) * (px - x0);
+    }
     float w0, w1, w2;
     size_t base = (size_t)y * (size_t)t->width;
     int span_lo = minx, span_hi = maxx;
@@ -597,9 +617,6 @@ static void cart3d_raster(struct cart3d_target *t, const struct cart3d_draw *d,
       span_hi = maxx;
     }
     if (span_lo > span_hi) {
-      row0 += dw0dy;
-      row1 += dw1dy;
-      row2 += dw2dy;
       continue;
     }
     w0 = row0 + (float)(span_lo - minx) * dw0dx;
@@ -628,8 +645,11 @@ static void cart3d_raster(struct cart3d_target *t, const struct cart3d_draw *d,
             cart3d_sample(d->tex, u, v, src);
             if (d->gloss) {
               float e = (u * 0.75f + v - 0.40f) / 0.17f;
-              float streak = expf(-e * e);
               float lift = 1.0f + 0.15f * (1.0f - v);
+              /* exp(-9) * 24 is under 0.003, so outside the streak's own
+               * width the call is skipped rather than evaluated - and most of
+               * the label is outside it. */
+              float streak = (e > -3.0f && e < 3.0f) ? expf(-e * e) : 0.0f;
               for (i = 0; i < 3; i++) {
                 src[i] = src[i] * lift + 24.0f * streak;
               }
@@ -660,19 +680,40 @@ static void cart3d_raster(struct cart3d_target *t, const struct cart3d_draw *d,
       uw += duwdx;
       vw += dvwdx;
     }
-    row0 += dw0dy;
-    row1 += dw1dy;
-    row2 += dw2dy;
+  }
+}
+
+static void cart3d_raster(struct cart3d_target *t, const struct cart3d_draw *d,
+                          int zwrite) {
+  cart3d_raster_band(t, d, zwrite, 0, t->height);
+}
+
+static void cart3d_draw_list_band(struct cart3d_target *t,
+                                  const struct cart3d_draw *draws, int count,
+                                  int zwrite, int band_y0, int band_y1) {
+  int i;
+  if (band_y0 < 0) {
+    band_y0 = 0;
+  }
+  if (band_y1 > t->height) {
+    band_y1 = t->height;
+  }
+  for (i = 0; i < count; i++) {
+    /* One integer test rejects a triangle that cannot reach this band.  With
+     * the frame split into stripes for load balancing, the draw list is
+     * walked many times per frame and recomputing a bounding box each time
+     * would cost more than the rasterising. */
+    if (draws[i].ymax < band_y0 || draws[i].ymin >= band_y1) {
+      continue;
+    }
+    cart3d_raster_band(t, &draws[i], zwrite, band_y0, band_y1);
   }
 }
 
 static void cart3d_draw_list(struct cart3d_target *t,
                              const struct cart3d_draw *draws, int count,
                              int zwrite) {
-  int i;
-  for (i = 0; i < count; i++) {
-    cart3d_raster(t, &draws[i], zwrite);
-  }
+  cart3d_draw_list_band(t, draws, count, zwrite, 0, t->height);
 }
 
 static void cart3d_target_clear_depth(struct cart3d_target *t) {
