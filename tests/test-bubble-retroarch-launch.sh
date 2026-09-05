@@ -16,7 +16,7 @@ rom_root=$tmp/roms
 runtime=$tmp/run
 mkdir -p "$root/bin" "$root/cores" \
     "$root/factory-defaults/retroarch" "$rom_root/nes" "$rom_root/n64" \
-    "$runtime"
+    "$rom_root/easyrpg/ValidGame" "$rom_root/easyrpg/InvalidGame" "$runtime"
 cp package/frontend-bubble/plumos/bin/plumos-retroarch-launch \
     "$root/bin/plumos-retroarch-launch"
 cp package/frontend-bubble/plumos/bin/plumos-retroarch-config-merge \
@@ -25,8 +25,10 @@ cp configs/retroarch/bubble-software-drm.cfg \
     "$root/factory-defaults/retroarch/retroarch-bubble.cfg"
 : >"$root/cores/quicknes_libretro.so"
 : >"$root/cores/parallel_n64_libretro.so"
+: >"$root/cores/easyrpg_libretro.so"
 : >"$rom_root/nes/test.nes"
 : >"$rom_root/n64/test.z64"
+: >"$rom_root/easyrpg/ValidGame/RPG_RT.ldb"
 
 cat >"$root/bin/retroarch" <<'EOF'
 #!/bin/sh
@@ -100,6 +102,25 @@ PLUMOS_RUNTIME_ROOT=$runtime PLUMOS_BUSYBOX=/bin/busybox \
     --core "$root/cores/quicknes_libretro.so" \
     --rom "$rom_root/nes/test.nes"
 grep -qx "$rom_root/nes/test.nes" "$tmp/symlink.args"
+
+# The FE presents each EasyRPG project directory as one game.  Resolve that
+# directory to the core-compatible RPG_RT.ldb marker used by the device matrix.
+run_launcher "$tmp/easyrpg" --system easyrpg \
+    --core "$root/cores/easyrpg_libretro.so" \
+    --rom "$rom_root/easyrpg/ValidGame"
+grep -qx "$rom_root/easyrpg/ValidGame/RPG_RT.ldb" "$tmp/easyrpg.args"
+
+set +e
+run_launcher "$tmp/easyrpg-invalid" --system easyrpg \
+    --core "$root/cores/easyrpg_libretro.so" \
+    --rom "$rom_root/easyrpg/InvalidGame" \
+    >"$tmp/easyrpg-invalid.log" 2>&1
+easyrpg_invalid_rc=$?
+set -e
+test "$easyrpg_invalid_rc" -eq 1
+grep -q 'EasyRPG project directory is missing RPG_RT.ldb' \
+    "$tmp/easyrpg-invalid.log"
+test ! -e "$tmp/easyrpg-invalid.args"
 
 set +e
 TEST_TRACE=$tmp/escape PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$tmp/rom-link \

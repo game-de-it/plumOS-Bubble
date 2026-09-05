@@ -49,6 +49,28 @@ if [ "$no_content" -eq 0 ]; then
         "$rom_root_resolved"/*) rom=$rom_resolved ;;
         *) echo 'ROM path escaped configured ROM root' >&2; exit 2 ;;
     esac
+    if [ -d "$rom" ]; then
+        case "$system" in
+            easyrpg)
+                easyrpg_marker=
+                for candidate in "$rom"/[Rr][Pp][Gg]_[Rr][Tt].[Ll][Dd][Bb]; do
+                    if [ -f "$candidate" ]; then
+                        easyrpg_marker=$candidate
+                        break
+                    fi
+                done
+                if [ -z "$easyrpg_marker" ]; then
+                    echo 'EasyRPG project directory is missing RPG_RT.ldb' >&2
+                    exit 1
+                fi
+                rom=$easyrpg_marker
+                ;;
+            *)
+                echo 'ROM content must be a regular file' >&2
+                exit 1
+                ;;
+        esac
+    fi
 fi
 [ -f "$core" ] || exit 1
 [ "$no_content" -eq 1 ] || [ -f "$rom" ] || exit 1
