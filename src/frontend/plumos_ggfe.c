@@ -37,6 +37,7 @@
 #endif
 
 #include "plumos_ggfe_art.h"
+#include "plumos_ggfe_launch.h"
 #include "plumos_ggfe_model.h"
 
 #ifdef PLUMOS_GGFE_HOST
@@ -136,6 +137,9 @@ struct ggfe_label_slot {
 
 struct ggfe_app {
   struct ggfe_config cfg;
+  struct ggfe_catalog catalog;
+  struct ggfe_override_set ggfe_overrides;
+  struct ggfe_override_set plumos_overrides;
   struct ggfe_roots roots;
   struct ggfe_entry *entries;
   int entry_count;
@@ -1162,6 +1166,22 @@ static int ggfe_app_init(struct ggfe_app *app, const char *plumos_root,
   app->entry_count = ggfe_scan(&app->cfg, &app->roots, app->entries,
                                GGFE_MAX_ENTRIES);
 
+  {
+    char path[PATH_MAX];
+    if (join_path(path, sizeof(path), plumos_root, app->cfg.systems_path)) {
+      ggfe_catalog_load(&app->catalog, path, app->cfg.launch_system);
+      ggfe_probe_profiles(&app->catalog, plumos_root);
+    }
+    if (join_path(path, sizeof(path), plumos_root, app->cfg.ggfe_overrides)) {
+      ggfe_overrides_load(&app->ggfe_overrides, path, app->cfg.launch_system);
+    }
+    if (app->cfg.use_plumos_overrides &&
+        join_path(path, sizeof(path), plumos_root, app->cfg.plumos_overrides)) {
+      ggfe_overrides_load(&app->plumos_overrides, path,
+                          app->cfg.launch_system);
+    }
+  }
+
   if (!ggfe_build_cartridge(&app->cart, NULL) ||
       !ggfe_build_case(&app->tray, &app->lid, &app->case_h)) {
     return 0;
@@ -1206,6 +1226,8 @@ static int ggfe_app_init(struct ggfe_app *app, const char *plumos_root,
 static void ggfe_app_free(struct ggfe_app *app) {
   int i;
   ggfe_text_free(&app->text);
+  ggfe_overrides_free(&app->ggfe_overrides);
+  ggfe_overrides_free(&app->plumos_overrides);
   for (i = 0; i < GGFE_LABEL_CACHE; i++) {
     free(app->labels[i].rgb);
   }
@@ -1344,51 +1366,50 @@ static void ggfe_terminate_group(pid_t pgid) {
 static int ggfe_launch_rom(struct ggfe_app *app,
                            struct plumos_fbdev_renderer *renderer,
                            const struct ggfe_entry *entry) {
-  char launcher[PATH_MAX];
-  char core[PATH_MAX];
-  char cmd[PATH_MAX * 4];
-  int cmd_len;
+  struct ggfe_launch_choice choice;
+  char resolver[PATH_MAX];
   char error[256];
-  const char *busybox = getenv("PLUMOS_BUSYBOX");
-  char *argv[5];
+  char *argv[8];
+  int argc = 0;
   pid_t pid;
   int status = 0;
 
-  if (!busybox || !busybox[0]) {
-    busybox = "/bin/busybox";
-  }
-  if (!join_path(launcher, sizeof(launcher), app->plumos_root,
-                 app->cfg.launcher) ||
-      !join_path(core, sizeof(core), app->plumos_root, app->cfg.launch_core)) {
+  if (!ggfe_choose_profile(&app->catalog, &app->cfg, &app->ggfe_overrides,
+                           &app->plumos_overrides, entry->rel, &choice)) {
+    ggfe_log(app, "ggfe_launch=no-profile rom=%s reason=%s\n", entry->rel,
+             choice.source);
     return -1;
   }
-  if (!is_regular_file(core)) {
-    ggfe_log(app, "ggfe_launch=missing-core core=%s\n", core);
+  if (!join_path(resolver, sizeof(resolver), app->plumos_root,
+                 app->cfg.resolver) ||
+      !is_regular_file(resolver)) {
+    ggfe_log(app, "ggfe_launch=missing-resolver path=%s\n", resolver);
     return -1;
   }
-  cmd_len = snprintf(cmd, sizeof(cmd),
-                     "'%s' --system '%s' --core '%s' --rom '%s' --cpu '%s'",
-                     launcher, app->cfg.launch_system, core, entry->rom,
-                     app->cfg.launch_cpu);
-  if (cmd_len < 0 || (size_t)cmd_len >= sizeof(cmd)) {
-    ggfe_log(app, "ggfe_launch=command-too-long rom=%s\n", entry->rom);
-    return -1;
-  }
-  ggfe_log(app, "ggfe_launch=start rom=%s\n", entry->rom);
+  ggfe_log(app, "ggfe_launch=start rom=%s profile=%s source=%s\n", entry->rel,
+           choice.profile->id, choice.source);
+
+  /* GGFE picked the profile; plumos-text-ui builds the command for whichever
+   * runtime it names, validates the ROM and core paths, and records recent
+   * and resume state.  The three runtimes disagree on calling convention, so
+   * this is the one place that knowledge should live. */
+  argv[argc++] = resolver;
+  argv[argc++] = (char *)"launch";
+  argv[argc++] = (char *)app->cfg.launch_system;
+  argv[argc++] = (char *)entry->rel;
+  argv[argc++] = (char *)"--profile";
+  argv[argc++] = (char *)choice.profile->id;
+  argv[argc++] = (char *)"--execute";
+  argv[argc] = NULL;
 
   plumos_fbdev_renderer_shutdown(renderer);
 
-  argv[0] = (char *)busybox;
-  argv[1] = (char *)"sh";
-  argv[2] = (char *)"-c";
-  argv[3] = cmd;
-  argv[4] = NULL;
   pid = fork();
   if (pid == 0) {
     if (setpgid(0, 0) != 0) {
       _exit(126);
     }
-    execv(busybox, argv);
+    execv(resolver, argv);
     _exit(127);
   }
   if (pid > 0) {
@@ -1407,6 +1428,24 @@ static int ggfe_launch_rom(struct ggfe_app *app,
     return -1;
   }
   return status;
+}
+
+/* Whether pressing A on this cartridge can do anything.  Checked before the
+ * insert animation starts, so a game with no runnable core never plays a
+ * launch sequence that would end in nothing. */
+static int ggfe_can_launch(struct ggfe_app *app, const struct ggfe_entry *entry,
+                           char *why, size_t why_size) {
+  struct ggfe_launch_choice choice;
+  if (ggfe_choose_profile(&app->catalog, &app->cfg, &app->ggfe_overrides,
+                          &app->plumos_overrides, entry->rel, &choice)) {
+    return 1;
+  }
+  if (app->catalog.profile_count > 0) {
+    copy_string(why, why_size, app->catalog.profiles[0].reason);
+  } else {
+    copy_string(why, why_size, "no launch profile listed for this system");
+  }
+  return 0;
 }
 
 static long long ggfe_now_ms(void) {
@@ -1524,8 +1563,17 @@ int main(int argc, char **argv) {
             }
             break;
           case BTN_EAST: /* A */
-            launch_t = 0.0f;
+          {
+            char why[96];
+            if (ggfe_can_launch(&app, &app.entries[target], why,
+                                sizeof(why))) {
+              launch_t = 0.0f;
+            } else {
+              ggfe_log(&app, "ggfe_launch=unavailable rom=%s reason=%s\n",
+                       app.entries[target].rel, why);
+            }
             break;
+          }
           case BTN_SOUTH: /* B */
           case BTN_START:
             running = 0;
@@ -1640,6 +1688,22 @@ int main(int argc, char **argv) {
   for (i = 0; i < app.entry_count; i++) {
     printf("  %-40s %s\n", app.entries[i].title,
            app.entries[i].art[0] ? app.entries[i].rule : "(no artwork)");
+  }
+  printf("\nlaunch profiles for %s (default %s):\n", app.catalog.system_id,
+         app.catalog.default_profile[0] ? app.catalog.default_profile : "-");
+  for (i = 0; i < app.catalog.profile_count; i++) {
+    printf("  %-34s %s\n", app.catalog.profiles[i].id,
+           app.catalog.profiles[i].available ? "available"
+                                             : app.catalog.profiles[i].reason);
+  }
+  printf("\nresolved launch:\n");
+  for (i = 0; i < app.entry_count; i++) {
+    struct ggfe_launch_choice choice;
+    int ok = ggfe_choose_profile(&app.catalog, &app.cfg, &app.ggfe_overrides,
+                                 &app.plumos_overrides, app.entries[i].rel,
+                                 &choice);
+    printf("  %-40s %-30s %s\n", app.entries[i].title,
+           ok ? choice.profile->id : "(cannot launch)", choice.source);
   }
   if (app.entry_count == 0) {
     fprintf(stderr, "ggfe: no ROMs under %s\n", app.roots.roms);

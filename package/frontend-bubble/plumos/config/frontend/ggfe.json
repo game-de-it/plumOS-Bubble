@@ -5,10 +5,19 @@
   "rom_extensions": ["gg", "sms", "zip", "7z"],
   "extensions": ["png", "jpg", "jpeg", "webp"],
   "launch": {
-    "launcher": "bin/plumos-retroarch-launch",
+    "resolver": "bin/plumos-text-ui",
     "system": "gamegear",
-    "core": "cores/genesis_plus_gx_libretro.so",
-    "cpu": "ondemand"
+    "systems": "config/frontend/systems.json",
+    "profile": "",
+    "prefer": [
+      "retroarch:genesis_plus_gx",
+      "retroarch:gearsystem",
+      "retroarch:picodrive",
+      "picoarch:genesis_plus_gx"
+    ],
+    "overrides": "state/frontend/ggfe-overrides.json",
+    "plumos_overrides": "state/frontend/core-overrides.json",
+    "use_plumos_overrides": true
   },
   "artwork": {
     "prefer": ["title", "boxart"],

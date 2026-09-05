@@ -37,6 +37,7 @@
 #define GGFE_MAX_ROM_DIRS 8
 #define GGFE_MAX_EXTS 6
 #define GGFE_MAX_LOOKUPS 4
+#define GGFE_MAX_PREFER 12
 
 enum ggfe_art_kind {
   GGFE_ART_UNKNOWN = 0,
@@ -69,11 +70,19 @@ struct ggfe_config {
   int title_aspect_w;
   int title_aspect_h;
   int title_aspect_tol_permille;
-  /* how a selected cartridge is launched */
-  char launcher[160];
-  char launch_system[64];
-  char launch_core[192];
-  char launch_cpu[24];
+  /* How a selected cartridge is launched.  GGFE decides which profile;
+   * plumos-text-ui builds and runs the command.  There is deliberately no
+   * CPU policy here: it is resolved by the same chain inside that tool, and
+   * forcing a value would override what the user set in the stock frontend. */
+  char resolver[160];         /* bin/plumos-text-ui */
+  char launch_system[64];     /* systems.json id, e.g. gamegear */
+  char launch_profile[128];   /* GGFE system-scope choice, may be empty */
+  char systems_path[160];
+  char ggfe_overrides[160];   /* GGFE writes only this one */
+  char plumos_overrides[160]; /* read as a reference, never written */
+  int use_plumos_overrides;
+  char launch_prefer[GGFE_MAX_PREFER][128];
+  int launch_prefer_count;
 };
 
 struct ggfe_roots {
@@ -115,12 +124,15 @@ static void ggfe_config_defaults(struct ggfe_config *cfg) {
   cfg->title_aspect_w = 160;
   cfg->title_aspect_h = 144;
   cfg->title_aspect_tol_permille = 30;
-  copy_string(cfg->launcher, sizeof(cfg->launcher),
-              "bin/plumos-retroarch-launch");
+  copy_string(cfg->resolver, sizeof(cfg->resolver), "bin/plumos-text-ui");
   copy_string(cfg->launch_system, sizeof(cfg->launch_system), "gamegear");
-  copy_string(cfg->launch_core, sizeof(cfg->launch_core),
-              "cores/genesis_plus_gx_libretro.so");
-  copy_string(cfg->launch_cpu, sizeof(cfg->launch_cpu), "ondemand");
+  copy_string(cfg->systems_path, sizeof(cfg->systems_path),
+              "config/frontend/systems.json");
+  copy_string(cfg->ggfe_overrides, sizeof(cfg->ggfe_overrides),
+              "state/frontend/ggfe-overrides.json");
+  copy_string(cfg->plumos_overrides, sizeof(cfg->plumos_overrides),
+              "state/frontend/core-overrides.json");
+  cfg->use_plumos_overrides = 1;
 }
 
 static int ggfe_read_file(const char *path, char **out, size_t *len_out) {
@@ -265,14 +277,27 @@ static int ggfe_config_load(struct ggfe_config *cfg, const char *path) {
   {
     const char *launch, *launch_end;
     if (json_find_object(text, end, "launch", &launch, &launch_end)) {
-      json_get_string(launch, launch_end, "launcher", cfg->launcher,
-                      sizeof(cfg->launcher));
+      int m;
+      json_get_string(launch, launch_end, "resolver", cfg->resolver,
+                      sizeof(cfg->resolver));
       json_get_string(launch, launch_end, "system", cfg->launch_system,
                       sizeof(cfg->launch_system));
-      json_get_string(launch, launch_end, "core", cfg->launch_core,
-                      sizeof(cfg->launch_core));
-      json_get_string(launch, launch_end, "cpu", cfg->launch_cpu,
-                      sizeof(cfg->launch_cpu));
+      json_get_string(launch, launch_end, "profile", cfg->launch_profile,
+                      sizeof(cfg->launch_profile));
+      json_get_string(launch, launch_end, "systems", cfg->systems_path,
+                      sizeof(cfg->systems_path));
+      json_get_string(launch, launch_end, "overrides", cfg->ggfe_overrides,
+                      sizeof(cfg->ggfe_overrides));
+      json_get_string(launch, launch_end, "plumos_overrides",
+                      cfg->plumos_overrides, sizeof(cfg->plumos_overrides));
+      cfg->use_plumos_overrides =
+          json_get_bool(launch, launch_end, "use_plumos_overrides", 1);
+      m = ggfe_read_string_array(launch, launch_end, "prefer",
+                                 cfg->launch_prefer[0], GGFE_MAX_PREFER,
+                                 sizeof(cfg->launch_prefer[0]));
+      if (m > 0) {
+        cfg->launch_prefer_count = m;
+      }
     }
   }
   free(text);

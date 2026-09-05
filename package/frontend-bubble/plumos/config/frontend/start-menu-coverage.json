@@ -19,14 +19,46 @@
     "shutdown"
   ],
   "start_entries": [
-    {"id": "ui-settings", "status": "implemented", "backend": "frontend"},
-    {"id": "system-settings", "status": "implemented", "backend": "frontend-and-device-helpers"},
-    {"id": "network-settings", "status": "implemented", "backend": "plumos-network-control"},
-    {"id": "performance-settings", "status": "implemented", "backend": "plumos-cpu-control"},
-    {"id": "apps", "status": "implemented", "backend": "apps-catalog"},
-    {"id": "help", "status": "implemented", "backend": "frontend"},
-    {"id": "reboot", "status": "implemented", "backend": "plumos-safe-shutdown"},
-    {"id": "shutdown", "status": "implemented", "backend": "plumos-safe-shutdown"}
+    {
+      "id": "ui-settings",
+      "status": "implemented",
+      "backend": "frontend"
+    },
+    {
+      "id": "system-settings",
+      "status": "implemented",
+      "backend": "frontend-and-device-helpers"
+    },
+    {
+      "id": "network-settings",
+      "status": "implemented",
+      "backend": "plumos-network-control"
+    },
+    {
+      "id": "performance-settings",
+      "status": "implemented",
+      "backend": "plumos-cpu-control"
+    },
+    {
+      "id": "apps",
+      "status": "implemented",
+      "backend": "apps-catalog"
+    },
+    {
+      "id": "help",
+      "status": "implemented",
+      "backend": "frontend"
+    },
+    {
+      "id": "reboot",
+      "status": "implemented",
+      "backend": "plumos-safe-shutdown"
+    },
+    {
+      "id": "shutdown",
+      "status": "implemented",
+      "backend": "plumos-safe-shutdown"
+    }
   ],
   "apps_order": [
     "scraping",
@@ -35,7 +67,8 @@
     "retroarch",
     "pyxel_setup",
     "portmaster",
-    "portmaster_update"
+    "portmaster_update",
+    "ggfe"
   ],
   "apps_catalog_order": [
     "scraping",
@@ -47,7 +80,8 @@
     "portmaster_update",
     "thumbnail-plan",
     "thumbnail-fetch",
-    "thumbnail-results"
+    "thumbnail-results",
+    "ggfe"
   ],
   "apps_hidden_order": [
     "thumbnail-plan",
@@ -58,33 +92,113 @@
     "settings",
     "network"
   ],
-  "apps_reference_match": ["plumOS-MF", "plumOS-V90S_v2-public"],
+  "apps_reference_match": [
+    "plumOS-MF",
+    "plumOS-V90S_v2-public"
+  ],
   "apps_reference_match_scope": "visible entries and order",
   "apps_entries": [
-    {"id": "scraping", "status": "implemented", "visible": true},
-    {"id": "file_manager", "status": "implemented", "visible": true},
-    {"id": "music_player", "status": "implemented", "visible": true},
-    {"id": "retroarch", "status": "implemented", "visible": true},
-    {"id": "pyxel_setup", "status": "implemented", "visible": true},
-    {"id": "portmaster", "status": "implemented", "visible": true},
-    {"id": "portmaster_update", "status": "implemented", "visible": true},
-    {"id": "thumbnail-plan", "status": "implemented", "visible": false},
-    {"id": "thumbnail-fetch", "status": "implemented", "visible": false},
-    {"id": "thumbnail-results", "status": "implemented", "visible": false}
+    {
+      "id": "scraping",
+      "status": "implemented",
+      "visible": true
+    },
+    {
+      "id": "file_manager",
+      "status": "implemented",
+      "visible": true
+    },
+    {
+      "id": "music_player",
+      "status": "implemented",
+      "visible": true
+    },
+    {
+      "id": "retroarch",
+      "status": "implemented",
+      "visible": true
+    },
+    {
+      "id": "pyxel_setup",
+      "status": "implemented",
+      "visible": true
+    },
+    {
+      "id": "portmaster",
+      "status": "implemented",
+      "visible": true
+    },
+    {
+      "id": "portmaster_update",
+      "status": "implemented",
+      "visible": true
+    },
+    {
+      "id": "ggfe",
+      "status": "implemented",
+      "visible": true,
+      "device": "bubble"
+    },
+    {
+      "id": "thumbnail-plan",
+      "status": "implemented",
+      "visible": false
+    },
+    {
+      "id": "thumbnail-fetch",
+      "status": "implemented",
+      "visible": false
+    },
+    {
+      "id": "thumbnail-results",
+      "status": "implemented",
+      "visible": false
+    }
   ],
   "bubble_only_start_entries": [],
-  "bubble_only_apps_entries": [],
+  "bubble_only_apps_entries": [
+    "ggfe"
+  ],
   "implemented_subroutes": [
-    {"path": "system/lumination", "backend": "Rockchip DRM DSI brightness property"},
-    {"path": "system/display-color", "backend": "Rockchip DRM DSI contrast/hue/saturation properties"},
-    {"path": "system/update/runtime", "backend": "signed Ed25519 transactional updater with frontend readiness rollback"},
-    {"path": "system/factory-reset/picoarch", "backend": "factory-defaults/picoarch"},
-    {"path": "network/services/ftp", "backend": "BusyBox ftpd"},
-    {"path": "network/services/sftp", "backend": "Dropbear SFTP subsystem shared with SSH on port 22"},
-    {"path": "network/services/samba", "backend": "Samba smbd"}
+    {
+      "path": "system/lumination",
+      "backend": "Rockchip DRM DSI brightness property"
+    },
+    {
+      "path": "system/display-color",
+      "backend": "Rockchip DRM DSI contrast/hue/saturation properties"
+    },
+    {
+      "path": "system/update/runtime",
+      "backend": "signed Ed25519 transactional updater with frontend readiness rollback"
+    },
+    {
+      "path": "system/factory-reset/picoarch",
+      "backend": "factory-defaults/picoarch"
+    },
+    {
+      "path": "network/services/ftp",
+      "backend": "BusyBox ftpd"
+    },
+    {
+      "path": "network/services/sftp",
+      "backend": "Dropbear SFTP subsystem shared with SSH on port 22"
+    },
+    {
+      "path": "network/services/samba",
+      "backend": "Samba smbd"
+    }
   ],
   "unsupported_visible": [
-    {"path": "system/lid-suspend", "reason": "no-lid-device", "todo": "BUB-P5-02"},
-    {"path": "network/services/adb", "reason": "device-node-and-runtime-absent", "todo": "BUB-P5-02"}
+    {
+      "path": "system/lid-suspend",
+      "reason": "no-lid-device",
+      "todo": "BUB-P5-02"
+    },
+    {
+      "path": "network/services/adb",
+      "reason": "device-node-and-runtime-absent",
+      "todo": "BUB-P5-02"
+    }
   ]
 }

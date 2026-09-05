@@ -499,6 +499,12 @@
   - 導線はAppsへ`ggfe`を追加した。既存FEは`shell:`アプリの実行前にrendererを落とすため、
     `plumos_controller_ui.c`は無改変でDRM handoffが成立する。共通項目は削除していない。
     Bubble固有項目としてmanifestの`bubble_only_menu_entries`へ記録した。
+- [ ] GGFEのコア選択UIを実装する。解決結果と各profileの`未対応`理由は既に取得できるので、
+  カート上のオーバーレイで選ばせ、`state/frontend/ggfe-overrides.json`へ書き戻す。
+  plumOS側の`core-overrides.json`へは書かない（参照のみ）。
+- [ ] macOSのbash 3.2は`set -e`で`[[ ]]`の失敗を無視するため、`tests/`配下の
+  `[[ ]]`アサーションはmacOS上で無言パスする。container（bash 5.2）では正しく落ちる。
+  既存testを`if ... then fail; fi`形式へ寄せる（GGFE testは対応済み）。
 - [ ] GGFEの実機acceptanceを行う。FE→Apps→Game Gearでの起動、カルーセル操作、
   A起動→RetroArch→復帰、B/STARTでFE復帰、DRM master再取得、60fps維持を確認する。
 - [ ] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
