@@ -6,6 +6,8 @@ package="$repo_root/package/frontend-bubble/plumos"
 menus="$package/config/frontend/menus.json"
 apps="$package/config/frontend/apps.json"
 coverage="$package/config/frontend/start-menu-coverage.json"
+gg_boxart_rescue="$package/share/frontend/artwork-scraper/rescue/gamegear/Named_Boxarts.tsv"
+gg_title_rescue="$package/share/frontend/artwork-scraper/rescue/gamegear/Named_Titles.tsv"
 
 expected_start='["ui-settings","system-settings","network-settings","performance-settings","apps","help","reboot","shutdown"]'
 expected_apps='["scraping","file_manager","music_player","retroarch","pyxel_setup","portmaster","portmaster_update","ggfe"]'
@@ -64,6 +66,11 @@ done
 
 grep -Fq 'PLUMOS_BUSYBOX="$BB"' "$package/bin/plumos-frontend-launch"
 grep -Fq 'PLUMOS_BUSYBOX="$BB"' "$package/bin/plumos-controller-ui-bubble"
+[[ $(wc -l < "$gg_boxart_rescue") -eq 2 ]]
+[[ $(wc -l < "$gg_title_rescue") -eq 2 ]]
+grep -q $'^04302bbd\tEternal%20Legend' "$gg_boxart_rescue"
+grep -q $'^407ac070\tPutt%20_%20Putter' "$gg_boxart_rescue"
+cmp "$gg_boxart_rescue" "$gg_title_rescue"
 grep -Fq 'tr(ui, "common.start", "Start")' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
 grep -Fq 'tr(ui, "common.stop", "Stop")' \
