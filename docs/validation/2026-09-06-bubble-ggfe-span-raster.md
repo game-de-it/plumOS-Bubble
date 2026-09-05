@@ -227,3 +227,71 @@ ggfe_cpu=restore result=ok active=ondemand
 The component checksum and all three mutable-setting hashes remained unchanged.
 This accepts the normal Apps lifecycle and governor wrapper.  It does not close
 the separate 60 fps motion gate.
+
+## Parallel prepare and panel conversion
+
+Commit `c4b756c` moves the background copy/depth clear and the 32-bit panel
+conversion onto the existing dynamic stripe pool.  Review found that its
+one-thread fallback reset `next_stripe` but still locked a mutex which had never
+been initialised.  Commit `b7be9c5` makes stripe claiming genuinely lock-free
+when no worker exists and adds a permanent host regression: one-thread and
+four-thread builds render all six representative browse/launch PNGs
+byte-for-byte identically.
+
+The rebuilt `b7be9c5` 212-entry frontend component and its 213 corresponding
+global checksum entries passed before and after the device switch.  The
+transfer payload SHA-256 was
+`eb43f438b0e2c2e1daedb20146d626492af52d89d013064d5b3c8aa91b6cc99a`.
+Installed hashes were:
+
+```text
+c88291280e588b4e43fb836372735ba4cafc738cb2d8cbbaf637f1774e40655c  bin/plumos-ggfe
+09718b768aed5fd44103fbd29df05f7252a65dabc6c0deb805cc78d1ecc01880  bin/plumos-ggfe-launch
+fd9bc6d0944f39650a9cc06ca70643e0fae3fa350332d8925e4282c406c2e96d  components/frontend/checksums.sha256
+```
+
+Rollback is
+`/storage/plumos/state/app-deploy/b7be9c5-ggfe-parallel-io/rollback.tar`,
+SHA-256
+`5467b34f0dc4b97533283ee555eb781fc6526c5a0b5a402fbe6ca22cd02821e1`.
+The three mutable configuration hashes stayed unchanged.
+
+On the physical device, the panel conversion fell from about 2.25 ms to about
+0.85 ms, a roughly 62% reduction.  Parallel prepare did not help: the measured
+`clear` stage increased from about 0.53 ms to about 1.02 ms because dispatch
+overhead is larger than the memory operation saved.  Net frame work improved
+by about 0.9 ms.
+
+At the left library boundary, where fewer cases are visible, a stationary
+frame now meets the display deadline:
+
+```text
+ggfe_frames=fps=60.00 frames=60 elapsed_ms=1000 max_frame_ms=17 slow_frames=0 compose_us=14826/14972 blit_us=851/932 present_us=983/1161
+ggfe_stages=clear=1025 console=1 label=737 cart3d=6269 glass=4756 console_front=0 hud=2034 flash=0 threads=4
+```
+
+Repeated stationary intervals were 58 to 60 fps, with compose approximately
+14.83 to 14.93 ms and blit approximately 0.85 to 0.87 ms.  This accepts the
+static 60 Hz target at that boundary.
+
+Continuous physical D-pad scrolling improved perceptually according to the
+user, but it is not a 60 fps pass.  Depending on carousel position it measured
+about 27.5 to 39 fps.  A representative centre interval remained 30 fps:
+
+```text
+ggfe_frames=fps=30.00 frames=30 elapsed_ms=1000 max_frame_ms=34 slow_frames=30 compose_us=20627/22384 blit_us=873/958 present_us=11809/13577
+ggfe_stages=clear=1014 console=0 label=1265 cart3d=8958 glass=6882 console_front=0 hud=2504 flash=0 threads=4
+```
+
+Physical A launched `gamegear/Columns [V1.0].gg` through
+`retroarch:genesis_plus_gx`.  The launch animation measured 47 to 60 fps.
+RetroArch exited with SELECT+START, status was zero, and GGFE reopened input.
+Physical B then ended GGFE through the normal Apps route.  The final state had
+one frontend renderer, no GGFE/RetroArch/broker process, `ondemand`, no
+validation hold, valid component checksums, and unchanged mutable settings.
+
+The parallel blit and complete normal lifecycle are accepted.  The user's
+visual assessment was that scrolling is substantially better and visibly
+smooth, but centre scrolling remains below 60 fps.  Removing or changing case
+rendering would alter the frontend appearance and was not done without a
+separate product decision.

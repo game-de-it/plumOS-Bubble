@@ -528,7 +528,12 @@
     `threads=4`、終了後`ondemand`復元、RA往復後の入力再開は合格。静止時composeは
     約14.3 msまで短縮したが、blitとvblank待ちを含めると約30〜32 fps。連続scrollは
     約27〜43 fps、重い区間はcompose約19.5〜22.1 msで約30 fpsだった。
-    60 fpsの16.6 ms全体予算には未達のため、cart3dとglassの描画量削減を継続する。詳細は
+    source `b7be9c5`でpanel blitとbackground/depth prepareも4-core化し、未初期化mutexを
+    使用していた1-thread fallbackを修正。1/4-threadの代表6画面byte一致を回帰test化した。
+    実機blitは約2.25 msから約0.85 msへ短縮。左端静止は58〜60 fpsへ到達し、利用者も
+    scrollが目視で大きく改善したことを確認した。一方、中央の連続scrollは約27.5〜39 fps、
+    代表区間30 fps/compose約20.6 msのため、全位置60 fpsのgateはopen。外観を変えるcase省略は
+    product判断なしに行わず、cart3dとglassの描画量削減を継続する。詳細は
     `docs/validation/2026-09-06-bubble-ggfe-span-raster.md`。
 - [x] GGFEの操作説明と移植リファレンスを`docs/ggfe.md`へ書く。画面上のボタン凡例は置かず、
   ドキュメントで告知する方針。他plumOS機種へ移植する際もこの文書を起点にする。
@@ -550,7 +555,8 @@
     `ggfe_input=reopened-after-launch`後にD-pad操作を継続でき、物理BでのみGGFE終了して
     通常FEへ戻ることを再試験合格。source `bc27cd4`でも通常のSTART > Apps > Game Gear導線から
     `performance`適用、D-pad連続操作、物理B終了、FE 1 process復帰、`ondemand`復元、checksumと
-    mutable設定保持まで合格。60 fpsとmotionの物理acceptanceは未完了。
+    mutable設定保持まで合格。source `b7be9c5`でもColumns起動、SELECT+START終了、GGFE入力再開、
+    物理B終了、FE復帰まで再合格。静止60 fpsは部分合格、全位置scroll 60 fpsは未完了。
 - [ ] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
   現行buildはlibpngのみリンクしており該当hitは`NO ARTWORK`板へ落ちる。
   libjpeg導入はtools imageとfrontend/lib双方の変更になるため単独で実施する。
