@@ -1034,6 +1034,45 @@ static void ggfe_draw_hud(struct ggfe_app *app, const struct ggfe_frame *f,
   }
 }
 
+/*
+ * Stage timing for the compose pass.  Compiled out entirely unless
+ * GGFE_PROFILE is defined, so the shipped frontend pays nothing: a low frame
+ * rate has to be attributable to a stage, not guessed at.
+ */
+#ifdef GGFE_PROFILE
+enum {
+  GGFE_STAGE_CLEAR = 0,
+  GGFE_STAGE_CONSOLE,
+  GGFE_STAGE_LABEL,
+  GGFE_STAGE_CART,
+  GGFE_STAGE_GLASS,
+  GGFE_STAGE_FRONT,
+  GGFE_STAGE_HUD,
+  GGFE_STAGE_FLASH,
+  GGFE_STAGE_COUNT
+};
+static const char *ggfe_stage_name[GGFE_STAGE_COUNT] = {
+    "clear", "console", "label", "cart3d", "glass", "console_front", "hud",
+    "flash"};
+static long long ggfe_stage_us[GGFE_STAGE_COUNT];
+static long long ggfe_stage_mark;
+static long long ggfe_profile_now_us(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (long long)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
+}
+#define GGFE_STAGE_BEGIN() (ggfe_stage_mark = ggfe_profile_now_us())
+#define GGFE_STAGE_END(stage)                                    \
+  do {                                                           \
+    long long now_us = ggfe_profile_now_us();                    \
+    ggfe_stage_us[stage] += now_us - ggfe_stage_mark;            \
+    ggfe_stage_mark = now_us;                                    \
+  } while (0)
+#else
+#define GGFE_STAGE_BEGIN() ((void)0)
+#define GGFE_STAGE_END(stage) ((void)0)
+#endif
+
 static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
                          const unsigned char *background) {
   const float deg = 3.14159265358979f / 180.0f;
@@ -1046,11 +1085,14 @@ static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
   if (sel < 0) sel = 0;
   if (sel > app->entry_count - 1) sel = app->entry_count - 1;
 
+  GGFE_STAGE_BEGIN();
   memcpy(app->target.rgb, background, (size_t)GGFE_W * GGFE_H * 3);
   cart3d_target_clear_depth(&app->target);
+  GGFE_STAGE_END(GGFE_STAGE_CLEAR);
   if (show_console) {
     ggfe_draw_console(&app->target, f->console_dy, f->shadow, 0);
   }
+  GGFE_STAGE_END(GGFE_STAGE_CONSOLE);
 
   for (i = 0; i < app->entry_count && n_order < 16; i++) {
     float d = (float)i - f->pos;
@@ -1080,6 +1122,7 @@ static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
     }
     tex = ggfe_label_tex(app, idx);
     ggfe_set_label(app, tex);
+    GGFE_STAGE_END(GGFE_STAGE_LABEL);
 
     ggfe_cart_matrix(base, x, GGFE_Y_IDLE, z, rx * deg, ry * deg, 1.0f, 1.0f);
     if (is_sel && f->has_hero) {
@@ -1093,6 +1136,7 @@ static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
                     &app->cam, dim, alpha * amul);
     cart3d_draw_list(&app->target, app->draws, n, 1);
     n = 0;
+    GGFE_STAGE_END(GGFE_STAGE_CART);
 
     if (f->cased) {
       float lid_model[16], pivot[16], back[16], rot[16], tmp[16];
@@ -1123,13 +1167,17 @@ static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
     }
   }
 
+  GGFE_STAGE_END(GGFE_STAGE_CART);
   cart3d_sort(glass, glass_n);
   cart3d_draw_list(&app->target, glass, glass_n, 0);
+  GGFE_STAGE_END(GGFE_STAGE_GLASS);
 
   if (show_console) {
     ggfe_draw_console(&app->target, f->console_dy, f->shadow, 1);
   }
+  GGFE_STAGE_END(GGFE_STAGE_FRONT);
   ggfe_draw_hud(app, f, sel);
+  GGFE_STAGE_END(GGFE_STAGE_HUD);
 
   if (f->flash > 0.0f) {
     long i2, total = (long)GGFE_W * GGFE_H * 3;
@@ -1139,6 +1187,7 @@ static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
           (unsigned char)((float)app->target.rgb[i2] * (1.0f - a) + 255.0f * a);
     }
   }
+  GGFE_STAGE_END(GGFE_STAGE_FLASH);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1913,6 +1962,33 @@ int main(int argc, char **argv) {
     }
     printf("wrote %s\n", path);
   }
+
+#ifdef GGFE_PROFILE
+  {
+    const int bench_frames = 300;
+    long long start_us, total_us;
+    int fr, st;
+
+    memset(ggfe_stage_us, 0, sizeof(ggfe_stage_us));
+    start_us = ggfe_profile_now_us();
+    for (fr = 0; fr < bench_frames; fr++) {
+      /* a continuous scroll: the state the frame rate complaint came from */
+      float k = (float)fr / (float)bench_frames;
+      float scroll = 1.0f + k * (float)(app.entry_count - 1);
+      ggfe_browse_frame(scroll, &frame);
+      ggfe_compose(&app, &frame, background);
+    }
+    total_us = ggfe_profile_now_us() - start_us;
+    printf("\nbench: %d frames, %.2f ms/frame (%.1f fps equivalent)\n",
+           bench_frames, (double)total_us / bench_frames / 1000.0,
+           1000000.0 * bench_frames / (double)total_us);
+    for (st = 0; st < GGFE_STAGE_COUNT; st++) {
+      printf("  %-14s %7.3f ms/frame  %5.1f%%\n", ggfe_stage_name[st],
+             (double)ggfe_stage_us[st] / bench_frames / 1000.0,
+             100.0 * (double)ggfe_stage_us[st] / (double)total_us);
+    }
+  }
+#endif
 
   free(background);
   ggfe_app_free(&app);

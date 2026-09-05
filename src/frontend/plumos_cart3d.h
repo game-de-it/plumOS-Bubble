@@ -501,6 +501,10 @@ static void cart3d_raster(struct cart3d_target *t, const struct cart3d_draw *d,
   float area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
   float inv_area, dw0dx, dw1dx, dw2dx, dw0dy, dw1dy, dw2dy;
   float row0, row1, row2;
+  float s0iw = d->s[0][2], s1iw = d->s[1][2], s2iw = d->s[2][2];
+  float u0 = 0.0f, u1 = 0.0f, u2 = 0.0f, v0 = 0.0f, v1 = 0.0f, v2 = 0.0f;
+  float iw = 0.0f, uw = 0.0f, vw = 0.0f;
+  float diwdx, duwdx = 0.0f, dvwdx = 0.0f;
   int minx, maxx, miny, maxy, x, y;
 
   if (area >= -1e-6f) {
@@ -526,6 +530,17 @@ static void cart3d_raster(struct cart3d_target *t, const struct cart3d_draw *d,
   dw0dy = (x2 - x1);
   dw1dy = (x0 - x2);
   dw2dy = (x1 - x0);
+  diwdx = (dw0dx * s0iw + dw1dx * s1iw + dw2dx * s2iw) * inv_area;
+  if (d->tex) {
+    u0 = d->uv[0][0] * s0iw;
+    u1 = d->uv[1][0] * s1iw;
+    u2 = d->uv[2][0] * s2iw;
+    v0 = d->uv[0][1] * s0iw;
+    v1 = d->uv[1][1] * s1iw;
+    v2 = d->uv[2][1] * s2iw;
+    duwdx = (dw0dx * u0 + dw1dx * u1 + dw2dx * u2) * inv_area;
+    dvwdx = (dw0dx * v0 + dw1dx * v1 + dw2dx * v2) * inv_area;
+  }
 
   {
     float px = (float)minx + 0.5f, py = (float)miny + 0.5f;
@@ -535,24 +550,81 @@ static void cart3d_raster(struct cart3d_target *t, const struct cart3d_draw *d,
   }
 
   for (y = miny; y <= maxy; y++) {
-    float w0 = row0, w1 = row1, w2 = row2;
+    float w0, w1, w2;
     size_t base = (size_t)y * (size_t)t->width;
-    for (x = minx; x <= maxx; x++) {
+    int span_lo = minx, span_hi = maxx;
+    int e;
+
+    /*
+     * Solve each edge for the x range it allows on this scanline instead of
+     * walking the whole bounding box.  Meshes here are built from centroid
+     * fans, which produce long thin slivers whose bounding boxes are enormous
+     * next to their area - iterating those boxes was costing eight pixels
+     * tested for every one shaded.
+     */
+    for (e = 0; e < 3; e++) {
+      float row = (e == 0) ? row0 : (e == 1) ? row1 : row2;
+      float slope = (e == 0) ? dw0dx : (e == 1) ? dw1dx : dw2dx;
+      if (slope > 1e-9f || slope < -1e-9f) {
+        float bound = (float)minx - row / slope;
+        /* A near-horizontal edge puts the crossing far outside the box, and
+         * converting that to int would overflow.  Clamp in float first. */
+        if (bound < (float)minx - 2.0f) {
+          bound = (float)minx - 2.0f;
+        } else if (bound > (float)maxx + 2.0f) {
+          bound = (float)maxx + 2.0f;
+        }
+        if (slope > 0.0f) {
+          int hi = (int)floorf(bound) + 1; /* widened; the test below is exact */
+          if (hi < span_hi) {
+            span_hi = hi;
+          }
+        } else {
+          int lo = (int)ceilf(bound) - 1;
+          if (lo > span_lo) {
+            span_lo = lo;
+          }
+        }
+      } else if (row > 0.0f) {
+        span_lo = 1;
+        span_hi = 0; /* this scanline is entirely outside the edge */
+      }
+    }
+    if (span_lo < minx) {
+      span_lo = minx;
+    }
+    if (span_hi > maxx) {
+      span_hi = maxx;
+    }
+    if (span_lo > span_hi) {
+      row0 += dw0dy;
+      row1 += dw1dy;
+      row2 += dw2dy;
+      continue;
+    }
+    w0 = row0 + (float)(span_lo - minx) * dw0dx;
+    w1 = row1 + (float)(span_lo - minx) * dw1dx;
+    w2 = row2 + (float)(span_lo - minx) * dw2dx;
+    /* 1/w, u/w and v/w are all linear in screen space, so they are stepped
+     * per pixel rather than rebuilt from barycentrics.  That removes six
+     * multiplies per fragment, which matters because most triangles here are
+     * flat colour and were paying for interpolation they never used. */
+    iw = (w0 * s0iw + w1 * s1iw + w2 * s2iw) * inv_area;
+    if (d->tex) {
+      uw = (w0 * u0 + w1 * u1 + w2 * u2) * inv_area;
+      vw = (w0 * v0 + w1 * v1 + w2 * v2) * inv_area;
+    }
+    for (x = span_lo; x <= span_hi; x++) {
       if (w0 <= 0.0f && w1 <= 0.0f && w2 <= 0.0f) {
-        float l0 = w0 * inv_area, l1 = w1 * inv_area, l2 = w2 * inv_area;
-        float iw = l0 * d->s[0][2] + l1 * d->s[1][2] + l2 * d->s[2][2];
         size_t idx = base + (size_t)x;
         if (iw > t->depth[idx]) {
           float src[3];
           unsigned char *dst = t->rgb + idx * 3;
           int i;
           if (d->tex) {
-            float u = (l0 * d->uv[0][0] * d->s[0][2] +
-                       l1 * d->uv[1][0] * d->s[1][2] +
-                       l2 * d->uv[2][0] * d->s[2][2]) / iw;
-            float v = (l0 * d->uv[0][1] * d->s[0][2] +
-                       l1 * d->uv[1][1] * d->s[1][2] +
-                       l2 * d->uv[2][1] * d->s[2][2]) / iw;
+            float inv = 1.0f / iw;
+            float u = uw * inv;
+            float v = vw * inv;
             cart3d_sample(d->tex, u, v, src);
             if (d->gloss) {
               float e = (u * 0.75f + v - 0.40f) / 0.17f;
@@ -584,6 +656,9 @@ static void cart3d_raster(struct cart3d_target *t, const struct cart3d_draw *d,
       w0 += dw0dx;
       w1 += dw1dx;
       w2 += dw2dx;
+      iw += diwdx;
+      uw += duwdx;
+      vw += dvwdx;
     }
     row0 += dw0dy;
     row1 += dw1dy;

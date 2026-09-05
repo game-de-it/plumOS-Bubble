@@ -281,6 +281,40 @@ The three timing pairs are average/maximum microseconds for software scene
 composition, RGB-to-panel conversion, and DRM/fbdev presentation.  They make a
 low frame rate attributable without guessing from the CPU governor alone.
 
+## Rasteriser performance
+
+The frame is dominated by the software rasteriser; on a scrolling carousel
+everything else together is under 5% of compose time. Two properties of the
+meshes drive the cost.
+
+**Fans produce slivers.** Every rounded outline is filled as a triangle fan
+from its centroid, so a shell face is 28 long thin diagonal triangles. A
+sliver's bounding box is enormous next to its area, and walking that box was
+costing eight pixels tested for every one shaded - 3.0 M tested against 357 k
+shaded per frame. `cart3d_raster` therefore solves each edge for the x range
+it allows on the current scanline and iterates only that span, which brings
+tested fragments to 563 k without changing what is drawn.
+
+**Most triangles are flat colour.** 1/w, u/w and v/w are linear in screen
+space, so they are stepped per pixel rather than rebuilt from barycentrics
+each time, removing six multiplies per fragment that flat triangles never
+needed.
+
+Together these took a scroll frame from 5.57 ms to 3.20 ms on the build
+machine. Shaded overdraw is 1.2x screen area, which is close to the floor for
+this scene, so further gains have to come from drawing less rather than from
+the inner loop: the closed cases contribute about 43% of compose time for a
+frosted overlay, and their hidden faces - the tray back plate behind the
+cartridge, the lid back face - are candidates.
+
+Span bounds are computed with one multiply where the previous loop
+accumulated additions, so a handful of edge pixels round differently: 0.13% of
+pixels change by at most 18 levels, invisible at 24x amplification.
+
+Measure on the device with `ggfe_frames=` in `logs/ggfe.log`, which reports
+compose, blit and present separately. `-DGGFE_PROFILE` additionally breaks
+compose into stages and adds a 300-frame scroll benchmark to the host build.
+
 ## Known limits
 
 * No core-picker UI yet. The resolution result and each profile's reason are
