@@ -43,8 +43,10 @@ if { [ "$no_content" -eq 0 ] && [ -z "$rom" ]; } ||
     exit 2
 fi
 if [ "$no_content" -eq 0 ]; then
-    case "$rom" in
-        "$PLUMOS_ROM_ROOT"/*) ;;
+    rom_root_resolved="$($BB readlink -f "$PLUMOS_ROM_ROOT")"
+    rom_resolved="$($BB readlink -f "$rom")"
+    case "$rom_resolved" in
+        "$rom_root_resolved"/*) rom=$rom_resolved ;;
         *) echo 'ROM path escaped configured ROM root' >&2; exit 2 ;;
     esac
 fi

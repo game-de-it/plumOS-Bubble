@@ -90,6 +90,29 @@ grep -qx 'audio_device = "plumos_output"' "$tmp/software.append"
 ! grep -q '^config_save_on_exit = ' "$tmp/software.append"
 ! find "$runtime/retroarch" -type f -name 'launch.*.cfg' -print -quit | grep -q .
 
+# Bubble exposes SD2 through /storage/Roms -> /storage/user/Roms while the
+# scanner records the resolved /storage/user/Roms path.  Both names identify
+# the same managed ROM tree and must pass the traversal guard.
+ln -s "$rom_root" "$tmp/rom-link"
+TEST_TRACE=$tmp/symlink PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$tmp/rom-link \
+PLUMOS_RUNTIME_ROOT=$runtime PLUMOS_BUSYBOX=/bin/busybox \
+    "$root/bin/plumos-retroarch-launch" --system nes \
+    --core "$root/cores/quicknes_libretro.so" \
+    --rom "$rom_root/nes/test.nes"
+grep -qx "$rom_root/nes/test.nes" "$tmp/symlink.args"
+
+set +e
+TEST_TRACE=$tmp/escape PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$tmp/rom-link \
+PLUMOS_RUNTIME_ROOT=$runtime PLUMOS_BUSYBOX=/bin/busybox \
+    "$root/bin/plumos-retroarch-launch" --system nes \
+    --core "$root/cores/quicknes_libretro.so" \
+    --rom "$root/cores/quicknes_libretro.so" \
+    >"$tmp/escape.log" 2>&1
+escape_rc=$?
+set -e
+test "$escape_rc" -eq 2
+grep -q 'ROM path escaped configured ROM root' "$tmp/escape.log"
+
 sed -i 's/^menu_driver = "rgui"$/menu_driver = "xmb"/' \
     "$root/config/retroarch/retroarch-bubble.cfg"
 run_launcher "$tmp/xmb" --system nes \
