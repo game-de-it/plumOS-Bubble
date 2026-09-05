@@ -367,6 +367,13 @@
     Function1 menu、通常終了復帰を残す。これにより機械実行集計は173起動、失敗1、content不足22、
     unsupported 0。残る失敗はFBA2012 CPS2専用coreが要求するCRC `cf94d275`がROM2の全archiveに
     存在しないcontent-set不一致で、FBNeoとgeneric FBA2012は同じCPS2 familyで起動済み。
+  - FEからの実ROM起動失敗を再調査し、BubbleのDRM/GLES runner初期化が1秒を超える一方、
+    launcherは共有メモリを1秒しか待たず、runner自身も初回frameを1.5秒で打ち切るstartup raceを
+    特定。launcherを5秒、runnerを10秒の初回frame待機へ変更し、空の`pidof drastic`を使う
+    Bubble向け強制killを除去した。実ROMでは1.2秒でreadyとなり、ARMHF coreのgamecard解析、
+    DRM/Mali ownership、ALSA `RUNNING`とhardware pointer進行まで合格。実LCDのdual-screen配置、
+    全入力、Function1 menu、通常終了とFE復帰は利用者による物理確認を残す。詳細は
+    `docs/validation/2026-09-05-bubble-nds-startup-race.md`。
 - [ ] `BUB-P6-09` Bubble全物理入力を実機captureから固定し、全runtimeへ割り当てて物理確認する。
   - event0/1/2、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`から、D-pad、ABXY、
     Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。
