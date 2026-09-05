@@ -56,12 +56,21 @@ terminated/unmounted, the shared-memory marker was removed, governors remained
 This forced-timeout behavior is not evidence for the normal menu-exit path;
 normal Function1 menu, exit and frontend return still need physical acceptance.
 
+The post-launch app-layer verification also exposed that active standalone
+configuration had accidentally remained in the global checksum inventory.
+DraStic correctly updated its mutable `drastic.cf2`, but that made the old
+inventory fail after a valid game launch. `config/standalone/*` is now excluded
+alongside active RetroArch configuration; factory standalone defaults remain
+managed by the standalone component checksum.
+
 ## Deployment integrity
 
 Source `47d8438` was deployed as the launcher, runner, DraStic build manifest,
 standalone component manifest/checksum, and app manifest. Staged hashes matched
 the host before switching. The device passed all 860 standalone component
-checksums and all 12,894 live app-layer checksums. Rollback is retained at:
+checksums. The mutable-config inventory correction was deployed separately and
+the final live app-layer checksum count is recorded after that switch. Rollback
+for the NDS runtime change is retained at:
 
 ```text
 /storage/plumos/state/update-rollback/973edcf-to-47d8438-nds-20260905T0630Z

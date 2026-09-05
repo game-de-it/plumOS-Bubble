@@ -116,6 +116,7 @@ EOF
         ! -path './config/frontend/settings.json' \
         ! -path './config/system/settings.json' \
         ! -path './config/retroarch/*' \
+        ! -path './config/standalone/*' \
         ! -path './logs/*' ! -path './state/*' ! -path './saves/*' ! -path './states/*' \
         -print | sed 's#^./##' | LC_ALL=C sort |
         while IFS= read -r path; do sha256sum "$path"; done

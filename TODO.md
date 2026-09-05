@@ -374,6 +374,9 @@
     DRM/Mali ownership、ALSA `RUNNING`とhardware pointer進行まで合格。実LCDのdual-screen配置、
     全入力、Function1 menu、通常終了とFE復帰は利用者による物理確認を残す。詳細は
     `docs/validation/2026-09-05-bubble-nds-startup-race.md`。
+  - 同試験後、active `config/standalone/*`がglobal checksumへ誤収録され、DraSticによる正当な
+    `drastic.cf2`更新でapp-layer検証が失敗することを検出。active standalone設定をmanaged
+    inventoryから除外し、factory defaultはstandalone component checksumで引き続き管理する。
 - [ ] `BUB-P6-09` Bubble全物理入力を実機captureから固定し、全runtimeへ割り当てて物理確認する。
   - event0/1/2、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`から、D-pad、ABXY、
     Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。
