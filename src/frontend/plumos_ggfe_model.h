@@ -123,12 +123,16 @@ static int ggfe_bracket_outline(float (*p)[2], int capacity) {
 /* Build one cartridge.  label must outlive the mesh. */
 static int ggfe_build_cartridge(struct cart3d_mesh *m,
                                 const struct cart3d_tex *label) {
-  float outline[64], (*ol)[2] = (float (*)[2])outline;
-  float block[32], (*bl)[2] = (float (*)[2])block;
-  float trough[32], (*tr)[2] = (float (*)[2])trough;
-  float bar_out[32], (*bo)[2] = (float (*)[2])bar_out;
-  float pill[32], (*pl)[2] = (float (*)[2])pill;
-  float brk[64], (*bk)[2] = (float (*)[2])brk;
+#define GGFE_SHELL_PTS CART3D_RR_POINTS(6)
+#define GGFE_PANEL_PTS CART3D_RR_POINTS(4)
+#define GGFE_PILL_PTS CART3D_RR_POINTS(5)
+#define GGFE_BRACKET_PTS 32
+  float outline[GGFE_SHELL_PTS][2], (*ol)[2] = outline;
+  float block[GGFE_PANEL_PTS][2], (*bl)[2] = block;
+  float trough[GGFE_PANEL_PTS][2], (*tr)[2] = trough;
+  float bar_out[GGFE_PANEL_PTS][2], (*bo)[2] = bar_out;
+  float pill[GGFE_PILL_PTS][2], (*pl)[2] = pill;
+  float brk[GGFE_BRACKET_PTS][2], (*bk)[2] = brk;
   int n_outline, n_trough, n_bar, n_brk, n_pill, i, s;
   const float z_back = -GGFE_CART_D / 2.0f;
   const float z_face = GGFE_CART_D / 2.0f;
@@ -140,7 +144,7 @@ static int ggfe_build_cartridge(struct cart3d_mesh *m,
     return 0;
   }
 
-  n_outline = ggfe_shell_outline(ol, 32);
+  n_outline = ggfe_shell_outline(ol, GGFE_SHELL_PTS);
   cart3d_face(m, ol, n_outline, z_face, ggfe_shell, 0, 1.0f);
   cart3d_face(m, ol, n_outline, z_back, ggfe_shell_back, 1, 1.0f);
   cart3d_wall(m, ol, n_outline, z_face, z_back, ggfe_shell_side, 1.0f);
@@ -148,9 +152,9 @@ static int ggfe_build_cartridge(struct cart3d_mesh *m,
   /* bracket: three convex fills at one height, one wall along the real
    * outline.  The bar is a ring so the grip trough behind it survives the
    * depth test. */
-  n_trough = cart3d_rounded_rect(tr, 16, -GGFE_GRIP_X, GGFE_GRIP_X,
+  n_trough = cart3d_rounded_rect(tr, GGFE_PANEL_PTS, -GGFE_GRIP_X, GGFE_GRIP_X,
                                  GGFE_GRIP_Y0, GGFE_GRIP_Y1, 1.6f, 1.6f, 4);
-  n_bar = cart3d_rounded_rect(bo, 16, -GGFE_BR_X_OUT, GGFE_BR_X_OUT,
+  n_bar = cart3d_rounded_rect(bo, GGFE_PANEL_PTS, -GGFE_BR_X_OUT, GGFE_BR_X_OUT,
                               GGFE_BR_Y_BAR, GGFE_BR_Y_TOP,
                               GGFE_CORNER_R_TOP, 0.2f, 4);
   if (n_bar == n_trough) {
@@ -161,12 +165,12 @@ static int ggfe_build_cartridge(struct cart3d_mesh *m,
   for (s = 0; s < 2; s++) {
     float sx = s ? 1.0f : -1.0f;
     float a = sx * GGFE_BR_X_OUT, b = sx * GGFE_BR_X_IN;
-    int n_arm = cart3d_rounded_rect(bl, 16, a < b ? a : b, a < b ? b : a,
+    int n_arm = cart3d_rounded_rect(bl, GGFE_PANEL_PTS, a < b ? a : b, a < b ? b : a,
                                     GGFE_BR_Y_ARM, GGFE_BR_Y_BAR + 0.2f,
                                     0.2f, 1.4f, 4);
     cart3d_face(m, bl, n_arm, z_block, ggfe_bracket, 0, 1.0f);
   }
-  n_brk = ggfe_bracket_outline(bk, 32);
+  n_brk = ggfe_bracket_outline(bk, GGFE_BRACKET_PTS);
   cart3d_wall(m, bk, n_brk, z_block, z_face, ggfe_shell_side, 1.0f);
   cart3d_quad(m, -GGFE_BR_X_OUT + 4.5f, GGFE_BR_X_OUT - 4.5f,
               GGFE_BR_Y_TOP - 0.45f, GGFE_BR_Y_TOP, z_block + 0.02f,
@@ -175,7 +179,7 @@ static int ggfe_build_cartridge(struct cart3d_mesh *m,
   /* grip trough and its anti-slip ridges */
   cart3d_face(m, tr, n_trough, z_grip, ggfe_trough, 0, 1.0f);
   {
-    float rev[32], (*rv)[2] = (float (*)[2])rev;
+    float rev[GGFE_PANEL_PTS][2], (*rv)[2] = rev;
     for (i = 0; i < n_trough; i++) {
       rv[i][0] = tr[n_trough - 1 - i][0];
       rv[i][1] = tr[n_trough - 1 - i][1];
@@ -226,7 +230,7 @@ static int ggfe_build_cartridge(struct cart3d_mesh *m,
   }
 
   /* SEGA emboss: a recess with a lit lower lip */
-  n_pill = cart3d_rounded_rect(pl, 24, -14.0f, 14.0f, -3.5f, 3.5f, 3.5f, 3.5f, 5);
+  n_pill = cart3d_rounded_rect(pl, GGFE_PILL_PTS, -14.0f, 14.0f, -3.5f, 3.5f, 3.5f, 3.5f, 5);
   for (i = 0; i < n_pill; i++) {
     pl[i][1] -= 23.5f;
   }
@@ -241,10 +245,12 @@ static int ggfe_build_cartridge(struct cart3d_mesh *m,
 /* Translucent clamshell: an open back tray and a lid hinged at the top. */
 static int ggfe_build_case(struct cart3d_mesh *tray, struct cart3d_mesh *lid,
                            float *height_out) {
-  float outer[64], (*ou)[2] = (float (*)[2])outer;
-  float inner[64], (*in)[2] = (float (*)[2])inner;
-  float rev[64], (*rv)[2] = (float (*)[2])rev;
-  float tab[32], (*tb)[2] = (float (*)[2])tab;
+#define GGFE_CASE_PTS CART3D_RR_POINTS(5)
+#define GGFE_TAB_PTS CART3D_RR_POINTS(3)
+  float outer[GGFE_CASE_PTS][2], (*ou)[2] = outer;
+  float inner[GGFE_CASE_PTS][2], (*in)[2] = inner;
+  float rev[GGFE_CASE_PTS][2], (*rv)[2] = rev;
+  float tab[GGFE_TAB_PTS][2], (*tb)[2] = tab;
   const float w = GGFE_CART_W + 9.0f, h = GGFE_CART_H + 9.0f;
   const float z_f = 1.6f, z_b = -9.0f;
   int n, n_in, n_tab, i;
@@ -253,9 +259,9 @@ static int ggfe_build_case(struct cart3d_mesh *tray, struct cart3d_mesh *lid,
       !cart3d_mesh_init(lid, GGFE_CASE_TRIS)) {
     return 0;
   }
-  n = cart3d_rounded_rect(ou, 32, -w / 2.0f, w / 2.0f, -h / 2.0f, h / 2.0f,
+  n = cart3d_rounded_rect(ou, GGFE_CASE_PTS, -w / 2.0f, w / 2.0f, -h / 2.0f, h / 2.0f,
                           6.0f, 6.0f, 5);
-  n_in = cart3d_rounded_rect(in, 32, -w / 2.0f + 4.5f, w / 2.0f - 4.5f,
+  n_in = cart3d_rounded_rect(in, GGFE_CASE_PTS, -w / 2.0f + 4.5f, w / 2.0f - 4.5f,
                              -h / 2.0f + 4.5f, h / 2.0f - 4.5f, 4.5f, 4.5f, 5);
   for (i = 0; i < n_in; i++) {
     rv[i][0] = in[n_in - 1 - i][0];
@@ -271,7 +277,7 @@ static int ggfe_build_case(struct cart3d_mesh *tray, struct cart3d_mesh *lid,
   cart3d_face(lid, ou, n, 4.4f, ggfe_case_tint, 0, 1.0f);
   cart3d_face(lid, ou, n, 1.8f, ggfe_case_back, 1, 1.0f);
   cart3d_wall(lid, ou, n, 4.4f, 1.8f, ggfe_case_side, 1.0f);
-  n_tab = cart3d_rounded_rect(tb, 16, -10.0f, 10.0f, -3.0f, 3.0f, 2.5f, 2.5f, 3);
+  n_tab = cart3d_rounded_rect(tb, GGFE_TAB_PTS, -10.0f, 10.0f, -3.0f, 3.0f, 2.5f, 2.5f, 3);
   for (i = 0; i < n_tab; i++) {
     tb[i][1] += h / 2.0f - 4.0f;
   }

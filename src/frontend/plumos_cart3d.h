@@ -309,6 +309,12 @@ static void cart3d_ring(struct cart3d_mesh *m, const float (*outer)[2],
   }
 }
 
+/* Points a rounded rectangle outline needs for a given corner segment count.
+ * Size every outline buffer with this: passing a capacity larger than the
+ * array overruns it, and passing one smaller silently truncates the outline
+ * so the shape closes across a chord. */
+#define CART3D_RR_POINTS(seg) (4 * ((seg) + 1))
+
 /* Rounded rectangle outline, counter-clockwise from the bottom right. */
 static int cart3d_rounded_rect(float (*out)[2], int capacity, float x0,
                                float x1, float y0, float y1, float r_top,
