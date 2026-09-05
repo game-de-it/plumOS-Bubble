@@ -168,7 +168,11 @@
     safe shutdownが正しく拒否した。FE foreground process groupをruntime markerへ公開し、
     terminal actionだけTERM→bounded KILLでgroup/display ownerを終了するよう修正。さらに
     safe shutdownがdisplayを持たないstorage blockerも走査・終了するhost fixtureに合格。
-    hung/black gameからのReboot/Shutdownと次bootのclean判定を実機確認に残す。
+    続く実機試験ではgame/group停止とp4 clean unmountまでは成功したが、外部overlayからの
+    request後にFEが終了せず、PID 1がrequestを消費できないことを特定。成功時にFE ready PIDも
+    TERM→bounded KILLし、失敗し得るstorage処理より後へnetwork/volume停止を移動した。
+    誤選択済みのpending ShutdownをRebootへ安全に差替える経路も追加。保留中Shutdownを新経路へ
+    渡して実機電源断まで合格。次boot後、black PSPからReboot/Shutdown双方とclean判定を残す。
 - [ ] `BUB-P4-I05` normalized Bubble controller を公開し、FE/RetroArch/standaloneで1入力1反応を確認する。
   - FEとRetroArch RGUIでD-pad/A/B、SELECT+START終了を物理確認した。standaloneと全buttonを残す。
   - PicoArch QuickNESで物理A/B、Function1/2 menu、menu A決定/B戻る、FE復帰を利用者確認済み。
@@ -431,7 +435,10 @@
   - 起動168導線のrendererを再監査し、Mali 128、GL非使用CPU framebuffer 40、意図しない
     llvmpipe/softpipe/swrast mapping 0。geometryを出す123導線はhorizontal 112、vertical 11。
     VarthでArcade/CPS1 9導線を再試験し全起動、geometry出力8導線は3:4・360x480中央配置。
-    MAME2003 Plusを含むgeometry非出力45導線とPPSSPP shader warningは物理LCD確認を残す。
+    MAME2003 Plusを含むgeometry非出力45導線とPPSSPPを物理LCD確認に残す。PPSSPPはStar Soldier
+    CHDで暗転し、Thin3Dの頂点側既定highpとfragment側lowpのvarying精度不一致をBubble Maliが
+    link拒否していた。software rendererへ逃がさずmediumpへ統一したsource `7c8f39b`をbuildし、
+    standalone 860/860で実機deploy済み。Star Soldierの映像・音・操作・終了を再確認する。
   - PCM pointerは起動168導線中163で進行。Atari800、FreeChaF、SquirrelJME、Numero、
     VeMUlatorはbounded probe内で進行せず、音量0のため全導線の実聴と併せて物理確認を残す。
     最新aggregateのgeometry 123件とPyxel fit 1件は全て640x480内・中央・aspect一致。
