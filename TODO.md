@@ -258,6 +258,11 @@
     SD2を明示的にread-only mountしていたためbind先の`Roms`/`BIOS`だけ550となることを特定。
     V90Sと同じく通常は`rw,fmask=0022,dmask=0022,errors=remount-ro`とし、媒体異常時は
     read-only fallback、保守時は`PLUMOS_SD2_ACCESS=ro`を選べる契約へ変更する。
+    source `973edcf`を実機へ反映し、SD2本体と既存Roms/BIOS bindを`rw`へ同期した。
+    FTP/SFTP/Sambaの各実プロトコルからRoms、BIOS、Images、Manuals、Music、Patches、
+    Screenshots、Shaders、Themes、exports、imports、updatesの12箇所すべてでdirectory作成、
+    file書込み、SHA-256読戻し、削除まで合格。試験残骸0、追加FAT error 0、FE 1 process、
+    全10 componentおよび実機app-layer 12,890 managed entryのchecksumに合格した。
 - [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
   - RetroArch v1.22.2とQuickNES `058d665`をAArch64 containerからbuildし、
     software DRM/RGUI/ALSA/udev、GPU runtime非依存、component checksumをhost検証済み。
