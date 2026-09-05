@@ -51,6 +51,15 @@ Notes:
 * Physical A is `BTN_EAST` and physical B is `BTN_SOUTH` on this device, per
   `configs/input/bubble-controller-map.json`. GGFE uses those codes, not
   positions.
+* A one-slot carousel move is a 0.45-second smoothstep made from 27 presented
+  positions at the 60 Hz target. Artwork for the visible destination range is
+  decoded before the transition starts, so first-use PNG work cannot skip the
+  motion. `logs/ggfe.log` reports measured FPS, maximum frame time and slow
+  frame count once per second.
+* B/START returns to the stock frontend when GGFE was opened from Apps. During
+  the standalone validation procedure, `frontend-hold` deliberately prevents
+  that frontend from restarting, so B/START leaves a black screen until the
+  marker is removed. That black screen is an exited GGFE, not a game launch.
 * Input is ignored while the launch sequence is playing, so a second A press
   cannot start a second game.
 * **A does nothing on a cartridge with no runnable core.** Rather than play an

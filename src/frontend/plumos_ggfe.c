@@ -111,6 +111,8 @@ static int plumos_fbdev_load_png_rgba(const char *path, unsigned char **out,
 #define GGFE_STRIP_W 61
 #define GGFE_LABEL_CACHE 12
 #define GGFE_MAX_DRAWS 6144
+#define GGFE_TARGET_FPS 60.0f
+#define GGFE_SCROLL_SECONDS 0.45f
 
 struct ggfe_image {
   unsigned char *rgb; /* RGB8 */
@@ -781,12 +783,6 @@ static float ggfe_ease_in(float k) { return k * k * k; }
 
 static float ggfe_ease_in_out(float k) { return 3.0f * k * k - 2.0f * k * k * k; }
 
-/* Ease out with a small settle overshoot, the way a carousel snaps. */
-static float ggfe_ease_back(float k) {
-  float d = k - 1.0f;
-  return 1.0f + 1.9f * d * d * d + 0.9f * d * d;
-}
-
 /* Slide into the mouth, then seat with a small overshoot. */
 static float ggfe_insert_curve(float t, float a, float b, float c) {
   float y = ggfe_lerp(GGFE_Y_IDLE, GGFE_Y_INSERTED - 3.0f,
@@ -961,6 +957,29 @@ static struct cart3d_tex *ggfe_label_tex(struct ggfe_app *app, int entry) {
   slot->tex.height = GGFE_LABEL_TEX_H;
   slot->tex.filter_nearest = 0;
   return &slot->tex;
+}
+
+/* Decode every label that can enter the visible carousel before motion starts.
+ * PNG decode and resize are intentionally kept out of the transition frames:
+ * advancing by wall time across that one-off stall made a one-slot move look
+ * like a jump on Bubble. */
+static void ggfe_warm_labels(struct ggfe_app *app, int center) {
+  int first = center - 4;
+  int last = center + 4;
+  int i;
+
+  if (!app) {
+    return;
+  }
+  if (first < 0) {
+    first = 0;
+  }
+  if (last >= app->entry_count) {
+    last = app->entry_count - 1;
+  }
+  for (i = first; i <= last; i++) {
+    (void)ggfe_label_tex(app, i);
+  }
 }
 
 static void ggfe_set_label(struct ggfe_app *app, const struct cart3d_tex *tex) {
@@ -1470,6 +1489,11 @@ int main(int argc, char **argv) {
   float pos_from = 0.0f, pos_to = 0.0f, scroll_t = 1.0f;
   float launch_t = -1.0f;
   long long last_ms;
+  long long last_present_ms;
+  long long stats_start_ms;
+  long long stats_max_frame_ms = 0;
+  unsigned long stats_frames = 0;
+  unsigned long stats_slow_frames = 0;
   int running = 1;
 
   (void)argc;
@@ -1513,12 +1537,15 @@ int main(int argc, char **argv) {
   }
   ggfe_background_build(background);
   last_ms = ggfe_now_ms();
+  last_present_ms = last_ms;
+  stats_start_ms = last_ms;
 
   while (running) {
     long long now = ggfe_now_ms();
     float dt = (float)(now - last_ms) / 1000.0f;
     struct pollfd pfd;
     float pos;
+    int present_ok;
 
     last_ms = now;
     if (dt > 0.1f) {
@@ -1544,27 +1571,33 @@ int main(int argc, char **argv) {
           case BTN_DPAD_UP:
             if (target > 0) {
               pos_from = ggfe_lerp(pos_from, pos_to,
-                                   ggfe_ease_back(scroll_t < 1.0f ? scroll_t
-                                                                  : 1.0f));
+                                   ggfe_ease_in_out(scroll_t < 1.0f ? scroll_t
+                                                                    : 1.0f));
               target--;
               pos_to = (float)target;
+              ggfe_warm_labels(&app, target);
               scroll_t = 0.0f;
+              ggfe_log(&app, "ggfe_input=move target=%d\n", target);
             }
             break;
           case BTN_DPAD_RIGHT:
           case BTN_DPAD_DOWN:
             if (target < app.entry_count - 1) {
               pos_from = ggfe_lerp(pos_from, pos_to,
-                                   ggfe_ease_back(scroll_t < 1.0f ? scroll_t
-                                                                  : 1.0f));
+                                   ggfe_ease_in_out(scroll_t < 1.0f ? scroll_t
+                                                                    : 1.0f));
               target++;
               pos_to = (float)target;
+              ggfe_warm_labels(&app, target);
               scroll_t = 0.0f;
+              ggfe_log(&app, "ggfe_input=move target=%d\n", target);
             }
             break;
-          case BTN_EAST: /* A */
+          case BTN_EAST: /* physical A on Bubble */
           {
             char why[96];
+            ggfe_log(&app, "ggfe_input=launch code=%u physical=A target=%d\n",
+                     (unsigned int)ev.code, target);
             if (ggfe_can_launch(&app, &app.entries[target], why,
                                 sizeof(why))) {
               launch_t = 0.0f;
@@ -1574,8 +1607,11 @@ int main(int argc, char **argv) {
             }
             break;
           }
-          case BTN_SOUTH: /* B */
+          case BTN_SOUTH: /* physical B on Bubble */
           case BTN_START:
+            ggfe_log(&app, "ggfe_input=exit code=%u physical=%s\n",
+                     (unsigned int)ev.code,
+                     ev.code == BTN_SOUTH ? "B" : "START");
             running = 0;
             break;
           default:
@@ -1584,11 +1620,14 @@ int main(int argc, char **argv) {
       }
     }
 
-    scroll_t += dt / 0.24f;
+    /* A transition always gets 27 presented positions at the 60 Hz target.
+     * A one-off slow frame therefore stretches the duration instead of
+     * skipping most of the motion. */
+    scroll_t += 1.0f / (GGFE_TARGET_FPS * GGFE_SCROLL_SECONDS);
     if (scroll_t > 1.0f) {
       scroll_t = 1.0f;
     }
-    pos = ggfe_lerp(pos_from, pos_to, ggfe_ease_back(scroll_t));
+    pos = ggfe_lerp(pos_from, pos_to, ggfe_ease_in_out(scroll_t));
 
     if (launch_t >= 0.0f) {
       ggfe_launch_frame(launch_t, (float)target, &frame);
@@ -1599,12 +1638,45 @@ int main(int argc, char **argv) {
 
     ggfe_compose(&app, &frame, background);
     ggfe_blit_panel(&renderer, app.target.rgb);
-    plumos_fbdev_present(&renderer);
+    present_ok = plumos_fbdev_present(&renderer);
+
+    if (present_ok) {
+      long long present_ms = ggfe_now_ms();
+      long long frame_ms = present_ms - last_present_ms;
+      long long stats_elapsed;
+
+      last_present_ms = present_ms;
+      stats_frames++;
+      if (frame_ms > stats_max_frame_ms) {
+        stats_max_frame_ms = frame_ms;
+      }
+      if (frame_ms > 20) {
+        stats_slow_frames++;
+      }
+      stats_elapsed = present_ms - stats_start_ms;
+      if (stats_elapsed >= 1000) {
+        ggfe_log(&app,
+                 "ggfe_frames=fps=%.2f frames=%lu elapsed_ms=%lld "
+                 "max_frame_ms=%lld slow_frames=%lu\n",
+                 1000.0 * (double)stats_frames / (double)stats_elapsed,
+                 stats_frames, stats_elapsed, stats_max_frame_ms,
+                 stats_slow_frames);
+        stats_start_ms = present_ms;
+        stats_frames = 0;
+        stats_slow_frames = 0;
+        stats_max_frame_ms = 0;
+      }
+    }
 
     if (launch_t > GGFE_LAUNCH_END) {
       ggfe_launch_rom(&app, &renderer, &app.entries[target]);
       launch_t = -1.0f;
       last_ms = ggfe_now_ms();
+      last_present_ms = last_ms;
+      stats_start_ms = last_ms;
+      stats_frames = 0;
+      stats_slow_frames = 0;
+      stats_max_frame_ms = 0;
     }
 
     {

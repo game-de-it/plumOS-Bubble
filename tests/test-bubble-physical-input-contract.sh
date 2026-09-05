@@ -27,6 +27,11 @@ grep -Fq 'input_screenshot_btn = "10"' configs/retroarch/autoconfig/udev/gkd-bub
 pico_patch=package/picoarch-bubble/patches/picoarch-bubble-physical-input.patch
 grep -Fq '{ BTN_EAST,   IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_A }' "$pico_patch"
 grep -Fq '{ BTN_SOUTH,  IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_B }' "$pico_patch"
+grep -Fq 'case BTN_EAST: /* physical A on Bubble */' src/frontend/plumos_ggfe.c
+grep -Fq 'case BTN_SOUTH: /* physical B on Bubble */' src/frontend/plumos_ggfe.c
+grep -Fq '#define GGFE_TARGET_FPS 60.0f' src/frontend/plumos_ggfe.c
+grep -Fq '#define GGFE_SCROLL_SECONDS 0.45f' src/frontend/plumos_ggfe.c
+grep -Fq 'ggfe_warm_labels(&app, target);' src/frontend/plumos_ggfe.c
 grep -Fq '{ BTN_THUMBL, IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_L3 }' "$pico_patch"
 grep -Fq '{ BTN_THUMBR, IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_R3 }' "$pico_patch"
 grep -Fq '{ BTN_TRIGGER_HAPPY1, IN_BINDTYPE_EMU, EACTION_MENU }' "$pico_patch"
