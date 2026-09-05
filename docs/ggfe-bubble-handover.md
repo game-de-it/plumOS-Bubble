@@ -86,6 +86,12 @@ config/frontend/start-menu-coverage.json   （bubble_only_apps_entries に ggfe�
 再起動前に実機上でSHA-256とapp-layer checksum検証を実行し、bootstrapが
 `critical checksum failed` で拒否しないことを確認すること。
 
+`checksums.sha256`のpathをAWKの`$2`で扱ってはならない。app-layerには空白を含む
+pathがあり、`$2`は最初の空白でpathを切り詰める。通常のSHA-256行ではhashが64文字、
+区切りが2文字なので、metadataを置換する場合は`substr($0, 67)`などでpath全体を保持する。
+また実機BusyBoxの`sha256sum -c`は空白入りpathを正しく検証できない。変更componentを
+個別検証したうえで、更新前catalogと変更対象外の行がbyte単位で一致することも確認する。
+
 ## 4. 動作試験の手順
 
 ### 4.1 まずFEを経由せず単体で起動する

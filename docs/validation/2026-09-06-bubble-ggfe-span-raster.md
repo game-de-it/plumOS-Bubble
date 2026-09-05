@@ -295,3 +295,58 @@ visual assessment was that scrolling is substantially better and visibly
 smooth, but centre scrolling remains below 60 fps.  Removing or changing case
 rendering would alter the frontend appearance and was not done without a
 separate product decision.
+
+## Physical cartridge-case toggle
+
+Commit `de1912e` connects physical X (`BTN_NORTH`, evdev code 307) to the
+existing `ggfe_frame.cased` render branch.  Browse mode retains the selected
+visibility for the current GGFE process; the launch animation still presents
+the case.  Host input-contract, one/four-thread byte-identical render,
+governor, and START/Apps route tests passed before deployment.
+
+The complete 212-entry frontend component and the corresponding 213 global
+catalog entries were switched together.  Installed hashes were:
+
+```text
+f8375aac3e8dae36155a484bf4c6de92b6a36f1028ee7163ad15ce1510735ce9  bin/plumos-ggfe
+4409bd9e4b185247fb2a96d80155269b63f6f84e63744b123571a62f014b0dd0  components/frontend/checksums.sha256
+```
+
+Rollback is
+`/storage/plumos/state/app-deploy/de1912e-ggfe-case-toggle/rollback.tar`,
+SHA-256
+`893fef92e4f9f677cfddcfd97b94946caad9c4bbd16979e4a9f3062ea71e0166`.
+Its size is 45,483,008 bytes.  Frontend and system setting hashes were
+unchanged.
+
+The first one-off global-catalog rewrite used AWK `$2` and therefore truncated
+pre-existing paths containing spaces.  A full verification exposed 5,224
+unreadable entries before any reboot.  The saved pre-switch catalog was
+restored and the 213 frontend hashes were reapplied using the complete path
+from character 67 onward.  Final structural proof found all 12,725
+non-frontend catalog lines byte-for-byte unchanged and separately verified all
+213 frontend entries and all 212 component entries.  BusyBox `sha256sum -c`
+cannot parse the catalog's space-containing paths, so it is not a valid full
+catalog verifier on this image; the handover now records this constraint.
+
+The user physically confirmed case OFF and ON.  GGFE logged all three toggles:
+
+```text
+ggfe_input=case-toggle code=307 visible=0
+ggfe_input=case-toggle code=307 visible=1
+ggfe_input=case-toggle code=307 visible=0
+```
+
+With cases enabled, continuous D-pad scrolling measured approximately 27.5 to
+39.3 fps with compose averages of about 18.4 to 20.6 ms.  With cases disabled,
+steady scrolling was mainly 51 to 60 fps with compose averages of about 12.6
+to 14.6 ms; samples crossing the toggle were 40 to 45 fps.  Case-off stationary
+frames repeatedly held 60 fps at about 13.2 ms compose.  The profile confirmed
+that the glass stage fell from roughly 3.7 to 6.9 ms to effectively zero.
+There was one late 30 fps case-off interval, so this does not close the global
+60 fps gate.
+
+Physical B then produced code 304, GGFE logged a clean exit, and the launcher
+restored `ondemand`.  Final state was one frontend process, no GGFE or DRM
+broker process, valid frontend checksums, and unchanged mutable settings.  The
+X toggle and its normal Apps lifecycle are accepted.

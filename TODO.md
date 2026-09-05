@@ -532,8 +532,11 @@
     使用していた1-thread fallbackを修正。1/4-threadの代表6画面byte一致を回帰test化した。
     実機blitは約2.25 msから約0.85 msへ短縮。左端静止は58〜60 fpsへ到達し、利用者も
     scrollが目視で大きく改善したことを確認した。一方、中央の連続scrollは約27.5〜39 fps、
-    代表区間30 fps/compose約20.6 msのため、全位置60 fpsのgateはopen。外観を変えるcase省略は
-    product判断なしに行わず、cart3dとglassの描画量削減を継続する。詳細は
+    代表区間30 fps/compose約20.6 msのため、全位置60 fpsのgateはopen。source `de1912e`で
+    物理X（BTN_NORTH/code 307）によるcase表示切替を追加し、利用者がON/OFFを実機確認した。
+    case ONの連続scrollは約27.5〜39.3 fps/compose約18.4〜20.6 ms、OFFは主に
+    51〜60 fps/compose約12.6〜14.6 msとなった。caseを既定で省略するproduct判断は行わず、
+    cart3dとglassの描画量削減を継続する。詳細は
     `docs/validation/2026-09-06-bubble-ggfe-span-raster.md`。
 - [x] GGFEの操作説明と移植リファレンスを`docs/ggfe.md`へ書く。画面上のボタン凡例は置かず、
   ドキュメントで告知する方針。他plumOS機種へ移植する際もこの文書を起点にする。
@@ -557,6 +560,9 @@
     `performance`適用、D-pad連続操作、物理B終了、FE 1 process復帰、`ondemand`復元、checksumと
     mutable設定保持まで合格。source `b7be9c5`でもColumns起動、SELECT+START終了、GGFE入力再開、
     物理B終了、FE復帰まで再合格。静止60 fpsは部分合格、全位置scroll 60 fpsは未完了。
+  - source `de1912e`で物理Xのcase ON/OFFを実機合格。code 307と状態遷移をlog確認し、
+    物理B終了後はFE 1 process、GGFE/broker 0 process、`ondemand`復元、component checksum、
+    frontend/system設定hash不変まで再確認した。
 - [ ] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
   現行buildはlibpngのみリンクしており該当hitは`NO ARTWORK`板へ落ちる。
   libjpeg導入はtools imageとfrontend/lib双方の変更になるため単独で実施する。
