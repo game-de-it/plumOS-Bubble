@@ -536,7 +536,10 @@
     物理X（BTN_NORTH/code 307）によるcase表示切替を追加し、利用者がON/OFFを実機確認した。
     case ONの連続scrollは約27.5〜39.3 fps/compose約18.4〜20.6 ms、OFFは主に
     51〜60 fps/compose約12.6〜14.6 msとなった。caseを既定で省略するproduct判断は行わず、
-    cart3dとglassの描画量削減を継続する。詳細は
+    cart3dとglassの描画量削減を継続する。source `9d98b66`のHUD glyph cacheも実機合格。
+    case ONのHUD平均は2.295 msから1.122 ms（51.1%削減）、OFFは1.981 msから
+    1.098 ms（44.6%削減）となり、6代表画面はcache導入前とbyte一致した。case ON中央は
+    依然28〜30 fpsのため、全位置60 fps gateはopenのままとする。詳細は
     `docs/validation/2026-09-06-bubble-ggfe-span-raster.md`。
 - [x] GGFEの操作説明と移植リファレンスを`docs/ggfe.md`へ書く。画面上のボタン凡例は置かず、
   ドキュメントで告知する方針。他plumOS機種へ移植する際もこの文書を起点にする。
@@ -563,6 +566,9 @@
   - source `de1912e`で物理Xのcase ON/OFFを実機合格。code 307と状態遷移をlog確認し、
     物理B終了後はFE 1 process、GGFE/broker 0 process、`ondemand`復元、component checksum、
     frontend/system設定hash不変まで再確認した。
+  - source `9d98b66`のHUD glyph cacheを通常Apps導線で実機合格。20 ROM走査、物理scroll、
+    case ON/OFF、3回のRA起動・正常終了・GGFE入力再取得、物理B終了、FE復帰を確認した。
+    最終状態はFE 1 process、GGFE/broker 0、`ondemand`、component checksumと設定hash不変。
 - [ ] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
   現行buildはlibpngのみリンクしており該当hitは`NO ARTWORK`板へ落ちる。
   libjpeg導入はtools imageとfrontend/lib双方の変更になるため単独で実施する。

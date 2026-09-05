@@ -350,3 +350,52 @@ Physical B then produced code 304, GGFE logged a clean exit, and the launcher
 restored `ondemand`.  Final state was one frontend process, no GGFE or DRM
 broker process, valid frontend checksums, and unchanged mutable settings.  The
 X toggle and its normal Apps lifecycle are accepted.
+
+## HUD glyph cache
+
+Commit `9d98b66` adds a 192-entry LRU cache keyed by Unicode codepoint and pixel
+size.  Review confirmed that the cache is used only by the main composition
+thread, releases evicted coverage buffers, and frees every retained buffer at
+shutdown.  In addition to the permanent one/four-thread comparison, all six
+representative browse/launch PNGs were rendered with `9d98b66^` and
+`9d98b66`; every pair was byte-for-byte identical.
+
+The complete 212-entry component was staged and verified, but only the two
+changed payload files, component metadata, and the corresponding 213 global
+entries were switched.  The other 12,725 global catalog lines remained
+byte-for-byte unchanged.  Installed hashes were:
+
+```text
+7a1406744f418a36aa605d8884a741f4f9e9321bbb2e9008ca9de090f79f9bdc  bin/plumos-ggfe
+424ffc06d4eb4df4e16b663acadf14a60663e16bf02d9ea7195ca3a1dc5fa806  components/frontend/checksums.sha256
+```
+
+Rollback is
+`/storage/plumos/state/app-deploy/9d98b66-ggfe-glyph-cache/rollback.tar`,
+SHA-256
+`36a3b15b7e87df65e459f9cb60ef5764add13cf0b64161bc92fdc1bec95178bc`.
+Its size is 1,545,728 bytes.  Frontend and system setting hashes were
+unchanged.
+
+The physical run used `START > Apps > Game Gear`, scanned 20 ROMs, and logged
+the expected DRM backend and four renderer threads.  Comparing browse frames
+whose console and flash stages were inactive gave:
+
+| Cases | Before cache HUD | Cached HUD | Reduction |
+|---|---:|---:|---:|
+| ON | 2.295 ms average (1.876--3.223 ms) | 1.122 ms (1.087--1.199 ms) | 51.1% |
+| OFF | 1.981 ms average (1.727--3.286 ms) | 1.098 ms (1.026--1.312 ms) | 44.6% |
+
+Case-on centre scrolling remained approximately 28 to 30 fps with compose
+about 18.8 to 20.1 ms, so the cache does not close the 60 fps gate.  Case-off
+scrolling was mainly 52 to 60 fps and compose was commonly 11.7 to 12.4 ms.
+This is the expected roughly one millisecond device-side saving.
+
+During the same session three physical A presses launched Game Gear content.
+All three launches returned status zero and reopened GGFE input.  The launcher
+did emit the pre-existing `missing safe hotkeyd` warning, but RetroArch's
+SELECT+START route and GGFE return both completed.  Physical B then logged a
+clean GGFE exit.  Final state had one frontend process, no GGFE or DRM broker,
+`ondemand`, valid component checksums, and unchanged mutable settings.  The
+glyph cache and its normal lifecycle are accepted; all-position 60 fps remains
+open.
