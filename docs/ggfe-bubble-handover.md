@@ -138,8 +138,9 @@ holdマーカーを消してから再起動するのが正しい戻し方であ�
 
 ### 相対パス規約の不一致
 
-GGFEは自前でROMを走査し、`Roms/<alias>/` からの相対パスを `rel` として持つ。
-起動時はこれをそのまま渡す。
+GGFEは自前でROMを走査し、plumOS scan cacheと同じくaliasを含む
+`<alias>/<ROM>`を起動用相対パス `rel` として持つ。サムネイル探索だけは
+`Roms/<alias>/` からの相対パスを使い、既存のImages配置を維持する。
 
 ```
 plumos-text-ui launch gamegear <rel> --profile <id> --execute
@@ -151,7 +152,7 @@ plumos-text-ui launch gamegear <rel> --profile <id> --execute
 切り分けは `--execute` を外した dry run で単独に行える。
 
 ```sh
-/storage/plumos/bin/plumos-text-ui launch gamegear 'Sonic.gg'
+/storage/plumos/bin/plumos-text-ui launch gamegear 'gamegear/Sonic.gg'
 ```
 
 `command:` と `can_execute: yes` が出れば規約は一致している。

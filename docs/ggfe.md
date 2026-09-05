@@ -157,6 +157,11 @@ GGFE decides **which** profile. `plumos-text-ui` decides **how** to run it:
 plumos-text-ui launch <system> <relative path> --profile <id> --execute
 ```
 
+The relative path uses the same scan-cache identity as the stock frontend and
+includes the ROM directory alias, for example `gamegear/Sonic.gg`. Artwork
+lookup separately uses `Sonic.gg` relative to that alias so existing
+`Images/gamegear/` layouts do not gain a duplicated directory component.
+
 That tool builds the command for every runtime, validates the ROM and core
 paths, and records recent and resume state. The three runtimes do not agree on
 a calling convention - RetroArch takes named flags and an absolute core path,

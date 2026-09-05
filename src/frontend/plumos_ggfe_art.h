@@ -525,21 +525,26 @@ static void ggfe_walk(const struct ggfe_config *cfg,
     {
       struct ggfe_entry *e = &out[*count];
       size_t base_len = strlen(base);
-      const char *rel = full;
+      const char *art_rel = full;
       char *dot;
       int dup = 0, i;
 
       if (strncmp(full, base, base_len) == 0) {
-        rel = full + base_len;
-        while (*rel == '/') {
-          rel++;
+        art_rel = full + base_len;
+        while (*art_rel == '/') {
+          art_rel++;
         }
       }
       memset(e, 0, sizeof(*e));
       copy_string(e->rom, sizeof(e->rom), full);
-      copy_string(e->rel, sizeof(e->rel), rel);
+      /* plumOS scan-cache identities include the directory alias
+       * (gamegear/Sonic.gg).  Artwork lookup is relative to that alias and
+       * therefore continues to use art_rel below. */
+      if (!join_path(e->rel, sizeof(e->rel), alias, art_rel)) {
+        continue;
+      }
       copy_string(e->alias, sizeof(e->alias), alias);
-      copy_string(e->title, sizeof(e->title), path_basename(rel));
+      copy_string(e->title, sizeof(e->title), path_basename(art_rel));
       dot = strrchr(e->title, '.');
       if (dot) {
         *dot = '\0';
@@ -555,7 +560,7 @@ static void ggfe_walk(const struct ggfe_config *cfg,
       if (dup) {
         continue;
       }
-      ggfe_resolve_art(cfg, roots, e->rel, e->alias, e->art, sizeof(e->art),
+      ggfe_resolve_art(cfg, roots, art_rel, e->alias, e->art, sizeof(e->art),
                        &e->kind, e->rule, sizeof(e->rule));
       (*count)++;
     }

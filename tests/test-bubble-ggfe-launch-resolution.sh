@@ -54,9 +54,9 @@ cat >"$root/state/frontend/core-overrides.json" <<'JSON'
     {"system_id": "gamegear", "launch_profile": "retroarch:gearsystem"}
   ],
   "rom_overrides": [
-    {"system_id": "gamegear", "relative_path": "Beta (Japan).gg",
+    {"system_id": "gamegear", "relative_path": "GG/Beta (Japan).gg",
      "launch_profile": "picoarch:genesis_plus_gx"},
-    {"system_id": "gamegear", "relative_path": "Gamma (Japan).gg",
+    {"system_id": "gamegear", "relative_path": "GG/Gamma (Japan).gg",
      "launch_profile": "retroarch:picodrive"}
   ]
 }
@@ -65,7 +65,7 @@ JSON
 cat >"$root/state/frontend/ggfe-overrides.json" <<'JSON'
 {
   "rom_overrides": [
-    {"system_id": "gamegear", "relative_path": "Beta (Japan).gg",
+    {"system_id": "gamegear", "relative_path": "GG/Beta (Japan).gg",
      "launch_profile": "retroarch:genesis_plus_gx"}
   ]
 }
