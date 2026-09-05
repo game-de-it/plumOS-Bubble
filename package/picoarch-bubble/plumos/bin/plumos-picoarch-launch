@@ -38,8 +38,13 @@ case "$CORE_ID" in
         exit 2
         ;;
 esac
-case "$CONTENT" in
-    "$PLUMOS_ROM_ROOT"/*) ;;
+ROM_ROOT_REAL=$($BB readlink -f "$PLUMOS_ROM_ROOT" 2>/dev/null || true)
+CONTENT_REAL=$($BB readlink -f "$CONTENT" 2>/dev/null || true)
+case "$ROM_ROOT_REAL:$CONTENT_REAL" in
+    :*|*:) echo 'plumos-picoarch-launch: cannot resolve configured ROM root or content' >&2; exit 2 ;;
+esac
+case "$CONTENT_REAL" in
+    "$ROM_ROOT_REAL"/*) CONTENT=$CONTENT_REAL ;;
     *) echo 'plumos-picoarch-launch: content escaped configured ROM root' >&2; exit 2 ;;
 esac
 [ -x "$PICOARCH" ] && [ -f "$CORE" ] && { [ -f "$CONTENT" ] || [ -d "$CONTENT" ]; } || {

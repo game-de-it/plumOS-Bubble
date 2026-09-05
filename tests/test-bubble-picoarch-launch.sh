@@ -53,6 +53,36 @@ PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=nes \
 grep -Fqx 'picoarch=stage-P19 system=nes core=quicknes rc=0' \
     "$root/logs/session.log"
 
+# The normal FE exposes content through /storage/user/Roms while the legacy
+# compatibility root is /storage/Roms -> user/Roms.  Both names must resolve to
+# the same accepted tree; the device matrix's explicit root must not be the only
+# route that passes containment validation.
+user_root=$tmp/user/Roms
+compat_root=$tmp/Roms
+mkdir -p "$user_root/nes"
+ln -s user/Roms "$compat_root"
+: >"$user_root/nes/alias-test.nes"
+TEST_TRACE=$tmp/alias PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$compat_root \
+PLUMOS_BIOS_ROOT=$tmp/bios PLUMOS_RUNTIME_ROOT=$runtime \
+PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=nes \
+    "$root/bin/plumos-picoarch-launch" quicknes "$user_root/nes/alias-test.nes"
+grep -Fqx 'picoarch=stage-P19 system=nes core=quicknes rc=0' \
+    "$root/logs/session.log"
+
+# Canonicalisation must not weaken the traversal boundary: a symlink below the
+# ROM root which resolves outside it remains rejected.
+: >"$tmp/outside.nes"
+ln -s "$tmp/outside.nes" "$user_root/nes/escape.nes"
+set +e
+TEST_TRACE=$tmp/escape PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$compat_root \
+PLUMOS_BIOS_ROOT=$tmp/bios PLUMOS_RUNTIME_ROOT=$runtime \
+PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=nes \
+    "$root/bin/plumos-picoarch-launch" quicknes "$compat_root/nes/escape.nes"
+escape_rc=$?
+set -e
+test "$escape_rc" -eq 2
+test ! -e "$tmp/escape.pid"
+
 TEST_TRACE=$tmp/signal TEST_HOLD=1 PLUMOS_ROOT=$root \
 PLUMOS_ROM_ROOT=$rom_root PLUMOS_BIOS_ROOT=$tmp/bios \
 PLUMOS_RUNTIME_ROOT=$runtime PLUMOS_BUSYBOX=/bin/busybox \
