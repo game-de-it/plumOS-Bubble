@@ -43,6 +43,7 @@ There is no on-screen button legend; the controls are documented here instead.
 | D-pad Left / Up | previous cartridge |
 | D-pad Right / Down | next cartridge |
 | **A** | launch the selected game |
+| **X** | toggle cartridge cases while browsing |
 | **B** | return to the stock frontend |
 | **START** | return to the stock frontend |
 
@@ -51,6 +52,9 @@ Notes:
 * Physical A is `BTN_EAST` and physical B is `BTN_SOUTH` on this device, per
   `configs/input/bubble-controller-map.json`. GGFE uses those codes, not
   positions.
+* Physical X is `BTN_NORTH`. Its case setting remains active after returning
+  from a game for the lifetime of the current GGFE process. The launch
+  animation itself always shows the case.
 * Carousel motion uses the same policy as plumOS Gallery: a 360 ms time-based
   smoothstep refreshed at the 60 Hz target, with one further D-pad move queued
   until the current move finishes. Artwork for the visible destination range

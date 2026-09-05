@@ -1119,10 +1119,10 @@ static void ggfe_launch_frame(float t, float pos, struct ggfe_frame *f) {
   if (f->shadow < 0.0f) f->shadow = 0.0f;
 }
 
-static void ggfe_browse_frame(float pos, struct ggfe_frame *f) {
+static void ggfe_browse_frame(float pos, int show_cases, struct ggfe_frame *f) {
   memset(f, 0, sizeof(*f));
   f->pos = pos;
-  f->cased = 1;
+  f->cased = show_cases;
   f->others = 1.0f;
   f->hud = 1.0f;
   f->case_alpha = GGFE_CASE_ALPHA;
@@ -1874,6 +1874,7 @@ int main(int argc, char **argv) {
   int input_fd;
   struct ggfe_scroll_state scroll;
   float launch_t = -1.0f;
+  int show_cases = 1;
   long long last_ms;
   long long last_present_ms;
   long long stats_start_ms;
@@ -1999,6 +2000,11 @@ int main(int argc, char **argv) {
             }
             break;
           }
+          case BTN_NORTH: /* physical X on Bubble */
+            show_cases = !show_cases;
+            ggfe_log(&app, "ggfe_input=case-toggle code=%u visible=%d\n",
+                     (unsigned int)ev.code, show_cases);
+            break;
           case BTN_SOUTH: /* physical B on Bubble */
           case BTN_START:
             ggfe_log(&app, "ggfe_input=exit code=%u physical=%s\n",
@@ -2018,7 +2024,7 @@ int main(int argc, char **argv) {
       ggfe_launch_frame(launch_t, (float)scroll.target, &frame);
       launch_t += dt;
     } else {
-      ggfe_browse_frame(pos, &frame);
+      ggfe_browse_frame(pos, show_cases, &frame);
     }
 
     compose_start_us = ggfe_now_us();
@@ -2240,7 +2246,7 @@ int main(int argc, char **argv) {
       pos = (float)(app.entry_count - 1);
     }
     if (shots[s].t < 0.0f) {
-      ggfe_browse_frame(pos, &frame);
+      ggfe_browse_frame(pos, 1, &frame);
     } else {
       ggfe_launch_frame(shots[s].t, pos, &frame);
     }
@@ -2265,7 +2271,7 @@ int main(int argc, char **argv) {
       /* a continuous scroll: the state the frame rate complaint came from */
       float k = (float)fr / (float)bench_frames;
       float scroll = 1.0f + k * (float)(app.entry_count - 1);
-      ggfe_browse_frame(scroll, &frame);
+      ggfe_browse_frame(scroll, 1, &frame);
       ggfe_compose(&app, &frame, background);
     }
     total_us = ggfe_profile_now_us() - start_us;
