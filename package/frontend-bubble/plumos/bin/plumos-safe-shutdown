@@ -14,6 +14,8 @@ MOUNTS_FILE=${PLUMOS_MOUNTS_FILE:-/proc/mounts}
 POWER_REQUEST=${PLUMOS_POWER_REQUEST:-$RUNTIME_ROOT/power-action/request}
 NETWORK_SERVICES=${PLUMOS_NETWORK_SERVICES:-$PLUMOS_ROOT/bin/plumos-network-services}
 VOLUME_KEYS_SERVICE=${PLUMOS_VOLUME_KEYS_SERVICE:-$PLUMOS_ROOT/bin/plumos-volume-keys-service}
+RUNTIME_QUIESCE=${PLUMOS_RUNTIME_QUIESCE:-$PLUMOS_ROOT/bin/plumos-runtime-quiesce}
+FOREGROUND_MARKER=${PLUMOS_FOREGROUND_MARKER:-$RUNTIME_ROOT/frontend/foreground.pgid}
 ACTION=shutdown
 POWER_OFF=0
 DRY_RUN=0
@@ -73,6 +75,21 @@ if [ "$ACTION" != shutdown ] || [ "$POWER_OFF" -eq 1 ]; then
         "$BB" sh "$NETWORK_SERVICES" quiesce >/dev/null 2>&1 ||
             log 'stage=network-quiesce result=failed'
     fi
+fi
+if [ -x "$RUNTIME_QUIESCE" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+        PLUMOS_BUSYBOX="$BB" "$BB" sh "$RUNTIME_QUIESCE" \
+        terminate-active "$FOREGROUND_MARKER" >>"$LOG" 2>&1 || {
+            log 'result=error stage=foreground-termination'
+            exit 1
+        }
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+        PLUMOS_BUSYBOX="$BB" "$BB" sh "$RUNTIME_QUIESCE" \
+        terminate-storage "$USER_MOUNT" "$SD2_MOUNT" /storage/Roms \
+        /storage/BIOS >>"$LOG" 2>&1 || {
+            log 'result=error stage=storage-blocker-termination'
+            exit 1
+        }
 fi
 if [ -x "$SD2_MANAGER" ]; then
     PLUMOS_MOUNTS_FILE="$MOUNTS_FILE" "$BB" sh "$SD2_MANAGER" stop \

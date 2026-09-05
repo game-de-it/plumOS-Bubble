@@ -4111,6 +4111,63 @@ static void terminate_foreground_process_group(pid_t pgid) {
   (void)kill(-pgid, SIGKILL);
 }
 
+static int foreground_process_group_marker(char *path, size_t path_size) {
+  const char *runtime_root = getenv("PLUMOS_RUNTIME_ROOT");
+
+  if (!path || path_size == 0) {
+    return 0;
+  }
+  if (!runtime_root || !runtime_root[0]) {
+    runtime_root = "/run/plumos";
+  }
+  return snprintf(path, path_size, "%s/frontend/foreground.pgid",
+                  runtime_root) < (int)path_size;
+}
+
+static int publish_foreground_process_group(pid_t pgid) {
+  char path[PATH_MAX];
+  char staged[PATH_MAX];
+  FILE *file;
+
+  if (pgid <= 1 || !foreground_process_group_marker(path, sizeof(path)) ||
+      snprintf(staged, sizeof(staged), "%s.next.%ld", path, (long)getpid()) >=
+          (int)sizeof(staged)) {
+    return 0;
+  }
+  file = fopen(staged, "w");
+  if (!file) {
+    return 0;
+  }
+  fprintf(file, "pgid=%ld\n", (long)pgid);
+  if (fclose(file) != 0 || rename(staged, path) != 0) {
+    unlink(staged);
+    return 0;
+  }
+  return 1;
+}
+
+static void clear_foreground_process_group(pid_t pgid) {
+  char path[PATH_MAX];
+  char line[64];
+  FILE *file;
+  long recorded = 0;
+
+  if (pgid <= 1 || !foreground_process_group_marker(path, sizeof(path))) {
+    return;
+  }
+  file = fopen(path, "r");
+  if (!file) {
+    return;
+  }
+  if (fgets(line, sizeof(line), file)) {
+    (void)sscanf(line, "pgid=%ld", &recorded);
+  }
+  fclose(file);
+  if (recorded == (long)pgid) {
+    unlink(path);
+  }
+}
+
 /*
  * Run an interactive child under one dedicated process group. The renderer is
  * released by the caller before entry, and the frontend's long-lived input
@@ -4145,11 +4202,13 @@ static int run_foreground_shell_command(const char *cmd) {
     (void)waitpid(pid, &status, 0);
     return -1;
   }
+  (void)publish_foreground_process_group(pid);
 
   for (;;) {
     pid_t waited = waitpid(pid, &status, WNOHANG);
     if (waited == pid) {
       terminate_foreground_process_group(pid);
+      clear_foreground_process_group(pid);
       return status;
     }
     if (waited < 0) {
@@ -4157,12 +4216,14 @@ static int run_foreground_shell_command(const char *cmd) {
         continue;
       }
       terminate_foreground_process_group(pid);
+      clear_foreground_process_group(pid);
       return -1;
     }
     if (g_terminate_requested) {
       terminate_foreground_process_group(pid);
       while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
       }
+      clear_foreground_process_group(pid);
       return status;
     }
     usleep(50000);

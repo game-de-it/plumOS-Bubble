@@ -71,6 +71,183 @@ release_runtime() {
     $BB rm -f "$state"
 }
 
+is_excluded_pid() {
+    candidate=$1
+    current=$$
+    [ "$candidate" != 1 ] || return 0
+    while is_pid "$current"; do
+        [ "$candidate" != "$current" ] || return 0
+        parent=$($BB awk '/^PPid:/ { print $2; exit }' \
+            "/proc/$current/status" 2>/dev/null || true)
+        is_pid "$parent" || break
+        current=$parent
+    done
+    return 1
+}
+
+pid_is_live() {
+    pid=$1
+    [ -r "/proc/$pid/stat" ] || return 1
+    state=$($BB sed 's/.*) //' "/proc/$pid/stat" 2>/dev/null |
+        $BB awk '{ print $1; exit }')
+    [ -n "$state" ] && [ "$state" != Z ]
+}
+
+group_is_live() {
+    wanted=$1
+    for stat in /proc/[0-9]*/stat; do
+        [ -r "$stat" ] || continue
+        fields=$($BB sed 's/.*) //' "$stat" 2>/dev/null || true)
+        [ -n "$fields" ] || continue
+        set -- $fields
+        state=${1:-}
+        pgrp=${3:-}
+        [ "$pgrp" = "$wanted" ] && [ "$state" != Z ] && return 0
+    done
+    return 1
+}
+
+terminate_pid_list() {
+    label=$1
+    shift
+    pids=""
+    for pid in "$@"; do
+        is_pid "$pid" || continue
+        is_excluded_pid "$pid" && continue
+        case " $pids " in *" $pid "*) continue ;; esac
+        pid_is_live "$pid" || continue
+        pids="$pids $pid"
+    done
+    pids=${pids# }
+    [ -n "$pids" ] || {
+        printf 'runtime_quiesce=terminated label=%s pids=none\n' "$label"
+        return 0
+    }
+
+    for pid in $pids; do kill -TERM "$pid" 2>/dev/null || true; done
+    for pid in $pids; do kill -CONT "$pid" 2>/dev/null || true; done
+    attempt=0
+    while [ "$attempt" -lt 30 ]; do
+        remaining=""
+        for pid in $pids; do
+            pid_is_live "$pid" && remaining="$remaining $pid"
+        done
+        [ -n "$remaining" ] || {
+            printf 'runtime_quiesce=terminated label=%s pids=%s signal=TERM\n' \
+                "$label" "$pids"
+            return 0
+        }
+        attempt=$((attempt + 1))
+        $BB usleep 100000
+    done
+
+    remaining=${remaining# }
+    for pid in $remaining; do kill -KILL "$pid" 2>/dev/null || true; done
+    attempt=0
+    while [ "$attempt" -lt 10 ]; do
+        survivors=""
+        for pid in $remaining; do
+            pid_is_live "$pid" && survivors="$survivors $pid"
+        done
+        [ -n "$survivors" ] || {
+            printf 'runtime_quiesce=terminated label=%s pids=%s signal=KILL\n' \
+                "$label" "$pids"
+            return 0
+        }
+        attempt=$((attempt + 1))
+        $BB usleep 100000
+    done
+    printf 'runtime_quiesce=failed label=%s survivors=%s\n' \
+        "$label" "${survivors# }" >&2
+    return 1
+}
+
+marker_pgid() {
+    marker=$1
+    $BB sed -n 's/^pgid=//p' "$marker" 2>/dev/null | $BB head -n 1
+}
+
+terminate_group() {
+    marker=$1
+    pgid=$(marker_pgid "$marker")
+    is_pid "$pgid" || {
+        printf 'runtime_quiesce=terminated label=foreground-group pgid=none\n'
+        return 0
+    }
+    if ! group_is_live "$pgid"; then
+        $BB rm -f "$marker"
+        printf 'runtime_quiesce=terminated label=foreground-group pgid=%s state=gone\n' \
+            "$pgid"
+        return 0
+    fi
+    $BB kill -TERM "-$pgid" 2>/dev/null || true
+    $BB kill -CONT "-$pgid" 2>/dev/null || true
+    attempt=0
+    while [ "$attempt" -lt 30 ] && group_is_live "$pgid"; do
+        attempt=$((attempt + 1))
+        $BB usleep 100000
+    done
+    signal=TERM
+    if group_is_live "$pgid"; then
+        $BB kill -KILL "-$pgid" 2>/dev/null || true
+        signal=KILL
+        attempt=0
+        while [ "$attempt" -lt 10 ] && group_is_live "$pgid"; do
+            attempt=$((attempt + 1))
+            $BB usleep 100000
+        done
+    fi
+    if group_is_live "$pgid"; then
+        printf 'runtime_quiesce=failed label=foreground-group pgid=%s\n' \
+            "$pgid" >&2
+        return 1
+    fi
+    $BB rm -f "$marker"
+    printf 'runtime_quiesce=terminated label=foreground-group pgid=%s signal=%s\n' \
+        "$pgid" "$signal"
+}
+
+state_pids() {
+    state=$1
+    [ "$state" != - ] || return 0
+    $BB sed -n 's/^pid=//p' "$state" 2>/dev/null
+}
+
+terminate_active() {
+    state=$1
+    marker=$2
+    group_result=0
+    pid_result=0
+
+    terminate_group "$marker" || group_result=$?
+    pids=$(state_pids "$state")
+    # The group normally includes every launcher descendant. Display owners
+    # from the state are a fallback for direct or legacy launches.
+    terminate_pid_list display-owner $pids || pid_result=$?
+    [ "$group_result" -eq 0 ] && [ "$pid_result" -eq 0 ] || return 1
+    [ "$state" = - ] || $BB rm -f "$state"
+}
+
+storage_blocker_pids() {
+    for link in /proc/[0-9]*/fd/* /proc/[0-9]*/cwd; do
+        target=$($BB readlink "$link" 2>/dev/null || true)
+        [ -n "$target" ] || continue
+        matched=0
+        for prefix in "$@"; do
+            case $target in "$prefix"|"$prefix"/*) matched=1; break ;; esac
+        done
+        [ "$matched" -eq 1 ] || continue
+        pid=${link#/proc/}
+        pid=${pid%%/*}
+        printf '%s\n' "$pid"
+    done | $BB sort -n -u
+}
+
+terminate_storage() {
+    pids=$(storage_blocker_pids "$@")
+    terminate_pid_list storage-blocker $pids
+}
+
 case ${1:-} in
     hold)
         [ "$#" -ge 2 ] || exit 2
@@ -80,8 +257,25 @@ case ${1:-} in
         [ "$#" -ge 2 ] || exit 2
         release_runtime "$2"
         ;;
+    terminate)
+        [ "$#" -eq 3 ] || exit 2
+        terminate_active "$2" "$3"
+        ;;
+    terminate-active)
+        [ "$#" -eq 2 ] || exit 2
+        terminate_active - "$2"
+        ;;
+    terminate-storage)
+        [ "$#" -ge 2 ] || exit 2
+        shift
+        terminate_storage "$@"
+        ;;
     *)
-        printf 'usage: %s hold STATE [DROP_DRM_0_OR_1] | release STATE\n' "$0" >&2
+        printf '%s\n' \
+            "usage: $0 hold STATE [DROP_DRM_0_OR_1] | release STATE" \
+            "       $0 terminate STATE FOREGROUND_MARKER" \
+            "       $0 terminate-active FOREGROUND_MARKER" \
+            "       $0 terminate-storage PATH..." >&2
         exit 2
         ;;
 esac

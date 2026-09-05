@@ -12,6 +12,7 @@ QUIESCE=${PLUMOS_POWER_MENU_QUIESCE:-$PLUMOS_ROOT/bin/plumos-runtime-quiesce}
 LOCK_DIR=${PLUMOS_POWER_MENU_LOCK_DIR:-$RUNTIME_ROOT/power-menu-overlay.lock}
 SELECTION_FILE=${PLUMOS_POWER_MENU_SELECTION_FILE:-$RUNTIME_ROOT/power-menu-overlay.$$.selection}
 QUIESCE_STATE=$RUNTIME_ROOT/power-menu-overlay.$$.quiesce
+FOREGROUND_MARKER=$RUNTIME_ROOT/frontend/foreground.pgid
 TERMINAL_ACTION=0
 
 $BB mkdir -p "$LOG_DIR" "$RUNTIME_ROOT" 2>/dev/null || true
@@ -99,9 +100,16 @@ case $selection in
         exit "$action_rc"
         ;;
     reboot|shutdown)
-        # Resume the display owner before the terminal transaction so the
-        # service can be stopped without waiting on this detached overlay.
-        release_runtime
+        # A terminal action intentionally discards the running game/app. Kill
+        # its dedicated FE process group (TERM, then bounded KILL) and every
+        # recorded display owner before storage is unmounted. Cancel is the
+        # only path that resumes the recorded owners.
+        if ! PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+            PLUMOS_BUSYBOX="$BB" "$BB" sh "$QUIESCE" terminate \
+            "$QUIESCE_STATE" "$FOREGROUND_MARKER" >>"$LOG_FILE" 2>&1; then
+            log 'terminal quiesce failed; safe power action refused'
+            exit 1
+        fi
         TERMINAL_ACTION=1
         run_power_action "$selection"
         action_rc=$?

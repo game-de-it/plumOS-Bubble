@@ -164,6 +164,11 @@
     既存FE内menuへ委譲し、game/app owner時だけownerを停止、DRM masterを一時譲渡して
     共通`--power-overlay`を表示する。hostのevent/lock/quiesce/checksum contractは合格。
     FE中とgame中の物理表示、Cancel後のgame復帰、Reboot/Shutdownを実機確認に残す。
+  - 初回game中Shutdownは、overlayがPPSSPPを再開したためROM bind解除が`EBUSY`となり、
+    safe shutdownが正しく拒否した。FE foreground process groupをruntime markerへ公開し、
+    terminal actionだけTERM→bounded KILLでgroup/display ownerを終了するよう修正。さらに
+    safe shutdownがdisplayを持たないstorage blockerも走査・終了するhost fixtureに合格。
+    hung/black gameからのReboot/Shutdownと次bootのclean判定を実機確認に残す。
 - [ ] `BUB-P4-I05` normalized Bubble controller を公開し、FE/RetroArch/standaloneで1入力1反応を確認する。
   - FEとRetroArch RGUIでD-pad/A/B、SELECT+START終了を物理確認した。standaloneと全buttonを残す。
   - PicoArch QuickNESで物理A/B、Function1/2 menu、menu A決定/B戻る、FE復帰を利用者確認済み。
