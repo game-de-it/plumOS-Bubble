@@ -6,19 +6,21 @@ BINARY="${1:?PPSSPP binary is required}"
 SOURCE_DIR="${2:?PPSSPP source directory is required}"
 OUT_ROOT="$ROOT_DIR/${PLUMOS_BUBBLE_PPSSPP_OUT:-output/ppsspp/bubble}"
 PATCH_FILE="$ROOT_DIR/package/standalone-bubble/patches/ppsspp/ppsspp-1.20.4-bubble-no-sdl2-ttf.patch"
+MALI_PRECISION_PATCH="$ROOT_DIR/package/standalone-bubble/patches/ppsspp/ppsspp-1.20.4-bubble-mali-thin3d-precision.patch"
 source "$ROOT_DIR/scripts/lib/copy-elf-runtime-deps.sh"
 PPSSPP_REPO="${PLUMOS_BUBBLE_PPSSPP_REPO:-https://github.com/hrydgard/ppsspp.git}"
 PPSSPP_REF="${PLUMOS_BUBBLE_PPSSPP_REF:-v1.20.4}"
 PPSSPP_COMMIT="fa50bb1976065c4f8b1b47af227d367fe9771555"
 COMMON_FLAGS="${PLUMOS_BUBBLE_PPSSPP_COMPILER_FLAGS:--O3 -mcpu=cortex-a55 -mtune=cortex-a55 -fomit-frame-pointer}"
 ARTIFACT_ORIGIN="${PLUMOS_BUBBLE_PPSSPP_ARTIFACT_ORIGIN:-source-built in the plumOS Bubble ARM64 toolchain}"
-SOURCE_PATCHES="${PLUMOS_BUBBLE_PPSSPP_SOURCE_PATCHES:-ppsspp-1.20.4-bubble-no-sdl2-ttf.patch}"
+SOURCE_PATCHES="${PLUMOS_BUBBLE_PPSSPP_SOURCE_PATCHES:-ppsspp-1.20.4-bubble-no-sdl2-ttf.patch ppsspp-1.20.4-bubble-mali-thin3d-precision.patch}"
 READELF="${READELF:-$(command -v readelf || command -v llvm-readelf || true)}"
 
 [ -x "$BINARY" ]
 [ -d "$SOURCE_DIR/assets" ]
 [ -s "$SOURCE_DIR/LICENSE.TXT" ]
 [ -s "$PATCH_FILE" ]
+[ -s "$MALI_PRECISION_PATCH" ]
 [ -n "$READELF" ]
 [ "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$PPSSPP_COMMIT" ]
 file "$BINARY" | grep -q 'ELF 64-bit.*ARM aarch64'
@@ -54,6 +56,7 @@ asset_tree_sha256="$(
         awk '{ print $1 }'
 )"
 patch_sha256="$(sha256sum "$PATCH_FILE" | awk '{ print $1 }')"
+mali_precision_patch_sha256="$(sha256sum "$MALI_PRECISION_PATCH" | awk '{ print $1 }')"
 cat >"$OUT_ROOT/build-manifest.json" <<EOF
 {
   "name": "PPSSPP for plumOS Bubble",
@@ -63,6 +66,7 @@ cat >"$OUT_ROOT/build-manifest.json" <<EOF
   "binary_sha256": "$binary_sha256",
   "asset_tree_sha256": "$asset_tree_sha256",
   "bubble_patch_sha256": "$patch_sha256",
+  "bubble_mali_precision_patch_sha256": "$mali_precision_patch_sha256",
   "source_patches": "$SOURCE_PATCHES",
   "target_cpu": "cortex-a55",
   "compiler_flags": "$COMMON_FLAGS",
