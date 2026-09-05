@@ -79,17 +79,34 @@ ggfe_launch=done status=0
 ```
 
 GGFE reacquired DRM (no `ggfe_renderer=reacquire-failed` was recorded), but the
-RetroArch SELECT+START exit chord remained queued on the evdev fd that GGFE had
-kept open during the child process.  Immediately after `ggfe_launch=done`, two
-`ggfe_input=exit code=315 physical=START` records caused an unintended GGFE
-exit.  This is not a valid physical START acceptance result.  The input fd must
-be closed before the emulator launch and reopened after return, then the return
-route must be retested.
+first test showed that the RetroArch SELECT+START exit chord remained queued on
+the evdev fd that GGFE had kept open during the child process.  Immediately
+after `ggfe_launch=done`, two `ggfe_input=exit code=315 physical=START` records
+caused an unintended GGFE exit.
+
+Commit `e7b08d9` closes GGFE's input fd before handing control to the emulator
+and opens a fresh fd after return.  The complete 212-entry frontend component
+was rebuilt and deployed with matching component/app-layer metadata.  Its
+device binary SHA-256 was
+`675bcd6873c0bd15da315cb656281f0c4a07c593182b21c870cae8b7c1dd5ead`.
+The physical retest launched `Pengo.gg`, exited RetroArch with SELECT+START,
+and recorded:
+
+```text
+ggfe_launch=done status=0
+ggfe_input=reopened-after-launch
+ggfe_scroll=start from=3 to=4 duration_ms=360
+```
+
+No `ggfe_input=exit` followed the RetroArch exit chord.  Physical D-pad input
+continued to move the carousel, proving that GGFE retained control after the
+game.  Physical B then produced code 304 and `ggfe_exit=ok`, returning through
+the normal Apps route to the frontend.
 
 The validation hold was removed and the normal frontend returned after three
 seconds.  Final state was exactly one
 `plumos-controller-ui-fbdev`, no GGFE or RetroArch process, no validation hold,
 valid frontend component checksums, and unchanged mutable configuration.
 
-The physical appearance of the improved motion has not been accepted, and the
-60 fps and post-game input-isolation gates remain open.
+The physical appearance of the improved motion has not been accepted and the
+60 fps gate remains open.  Post-game input isolation is accepted.

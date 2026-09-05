@@ -537,9 +537,10 @@
     規約が`load_selected_rom()`と一致するかを確認する。ここが最も可能性が高い
     失敗要因で、1コマンドで切り分けられる。
   - validation hold下で20 ROM走査、物理D-pad、物理A、RetroArch起動、正常終了後の
-    GGFE DRM再取得まで実機合格。ただしRA終了用SELECT+STARTが、game中も開いていた
-    GGFEのevdev queueへ残り、復帰直後にGGFEも誤終了した。game起動前close・復帰後reopenを
-    実装して再試験する。60 fpsとmotionの物理acceptanceも未完了のためopenのまま残す。
+    GGFE DRM再取得まで実機合格。初回はRA終了用SELECT+STARTがGGFEのevdev queueへ残り
+    GGFEも誤終了したが、source `e7b08d9`でgame起動前close・復帰後reopenを実装。
+    `ggfe_input=reopened-after-launch`後にD-pad操作を継続でき、物理BでのみGGFE終了して
+    通常FEへ戻ることを再試験合格。60 fpsとmotionの物理acceptanceは未完了。
 - [ ] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
   現行buildはlibpngのみリンクしており該当hitは`NO ARTWORK`板へ落ちる。
   libjpeg導入はtools imageとfrontend/lib双方の変更になるため単独で実施する。
