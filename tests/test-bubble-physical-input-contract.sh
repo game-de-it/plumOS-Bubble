@@ -41,6 +41,10 @@ grep -Fq 'mapInput("select", Input(joyId, TYPE_BUTTON, 17' \
 grep -Fq '"select": {"type": "button", "id": 17' \
     package/standalone-bubble/plumos/factory-defaults/standalone/yabasanshiro/keymapv2.json
 grep -Fq 'controls_b[CONTROL_INDEX_MENU] = 1041' scripts/build-drastic-bubble.sh
+drastic_patch=package/standalone-bubble/patches/drastic/steward-fu-nds-bubble-toolchain.patch
+grep -Fq '#define DEV_KEY_CODE_MENU       316' "$drastic_patch"
+grep -Fq '#define DEV_KEY_CODE_DRASTIC    704' "$drastic_patch"
+grep -Fq 'if (c == DEV_KEY_CODE_DRASTIC)' "$drastic_patch"
 ! grep -Fq 'guide:b10' package/standalone-bubble/plumos/bin/plumos-standalone-launch
 grep -Fq 'guide:b17' package/standalone-bubble/plumos/bin/plumos-standalone-launch
 drm_patch=patches/retroarch/015-bubble-drm-rgui-blocking-commit.patch

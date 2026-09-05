@@ -19,7 +19,7 @@ RELEASE_URL="https://github.com/steward-fu/nds/releases/download/final-china-dev
 RELEASE_SHA256="9e4ed98047dea0f014daea7c3530793f92f19d60073fceb9fd2a040696f66491"
 COMMON_SHA256="8a9f3c3d0c6a948868385ddfea26549ad2f0873e4e21111fa674bd1a88f2e240"
 DETOUR_SHA256="36a32d3208d5948d29264e26eabe9ff487d8fd48333bb866a1a42aea6271b29d"
-SDL2_SHA256="57891c787c296fc820c4bfaf2ced3b4af0df47b0c8c50398e2bb403ec2d5eabb"
+SDL2_SHA256="5eec049b2fe250efe1e25f86bb2e1fd1adeb419d5f24ab57e938d5421d9b2a94"
 RUNNER_SHA256="8e9f0980b3dde673b98a11ee0ff7ff768a6ec9719cbc3ccb09793905070493a8"
 PATCH="$ROOT_DIR/package/standalone-bubble/patches/drastic/steward-fu-nds-bubble-toolchain.patch"
 COMPAT_SOURCE="$ROOT_DIR/package/standalone-bubble/src/drastic-mmap-compat.c"
@@ -133,9 +133,9 @@ rsync -a \
     --exclude='lib/libdtr.so' \
     --exclude='lib/libSDL2-2.0.so.0' \
     "$RELEASE_DIR/drastic/" "$OUT_ROOT/"
-# The Miyoo Flip release maps the in-game menu to an analog direction. Bubble's
-# normalized controller exposes FUNCTION as SDL button 8, encoded by DraStic
-# as 1024 + 8. Keep this as the packaged factory value.
+# Keep the SDL joystick mapping as a fallback for runtimes where DraStic sees
+# the controller. Bubble's integration also maps Function1 evdev code 704
+# directly because the closed core reports zero joysticks on this device.
 sed \
     's/^controls_b\[CONTROL_INDEX_MENU\] = 1154$/controls_b[CONTROL_INDEX_MENU] = 1041/' \
     "$OUT_ROOT/config/drastic.cfg" >"$OUT_ROOT/config/drastic.cfg.next"

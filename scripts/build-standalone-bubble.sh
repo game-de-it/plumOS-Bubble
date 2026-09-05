@@ -305,7 +305,7 @@ cat >"$PLUMOS_DIR/components/standalone/manifest.json" <<EOF
       "runtime": "package-local-armhf",
       "renderer": "aarch64-gles-runner-with-armhf-shared-memory-producer",
       "input": "/dev/input/event2",
-      "menu": "function1-keycode-704",
+      "menu": "function1-evdev-704-direct; function2-evdev-316-plus-start-simple-menu",
       "route_status": "implemented-pending-device-acceptance"
     },
     {

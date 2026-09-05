@@ -261,12 +261,12 @@ diff --git a/sdl2/src/video/nds/nds_event.h b/sdl2/src/video/nds/nds_event.h
 index 6e2d240..46cc8ad 100644
 --- a/sdl2/src/video/nds/nds_event.h
 +++ b/sdl2/src/video/nds/nds_event.h
-@@ -240,14 +240,14 @@
+@@ -240,14 +240,15 @@
  #define DEV_KEY_CODE_R2         313
  #define DEV_KEY_CODE_START      315
  #define DEV_KEY_CODE_SELECT     314
--#define DEV_KEY_CODE_MENU       316
-+#define DEV_KEY_CODE_MENU       704
+ #define DEV_KEY_CODE_MENU       316
++#define DEV_KEY_CODE_DRASTIC    704
  #define DEV_KEY_CODE_POWER      -1
  #define DEV_KEY_CODE_VOL_UP     -1
  #define DEV_KEY_CODE_VOL_DOWN   -1
@@ -277,4 +277,22 @@ index 6e2d240..46cc8ad 100644
 +#define DEV_KEY_CODE_FAST       -1
  #define DEV_KEY_CODE_EXIT       -1
  #endif
+ 
+diff --git a/sdl2/src/video/nds/nds_event.c b/sdl2/src/video/nds/nds_event.c
+index 7f9dc07..47c39a7 100644
+--- a/sdl2/src/video/nds/nds_event.c
++++ b/sdl2/src/video/nds/nds_event.c
+@@ -1063,6 +1063,12 @@ static int update_key_bit(uint32_t c, uint32_t v)
+         trace("set KEY_BIT_MENU\n");
+         set_key_bit(KEY_BIT_MENU, v);
+     }
++#if defined(GKD_MINIPLUS)
++    if (c == DEV_KEY_CODE_DRASTIC) {
++        trace("set KEY_BIT_DRASTIC\n");
++        set_key_bit(KEY_BIT_DRASTIC, v);
++    }
++#endif
+     if (c == myevent.keypad.save) {
+         trace("set KEY_BIT_SAVE\n");
+         set_key_bit(KEY_BIT_SAVE, v);
  
