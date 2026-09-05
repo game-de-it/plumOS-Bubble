@@ -1,0 +1,87 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+DRM_MASTER=${PLUMOS_DRM_MASTER_HELPER:-$PLUMOS_ROOT/bin/plumos-drm-master}
+
+is_pid() {
+    case ${1:-} in ''|*[!0-9]*) return 1 ;; esac
+    [ "$1" -gt 1 ]
+}
+
+display_owner_pids() {
+    if [ "${PLUMOS_DISPLAY_OWNER_PIDS+x}" = x ]; then
+        printf '%s\n' ${PLUMOS_DISPLAY_OWNER_PIDS:-}
+        return
+    fi
+    for fd in /proc/[0-9]*/fd/*; do
+        target=$($BB readlink "$fd" 2>/dev/null || true)
+        case $target in
+            /dev/fb0|/dev/dri/*|/dev/mali*|/dev/disp) ;;
+            *) continue ;;
+        esac
+        pid=${fd#/proc/}
+        pid=${pid%%/*}
+        printf '%s\n' "$pid"
+    done | $BB sort -n -u
+}
+
+hold_runtime() {
+    state=$1
+    drop_drm=${2:-0}
+    temporary=$state.tmp.$$
+    $BB mkdir -p "${state%/*}" || return 1
+    : >"$temporary" || return 1
+    for pid in $(display_owner_pids); do
+        is_pid "$pid" || continue
+        [ "$pid" != "$$" ] || continue
+        [ "$pid" != "${PPID:-}" ] || continue
+        if kill -0 "$pid" 2>/dev/null && kill -STOP "$pid" 2>/dev/null; then
+            printf 'pid=%s\n' "$pid" >>"$temporary"
+            if [ "$drop_drm" = 1 ] && [ -x "$DRM_MASTER" ] &&
+               "$DRM_MASTER" drop "$pid" 2>/dev/null; then
+                printf 'master=%s\n' "$pid" >>"$temporary"
+            fi
+        fi
+    done
+    $BB mv -f "$temporary" "$state"
+}
+
+release_runtime() {
+    state=$1
+    [ -r "$state" ] || return 0
+    while IFS= read -r line; do
+        case $line in
+            master=*)
+                pid=${line#master=}
+                is_pid "$pid" && [ -x "$DRM_MASTER" ] &&
+                    "$DRM_MASTER" set "$pid" 2>/dev/null || true
+                ;;
+        esac
+    done <"$state"
+    while IFS= read -r line; do
+        case $line in
+            pid=*)
+                pid=${line#pid=}
+                is_pid "$pid" && kill -CONT "$pid" 2>/dev/null || true
+                ;;
+        esac
+    done <"$state"
+    $BB rm -f "$state"
+}
+
+case ${1:-} in
+    hold)
+        [ "$#" -ge 2 ] || exit 2
+        hold_runtime "$2" "${3:-0}"
+        ;;
+    release)
+        [ "$#" -ge 2 ] || exit 2
+        release_runtime "$2"
+        ;;
+    *)
+        printf 'usage: %s hold STATE [DROP_DRM_0_OR_1] | release STATE\n' "$0" >&2
+        exit 2
+        ;;
+esac

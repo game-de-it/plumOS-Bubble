@@ -57,6 +57,8 @@ gcc "${common[@]}" $png_cflags $ft_cflags $drm_cflags \
     $png_libs $ft_libs $drm_libs -lm
 gcc "${common[@]}" src/services/plumos_bubble_volume_keys.c \
     -o "$bin/plumos-volume-keys"
+gcc "${common[@]}" $drm_cflags src/services/plumos_drm_master.c \
+    -o "$bin/plumos-drm-master"
 for name in plumos_library_scan plumos_text_ui plumos_frontend; do
     gcc "${common[@]}" "src/frontend/${name}.c" -o "$bin/${name//_/-}"
 done
@@ -102,6 +104,15 @@ cat >"$component/manifest.json" <<EOF
     "input_name": "gpio-keys",
     "codes": [114, 115],
     "policy": "single-persistent-owner"
+  },
+  "power_menu": {
+    "input_name": "rk805 pwrkey",
+    "code": 116,
+    "frontend_policy": "delegate-when-frontend-owns-display",
+    "foreground_policy": "quiesce-display-owner-and-handoff-drm",
+    "overlay": "bin/plumos-power-menu-overlay",
+    "runtime_quiesce": "bin/plumos-runtime-quiesce",
+    "drm_handoff": "bin/plumos-drm-master"
   },
   "library_scope": "frontend/lib",
   "cpu_backend": "bin/plumos-cpu-control",

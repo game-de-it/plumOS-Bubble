@@ -1,0 +1,120 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+LOG_DIR=$PLUMOS_ROOT/logs
+LOG_FILE=${PLUMOS_POWER_MENU_OVERLAY_LOG:-$LOG_DIR/power-menu-overlay.log}
+MENU=${PLUMOS_POWER_MENU_OVERLAY_UI:-$PLUMOS_ROOT/bin/plumos-controller-ui-bubble}
+SAFE_SHUTDOWN=${PLUMOS_POWER_MENU_SAFE_SHUTDOWN:-$PLUMOS_ROOT/bin/plumos-safe-shutdown}
+QUIESCE=${PLUMOS_POWER_MENU_QUIESCE:-$PLUMOS_ROOT/bin/plumos-runtime-quiesce}
+LOCK_DIR=${PLUMOS_POWER_MENU_LOCK_DIR:-$RUNTIME_ROOT/power-menu-overlay.lock}
+SELECTION_FILE=${PLUMOS_POWER_MENU_SELECTION_FILE:-$RUNTIME_ROOT/power-menu-overlay.$$.selection}
+QUIESCE_STATE=$RUNTIME_ROOT/power-menu-overlay.$$.quiesce
+TERMINAL_ACTION=0
+
+$BB mkdir -p "$LOG_DIR" "$RUNTIME_ROOT" 2>/dev/null || true
+
+log() {
+    printf '%s %s\n' "$($BB date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || printf unknown-time)" "$*" \
+        >>"$LOG_FILE" 2>/dev/null || true
+}
+
+read_selection() {
+    $BB sed -n 's/^action=//p' "$SELECTION_FILE" 2>/dev/null | $BB head -n 1
+}
+
+release_runtime() {
+    [ -x "$QUIESCE" ] || return 0
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+        PLUMOS_BUSYBOX="$BB" "$BB" sh "$QUIESCE" release "$QUIESCE_STATE" \
+        >>"$LOG_FILE" 2>&1 || true
+}
+
+cleanup() {
+    if [ "$TERMINAL_ACTION" = 0 ]; then
+        release_runtime
+    fi
+    $BB rm -f "$SELECTION_FILE" "$QUIESCE_STATE" 2>/dev/null || true
+    $BB rmdir "$LOCK_DIR" 2>/dev/null || true
+}
+
+run_power_action() {
+    case $1 in
+        sleep)
+            "$BB" sh "$SAFE_SHUTDOWN" --sleep --sleep-backend mem \
+                --no-poweroff --no-hold-resume \
+                >>"$LOG_DIR/frontend-power-action.log" 2>&1
+            ;;
+        reboot)
+            "$BB" sh "$SAFE_SHUTDOWN" --reboot --no-hold-resume \
+                >>"$LOG_DIR/frontend-power-action.log" 2>&1
+            ;;
+        shutdown)
+            "$BB" sh "$SAFE_SHUTDOWN" --shutdown --poweroff \
+                --power-backend auto --no-hold-resume \
+                >>"$LOG_DIR/frontend-power-action.log" 2>&1
+            ;;
+        *) return 2 ;;
+    esac
+}
+
+if ! "$BB" mkdir "$LOCK_DIR" 2>/dev/null; then
+    log 'skip reason=already-open'
+    exit 0
+fi
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap cleanup EXIT
+
+[ -x "$MENU" ] || { log "error menu-missing path=$MENU"; exit 127; }
+[ -x "$SAFE_SHUTDOWN" ] || { log "error safe-shutdown-missing path=$SAFE_SHUTDOWN"; exit 127; }
+[ -x "$QUIESCE" ] || { log "error quiesce-missing path=$QUIESCE"; exit 127; }
+
+$BB rm -f "$SELECTION_FILE" "$QUIESCE_STATE" 2>/dev/null || true
+PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+    PLUMOS_BUSYBOX="$BB" "$BB" sh "$QUIESCE" hold "$QUIESCE_STATE" 1 \
+    >>"$LOG_FILE" 2>&1 || {
+        log 'error quiesce-failed'
+        exit 1
+    }
+log "menu begin backend=$MENU"
+PLUMOS_ROOT="$PLUMOS_ROOT" \
+PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+PLUMOS_BUSYBOX="$BB" \
+PLUMOS_FRONTEND_MODE=manual \
+PLUMOS_POWER_MENU_SELECTION="$SELECTION_FILE" \
+LD_LIBRARY_PATH="$PLUMOS_ROOT/frontend/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+    "$BB" sh "$MENU" --power-overlay
+menu_rc=$?
+selection=$(read_selection)
+log "menu end rc=$menu_rc selection=${selection:-cancel}"
+
+case $selection in
+    sleep)
+        run_power_action sleep
+        action_rc=$?
+        release_runtime
+        exit "$action_rc"
+        ;;
+    reboot|shutdown)
+        # Resume the display owner before the terminal transaction so the
+        # service can be stopped without waiting on this detached overlay.
+        release_runtime
+        TERMINAL_ACTION=1
+        run_power_action "$selection"
+        action_rc=$?
+        TERMINAL_ACTION=0
+        exit "$action_rc"
+        ;;
+    cancel|'')
+        release_runtime
+        exit "$menu_rc"
+        ;;
+    *)
+        log "selection ignored value=$selection"
+        release_runtime
+        exit "$menu_rc"
+        ;;
+esac

@@ -21,6 +21,11 @@ cat >"$root/bin/plumos-volume-control" <<'EOF'
 printf '%s\n' "$1" >>"${TEST_VOLUME_TRACE:?}"
 EOF
 chmod 0755 "$root/bin/plumos-volume-control"
+cat >"$root/bin/plumos-power-menu-overlay" <<'EOF'
+#!/bin/sh
+printf '%s\n' "${1:-}" >>"${TEST_POWER_TRACE:?}"
+EOF
+chmod 0755 "$root/bin/plumos-power-menu-overlay"
 
 python3 - "$tmp/up.events" <<'PY'
 import struct
@@ -50,4 +55,25 @@ PLUMOS_RUNTIME_ROOT=$runtime "$root/bin/plumos-volume-keys" \
 test "$(sed -n '2p' "$tmp/down.trace")" = runtime-down
 grep -q 'action=volume direction=down rc=0' "$tmp/down.log"
 
-printf 'bubble_volume_keys=result-ok input=gpio-keys codes=114,115\n'
+python3 - "$tmp/power.events" <<'PY'
+import struct
+import sys
+with open(sys.argv[1], "wb") as stream:
+    stream.write(struct.pack("llHHi", 0, 0, 1, 116, 1))
+    stream.write(struct.pack("llHHi", 0, 0, 1, 116, 0))
+PY
+TEST_VOLUME_TRACE=$tmp/power-volume.trace TEST_POWER_TRACE=$tmp/power.trace \
+PLUMOS_ROOT=$root PLUMOS_RUNTIME_ROOT=$runtime \
+    "$root/bin/plumos-volume-keys" --power-event "$tmp/power.events" --once \
+    2>"$tmp/power.log"
+attempt=0
+while [ ! -s "$tmp/power.trace" ] && [ "$attempt" -lt 50 ]; do
+    sleep 0.02
+    attempt=$((attempt + 1))
+done
+test "$(sed -n '1p' "$tmp/power.trace")" = open
+grep -q 'action=power-menu overlay=1 rc=0' "$tmp/power.log"
+grep -q 'process_owns_display(frontend_pid)' \
+    src/services/plumos_bubble_volume_keys.c
+
+printf 'bubble_hardware_keys=result-ok volume=114,115 power=116\n'

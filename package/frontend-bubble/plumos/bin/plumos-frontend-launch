@@ -109,9 +109,9 @@ seed_default "$PLUMOS_ROOT/config/frontend/settings.json" \
 seed_default "$PLUMOS_ROOT/config/system/settings.json" \
     "$PLUMOS_ROOT/factory-defaults/system/settings.json"
 
-# The volume keys must remain available while the frontend has released DRM
-# and an emulator owns the display. The service is singleton and starts its
-# evdev reader without delaying normal FE startup on audio initialization.
+# The volume and power keys must remain available while the frontend has
+# released DRM and an emulator owns the display. The service is singleton and
+# starts its evdev readers without delaying normal FE startup.
 if [ -x "$PLUMOS_ROOT/bin/plumos-volume-keys-service" ]; then
     PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
         "$BB" sh "$PLUMOS_ROOT/bin/plumos-volume-keys-service" start \
