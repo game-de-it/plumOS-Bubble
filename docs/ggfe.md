@@ -340,6 +340,11 @@ parallel as the rasterising, and the panel conversion alone was measured at
 They now run through the same stripe pool, which also gives the depth clear
 better locality: a worker clears the stripe it is about to draw into.
 
+**HUD glyphs are cached.** The header and title are the same handful of
+characters every frame, and rasterising them again each time was 13% of
+compose for pixels identical to the previous frame's. A 192-entry cache keyed
+on codepoint and size halves the HUD stage, bit for bit.
+
 GGFE also raises the CPU governor for its own lifetime and restores it on
 every exit path, the same shape the RetroArch and Pyxel launchers use. It is
 one of the few plumOS routes that is genuinely CPU bound, and ondemand was
@@ -348,6 +353,12 @@ measured on this device reaching full clock in only a third of samples.
 Span bounds are computed with one multiply where the original loop accumulated
 additions, so a handful of edge pixels round differently against the pre-span
 build: 0.13% of pixels by at most 18 levels, invisible at 24x amplification.
+
+Also rejected after measuring: level of detail on distant cartridges. Dropping
+the contact shadow and the SEGA emboss from *every* cartridge - far more than
+an LOD scheme would - was worth 3%. Fill is dominated by simply covering the
+cartridges and their cases, not by detail geometry, so there is nothing left
+to win by simplifying the mesh.
 
 Also rejected after measuring: merging the tray and lid into one layer while
 the case is shut. The two do cover the same area and compositing their alphas

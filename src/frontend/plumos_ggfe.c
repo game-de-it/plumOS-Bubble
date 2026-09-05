@@ -126,12 +126,35 @@ struct ggfe_image {
   int height;
 };
 
+/*
+ * Rendered glyphs are cached.  The HUD is the same handful of characters every
+ * frame - a title that only changes when the selection does - and rasterising
+ * them again each time was 13% of compose on the build machine, for pixels
+ * identical to the previous frame's.
+ */
+#define GGFE_GLYPH_CACHE 192
+
+struct ggfe_glyph {
+  unsigned int codepoint;
+  int size;
+  int valid;
+  unsigned long used;
+  int width;
+  int rows;
+  int left;
+  int top;
+  int advance;
+  unsigned char *coverage;
+};
+
 struct ggfe_text {
   FT_Library library;
   FT_Face face;
   FT_Face fallback;
   int ready;
   int size;
+  struct ggfe_glyph cache[GGFE_GLYPH_CACHE];
+  unsigned long tick;
 };
 
 struct ggfe_label_slot {
@@ -629,6 +652,10 @@ static int ggfe_text_init(struct ggfe_text *t, const char *font_path,
 }
 
 static void ggfe_text_free(struct ggfe_text *t) {
+  int i;
+  for (i = 0; i < GGFE_GLYPH_CACHE; i++) {
+    free(t->cache[i].coverage);
+  }
   if (t->face) {
     FT_Done_Face(t->face);
   }
@@ -679,6 +706,63 @@ static FT_Face ggfe_face_for(struct ggfe_text *t, unsigned int cp, int size) {
   return face;
 }
 
+/* Look a glyph up, rasterising and storing it on a miss. */
+static struct ggfe_glyph *ggfe_glyph_get(struct ggfe_text *t, unsigned int cp,
+                                         int size) {
+  int i, victim = -1;
+  unsigned long oldest = ~0UL;
+  struct ggfe_glyph *g;
+  FT_Face face;
+  FT_GlyphSlot slot;
+
+  for (i = 0; i < GGFE_GLYPH_CACHE; i++) {
+    if (t->cache[i].valid && t->cache[i].codepoint == cp &&
+        t->cache[i].size == size) {
+      t->cache[i].used = ++t->tick;
+      return &t->cache[i];
+    }
+    if (!t->cache[i].valid) {
+      victim = i;
+      oldest = 0;
+    } else if (t->cache[i].used < oldest) {
+      oldest = t->cache[i].used;
+      victim = i;
+    }
+  }
+  g = &t->cache[victim];
+
+  face = ggfe_face_for(t, cp, size);
+  if (FT_Load_Char(face, cp, FT_LOAD_RENDER) != 0) {
+    return NULL;
+  }
+  slot = face->glyph;
+  free(g->coverage);
+  g->coverage = NULL;
+  g->width = (int)slot->bitmap.width;
+  g->rows = (int)slot->bitmap.rows;
+  g->left = slot->bitmap_left;
+  g->top = slot->bitmap_top;
+  g->advance = (int)(slot->advance.x >> 6);
+  if (g->width > 0 && g->rows > 0) {
+    int y;
+    g->coverage = (unsigned char *)malloc((size_t)g->width * (size_t)g->rows);
+    if (!g->coverage) {
+      g->valid = 0;
+      return NULL;
+    }
+    for (y = 0; y < g->rows; y++) {
+      memcpy(g->coverage + (size_t)y * g->width,
+             slot->bitmap.buffer + (ptrdiff_t)y * slot->bitmap.pitch,
+             (size_t)g->width);
+    }
+  }
+  g->codepoint = cp;
+  g->size = size;
+  g->valid = 1;
+  g->used = ++t->tick;
+  return g;
+}
+
 static int ggfe_text_width(struct ggfe_text *t, int size, const char *utf8) {
   const char *p = utf8;
   int w = 0;
@@ -686,10 +770,9 @@ static int ggfe_text_width(struct ggfe_text *t, int size, const char *utf8) {
     return 0;
   }
   while (*p) {
-    unsigned int cp = ggfe_utf8_next(&p);
-    FT_Face face = ggfe_face_for(t, cp, size);
-    if (FT_Load_Char(face, cp, FT_LOAD_DEFAULT) == 0) {
-      w += (int)(face->glyph->advance.x >> 6);
+    struct ggfe_glyph *g = ggfe_glyph_get(t, ggfe_utf8_next(&p), size);
+    if (g) {
+      w += g->advance;
     }
   }
   return w;
@@ -705,23 +788,20 @@ static void ggfe_draw_text(struct cart3d_target *tg, struct ggfe_text *t, int x,
     return;
   }
   while (*p) {
-    unsigned int cp = ggfe_utf8_next(&p);
-    FT_Face face = ggfe_face_for(t, cp, size);
-    FT_GlyphSlot g;
+    struct ggfe_glyph *g = ggfe_glyph_get(t, ggfe_utf8_next(&p), size);
     int gx, gy;
 
-    if (FT_Load_Char(face, cp, FT_LOAD_RENDER) != 0) {
+    if (!g) {
       continue;
     }
-    g = face->glyph;
-    for (gy = 0; gy < (int)g->bitmap.rows; gy++) {
-      int py = y + size - g->bitmap_top + gy;
+    for (gy = 0; gy < g->rows; gy++) {
+      int py = y + size - g->top + gy;
       if (py < 0 || py >= tg->height) {
         continue;
       }
-      for (gx = 0; gx < (int)g->bitmap.width; gx++) {
-        int px = pen + g->bitmap_left + gx;
-        unsigned char cov = g->bitmap.buffer[gy * g->bitmap.pitch + gx];
+      for (gx = 0; gx < g->width; gx++) {
+        int px = pen + g->left + gx;
+        unsigned char cov = g->coverage[(size_t)gy * g->width + gx];
         float a;
         int c;
         if (px < 0 || px >= tg->width || cov == 0) {
@@ -736,7 +816,7 @@ static void ggfe_draw_text(struct cart3d_target *tg, struct ggfe_text *t, int x,
         }
       }
     }
-    pen += (int)(g->advance.x >> 6);
+    pen += g->advance;
   }
 }
 
