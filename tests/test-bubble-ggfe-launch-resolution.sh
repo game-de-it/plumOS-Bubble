@@ -74,6 +74,25 @@ JSON
 "$tmp/ggfe-host" "$root" "$card" "$tmp" >"$tmp/out.txt" 2>&1 ||
     fail "the GGFE host harness did not run"
 
+# The serial fallback must neither use the uninitialised pool mutex nor retain
+# its stripe counter between frames.  It must render exactly the same pixels as
+# the four-thread path for every representative browse/launch frame.
+for threads in 1 4; do
+    $cc -std=gnu99 -O1 -Wall -D_GNU_SOURCE -DPLUMOS_GGFE_HOST=1 \
+        -DGGFE_FORCE_THREADS="$threads" \
+        "$repo_root/src/frontend/plumos_ggfe.c" \
+        -o "$tmp/ggfe-host-$threads" -lm -lpthread \
+        $(pkg-config --cflags --libs libpng freetype2) 2>/dev/null ||
+        fail "cannot build the GGFE $threads-thread host harness"
+    mkdir -p "$tmp/render-$threads"
+    "$tmp/ggfe-host-$threads" "$root" "$card" "$tmp/render-$threads" \
+        >/dev/null 2>&1 || fail "GGFE $threads-thread render failed"
+done
+for shot in g-library g-browse g-open g-hop g-insert g-seated; do
+    cmp "$tmp/render-1/$shot.png" "$tmp/render-4/$shot.png" ||
+        fail "one-thread and four-thread output differ: $shot"
+done
+
 # Availability: an unpackaged core is reported, not silently dropped.
 expect_line "retroarch:genesis_plus_gx          available" "$tmp/out.txt"
 expect_line "retroarch:picodrive                core not packaged: picodrive" "$tmp/out.txt"
@@ -95,4 +114,4 @@ if [ "$before" != "$after" ]; then
     fail "GGFE modified the plumOS core-overrides file"
 fi
 
-printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3\n'
+printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 threads=1,4 identical=6\n'

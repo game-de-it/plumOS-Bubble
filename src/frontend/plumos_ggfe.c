@@ -241,9 +241,15 @@ struct ggfe_app {
 static void ggfe_run_stripes(struct ggfe_pool *p) {
   for (;;) {
     int stripe, y0, y1;
-    pthread_mutex_lock(&p->lock);
-    stripe = p->next_stripe++;
-    pthread_mutex_unlock(&p->lock);
+    if (p->started > 0) {
+      pthread_mutex_lock(&p->lock);
+      stripe = p->next_stripe++;
+      pthread_mutex_unlock(&p->lock);
+    } else {
+      /* No worker means the mutex was never initialised.  This is also the
+       * fallback after thread-pool setup fails, so keep it genuinely serial. */
+      stripe = p->next_stripe++;
+    }
     if (stripe >= GGFE_STRIPES) {
       return;
     }
