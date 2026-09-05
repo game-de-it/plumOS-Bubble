@@ -47,6 +47,14 @@ gcc "${common[@]}" $png_cflags $ft_cflags $drm_cflags \
     -DPLUMOS_FBDEV_ENABLE_FREETYPE=1 -DPLUMOS_FBDEV_ENABLE_DRM=1 \
     -DPLUMOS_BUBBLE_INPUT=1 src/frontend/plumos_controller_ui.c \
     -o "$bin/plumos-controller-ui-fbdev" $png_libs $ft_libs $drm_libs
+# GGFE: the Game Gear frontend.  Same CPU renderer path as the stock frontend,
+# no GL and no /dev/mali0, so it never competes for the GPU or for DRM master.
+# shellcheck disable=SC2086
+gcc "${common[@]}" $png_cflags $ft_cflags $drm_cflags \
+    -DPLUMOS_ENABLE_FBDEV_RENDERER=1 -DPLUMOS_FBDEV_ENABLE_PNG=1 \
+    -DPLUMOS_FBDEV_ENABLE_FREETYPE=1 -DPLUMOS_FBDEV_ENABLE_DRM=1 \
+    src/frontend/plumos_ggfe.c -o "$bin/plumos-ggfe" \
+    $png_libs $ft_libs $drm_libs -lm
 for name in plumos_library_scan plumos_text_ui plumos_frontend; do
     gcc "${common[@]}" "src/frontend/${name}.c" -o "$bin/${name//_/-}"
 done
@@ -69,7 +77,8 @@ stage_libraries() {
         done < <(ldd "$file" | awk '/=> \// {print $3} /^[[:space:]]*\// {print $1}')
     done
 }
-stage_libraries "$bin/plumos-controller-ui-fbdev" "$bin/plumos-library-scan" \
+stage_libraries "$bin/plumos-controller-ui-fbdev" "$bin/plumos-ggfe" \
+    "$bin/plumos-library-scan" \
     "$bin/plumos-text-ui" "$bin/plumos-frontend" "$bin/plumos-amixer" \
     "$bin/plumos-aplay" "$bin/plumos-openssl.bin"
 
@@ -88,9 +97,16 @@ cat >"$component/manifest.json" <<EOF
   "library_scope": "frontend/lib",
   "cpu_backend": "bin/plumos-cpu-control",
   "start_menu_contract": "config/frontend/start-menu-coverage.json",
+  "ggfe": {
+    "binary": "bin/plumos-ggfe",
+    "config": "config/frontend/ggfe.json",
+    "assets": "themes/default/ggfe",
+    "renderer": "cpu-software-3d",
+    "gpu_requirement": "none"
+  },
   "start_menu_entries": 8,
-  "apps_menu_entries": 10,
-  "bubble_only_menu_entries": [],
+  "apps_menu_entries": 11,
+  "bubble_only_menu_entries": ["ggfe"],
   "settings_backends": ["display", "volume", "network", "network-services", "time-sync", "factory-reset", "storage-health", "cpu", "safe-power", "signed-runtime-update"],
   "cpu_policies": ["interactive", "performance", "ondemand", "schedutil", "conservative"],
   "reference_port": "plumOS-MF@0095017c39226ad1c22bf8df852202673075936d"
@@ -106,6 +122,12 @@ printf '%s\n' "$version" >"$root/VERSION"
 ) >"$component/checksums.sha256"
 (cd "$root" && sha256sum -c components/frontend/checksums.sha256)
 readelf -h "$bin/plumos-controller-ui-fbdev" | grep -q 'Machine:.*AArch64'
+readelf -h "$bin/plumos-ggfe" | grep -q 'Machine:.*AArch64'
+# GGFE must not pull in a GL stack: that is the whole point of the CPU path.
+if ldd "$bin/plumos-ggfe" | grep -Eq 'libEGL|libGLESv2|libgbm|libmali'; then
+    echo "plumos-ggfe linked a GL stack" >&2
+    exit 1
+fi
 gcc -std=gnu99 -Os -Wall -Wextra \
     "$repo_root/scripts/probe-font-glyphs.c" \
     -o /tmp/probe-font-glyphs $(pkg-config --cflags --libs freetype2)

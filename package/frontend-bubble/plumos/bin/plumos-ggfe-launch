@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+
+# GGFE, the Game Gear frontend.  Reached from the stock frontend's Apps menu,
+# which already shuts its renderer down before running a shell app, so DRM
+# master is free by the time this starts.  GGFE opens no GL context, so the
+# handoff to RetroArch and back needs nothing beyond the same release.
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+LOG=$PLUMOS_ROOT/logs/ggfe.log
+controller=${PLUMOS_INPUT_EVENT:-}
+[ -n "$controller" ] ||
+    controller=$($BB sh "$PLUMOS_ROOT/bin/plumos-bubble-find-input" controller 2>/dev/null || true)
+
+$BB mkdir -p "$PLUMOS_ROOT/logs"
+export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" PLUMOS_BUSYBOX="$BB"
+export PLUMOS_SDCARD_ROOT=${PLUMOS_SDCARD_ROOT:-/storage}
+export PLUMOS_ROM_ROOT=${PLUMOS_ROM_ROOT:-/storage/Roms}
+export PLUMOS_IMAGE_ROOT=${PLUMOS_IMAGE_ROOT:-/storage/Images}
+export PLUMOS_FB=${PLUMOS_FB:-/dev/fb0}
+export PLUMOS_DRM_DEVICE=${PLUMOS_DRM_DEVICE:-/dev/dri/card0}
+export PLUMOS_FRONTEND_LIB_DIR=${PLUMOS_FRONTEND_LIB_DIR:-$PLUMOS_ROOT/frontend/lib}
+export LD_LIBRARY_PATH="$PLUMOS_FRONTEND_LIB_DIR"
+[ -z "$controller" ] || export PLUMOS_INPUT_EVENT="$controller"
+
+printf 'ggfe_launch=start controller=%s\n' "${controller:-none}" >>"$LOG"
+exec "$PLUMOS_ROOT/bin/plumos-ggfe" >>"$LOG" 2>&1

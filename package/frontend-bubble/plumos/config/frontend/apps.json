@@ -101,6 +101,15 @@
       "launch_profile": "internal:network",
       "visible": false,
       "menu": "start"
+    },
+    {
+      "id": "ggfe",
+      "display_name": "Game Gear",
+      "kind": "tool",
+      "launch_profile": "shell:$PLUMOS_ROOT/bin/plumos-ggfe-launch",
+      "visible": true,
+      "menu": "apps",
+      "device_specific": "bubble"
     }
   ],
   "catalog_baseline": {

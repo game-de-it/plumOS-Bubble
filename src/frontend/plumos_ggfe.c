@@ -16,6 +16,8 @@
 
 #include <errno.h>
 #include <signal.h>
+#include <stdarg.h>
+#include <sys/ioctl.h>
 #include <sys/wait.h>
 
 #include <ft2build.h>
@@ -1217,6 +1219,367 @@ static void ggfe_app_free(struct ggfe_app *app) {
   free(app->draws);
   free(app->entries);
 }
+
+#ifndef PLUMOS_GGFE_HOST
+/* ------------------------------------------------------------------ */
+/* device: panel, input and the launch handoff                        */
+/* ------------------------------------------------------------------ */
+
+#include <linux/input.h>
+#include <poll.h>
+
+/* One packed write per pixel when the panel is the usual 32bpp unrotated
+ * surface; put_pixel otherwise.  307k put_pixel calls a frame would not fit
+ * the budget. */
+static void ggfe_blit_panel(struct plumos_fbdev_renderer *r,
+                            const unsigned char *rgb) {
+  int x, y;
+  int fast = (r->bytes_per_pixel == 4 && !r->rotation_180 &&
+              r->var.red.length == 8 && r->var.green.length == 8 &&
+              r->var.blue.length == 8 && (int)r->var.xres == GGFE_W &&
+              (int)r->var.yres == GGFE_H);
+
+  if (fast) {
+    unsigned char *base = r->shadow ? r->shadow : r->mem + r->active_offset;
+    uint32_t alpha = 0;
+    if (r->var.transp.length) {
+      alpha = plumos_fbdev_scale_channel(255, r->var.transp.length,
+                                         r->var.transp.offset);
+    }
+    for (y = 0; y < GGFE_H; y++) {
+      uint32_t *out = (uint32_t *)(base + (size_t)y * r->fix.line_length);
+      const unsigned char *in = rgb + (size_t)y * GGFE_W * 3;
+      for (x = 0; x < GGFE_W; x++) {
+        out[x] = ((uint32_t)in[0] << r->var.red.offset) |
+                 ((uint32_t)in[1] << r->var.green.offset) |
+                 ((uint32_t)in[2] << r->var.blue.offset) | alpha;
+        in += 3;
+      }
+    }
+    return;
+  }
+  for (y = 0; y < GGFE_H; y++) {
+    const unsigned char *in = rgb + (size_t)y * GGFE_W * 3;
+    for (x = 0; x < GGFE_W; x++) {
+      plumos_fbdev_put_pixel(r, x, y,
+                             plumos_fbdev_pack_color(r, in[0], in[1], in[2]));
+      in += 3;
+    }
+  }
+}
+
+/* Pick the joypad by capability rather than by a hard-coded node: the
+ * controller map names event2, but nothing guarantees enumeration order. */
+static int ggfe_open_input(void) {
+  const char *forced = getenv("PLUMOS_INPUT_EVENT");
+  char path[64];
+  int i;
+
+  if (forced && forced[0]) {
+    return open(forced, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+  }
+  for (i = 0; i < 16; i++) {
+    unsigned long bits[(KEY_MAX + 1) / (8 * sizeof(unsigned long)) + 1];
+    int fd;
+    snprintf(path, sizeof(path), "/dev/input/event%d", i);
+    fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+    if (fd < 0) {
+      continue;
+    }
+    memset(bits, 0, sizeof(bits));
+    if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(bits)), bits) >= 0) {
+      int have_south = (bits[BTN_SOUTH / (8 * sizeof(unsigned long))] >>
+                        (BTN_SOUTH % (8 * sizeof(unsigned long)))) & 1UL;
+      int have_left = (bits[BTN_DPAD_LEFT / (8 * sizeof(unsigned long))] >>
+                       (BTN_DPAD_LEFT % (8 * sizeof(unsigned long)))) & 1UL;
+      if (have_south && have_left) {
+        return fd;
+      }
+    }
+    close(fd);
+  }
+  return -1;
+}
+
+static void ggfe_log(struct ggfe_app *app, const char *fmt, ...) {
+  char line[512];
+  va_list ap;
+  int n;
+
+  if (app->log_fd < 0) {
+    return;
+  }
+  va_start(ap, fmt);
+  n = vsnprintf(line, sizeof(line), fmt, ap);
+  va_end(ap);
+  if (n > 0) {
+    ssize_t written = write(app->log_fd, line, (size_t)n);
+    (void)written;
+  }
+}
+
+static void ggfe_terminate_group(pid_t pgid) {
+  int attempt;
+  if (pgid <= 0 || kill(-pgid, 0) != 0) {
+    return;
+  }
+  (void)kill(-pgid, SIGTERM);
+  for (attempt = 0; attempt < 10; attempt++) {
+    if (kill(-pgid, 0) != 0 && errno == ESRCH) {
+      return;
+    }
+    usleep(50000);
+  }
+  (void)kill(-pgid, SIGKILL);
+}
+
+/*
+ * Hand the panel to the launcher and take it back afterwards.
+ *
+ * This is the same shape the stock frontend uses: release the renderer before
+ * the child starts so DRM master is free, run the child in its own process
+ * group, then clean up any descendants a launcher leaves behind before
+ * reacquiring.  GGFE holds no GL context, so there is nothing else to give up.
+ */
+static int ggfe_launch_rom(struct ggfe_app *app,
+                           struct plumos_fbdev_renderer *renderer,
+                           const struct ggfe_entry *entry) {
+  char launcher[PATH_MAX];
+  char core[PATH_MAX];
+  char cmd[PATH_MAX * 4];
+  int cmd_len;
+  char error[256];
+  const char *busybox = getenv("PLUMOS_BUSYBOX");
+  char *argv[5];
+  pid_t pid;
+  int status = 0;
+
+  if (!busybox || !busybox[0]) {
+    busybox = "/bin/busybox";
+  }
+  if (!join_path(launcher, sizeof(launcher), app->plumos_root,
+                 app->cfg.launcher) ||
+      !join_path(core, sizeof(core), app->plumos_root, app->cfg.launch_core)) {
+    return -1;
+  }
+  if (!is_regular_file(core)) {
+    ggfe_log(app, "ggfe_launch=missing-core core=%s\n", core);
+    return -1;
+  }
+  cmd_len = snprintf(cmd, sizeof(cmd),
+                     "'%s' --system '%s' --core '%s' --rom '%s' --cpu '%s'",
+                     launcher, app->cfg.launch_system, core, entry->rom,
+                     app->cfg.launch_cpu);
+  if (cmd_len < 0 || (size_t)cmd_len >= sizeof(cmd)) {
+    ggfe_log(app, "ggfe_launch=command-too-long rom=%s\n", entry->rom);
+    return -1;
+  }
+  ggfe_log(app, "ggfe_launch=start rom=%s\n", entry->rom);
+
+  plumos_fbdev_renderer_shutdown(renderer);
+
+  argv[0] = (char *)busybox;
+  argv[1] = (char *)"sh";
+  argv[2] = (char *)"-c";
+  argv[3] = cmd;
+  argv[4] = NULL;
+  pid = fork();
+  if (pid == 0) {
+    if (setpgid(0, 0) != 0) {
+      _exit(126);
+    }
+    execv(busybox, argv);
+    _exit(127);
+  }
+  if (pid > 0) {
+    (void)setpgid(pid, pid);
+    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
+      continue;
+    }
+    ggfe_terminate_group(pid);
+  }
+  ggfe_log(app, "ggfe_launch=done status=%d\n", status);
+
+  error[0] = '\0';
+  if (!plumos_fbdev_renderer_init(renderer, getenv("PLUMOS_FB"), error,
+                                  sizeof(error))) {
+    ggfe_log(app, "ggfe_renderer=reacquire-failed error=%s\n", error);
+    return -1;
+  }
+  return status;
+}
+
+static long long ggfe_now_ms(void) {
+  struct timespec ts;
+  if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+    return 0;
+  }
+  return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+}
+
+int main(int argc, char **argv) {
+  struct ggfe_app app;
+  struct ggfe_frame frame;
+  struct plumos_fbdev_renderer renderer;
+  unsigned char *background;
+  char error[256];
+  const char *plumos_root = getenv("PLUMOS_ROOT");
+  const char *sdcard_root = getenv("PLUMOS_SDCARD_ROOT");
+  char log_path[PATH_MAX];
+  int input_fd;
+  int target = 0;
+  float pos_from = 0.0f, pos_to = 0.0f, scroll_t = 1.0f;
+  float launch_t = -1.0f;
+  long long last_ms;
+  int running = 1;
+
+  (void)argc;
+  (void)argv;
+  if (!plumos_root || !plumos_root[0]) {
+    plumos_root = "/storage/plumos";
+  }
+  if (!sdcard_root || !sdcard_root[0]) {
+    sdcard_root = "/storage";
+  }
+  if (!ggfe_app_init(&app, plumos_root, sdcard_root)) {
+    fprintf(stderr, "ggfe: init failed\n");
+    return 1;
+  }
+  if (join_path(log_path, sizeof(log_path), plumos_root, "logs/ggfe.log")) {
+    app.log_fd = open(log_path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
+  }
+  ggfe_log(&app, "ggfe_start=ok roms=%d\n", app.entry_count);
+  if (app.entry_count == 0) {
+    ggfe_log(&app, "ggfe_start=no-roms root=%s\n", app.roots.roms);
+    ggfe_app_free(&app);
+    return 0;
+  }
+
+  error[0] = '\0';
+  if (!plumos_fbdev_renderer_init(&renderer, getenv("PLUMOS_FB"), error,
+                                  sizeof(error))) {
+    ggfe_log(&app, "ggfe_renderer=init-failed error=%s\n", error);
+    fprintf(stderr, "ggfe: renderer init failed: %s\n", error);
+    ggfe_app_free(&app);
+    return 1;
+  }
+  input_fd = ggfe_open_input();
+  if (input_fd < 0) {
+    ggfe_log(&app, "ggfe_input=not-found\n");
+  }
+
+  background = (unsigned char *)malloc((size_t)GGFE_W * GGFE_H * 3);
+  if (!background) {
+    return 1;
+  }
+  ggfe_background_build(background);
+  last_ms = ggfe_now_ms();
+
+  while (running) {
+    long long now = ggfe_now_ms();
+    float dt = (float)(now - last_ms) / 1000.0f;
+    struct pollfd pfd;
+    float pos;
+
+    last_ms = now;
+    if (dt > 0.1f) {
+      dt = 0.1f; /* a launch or a stall must not fling the animation */
+    }
+
+    if (input_fd >= 0) {
+      pfd.fd = input_fd;
+      pfd.events = POLLIN;
+      while (poll(&pfd, 1, 0) > 0 && (pfd.revents & POLLIN)) {
+        struct input_event ev;
+        if (read(input_fd, &ev, sizeof(ev)) != (ssize_t)sizeof(ev)) {
+          break;
+        }
+        if (ev.type != EV_KEY || ev.value != 1) {
+          continue;
+        }
+        if (launch_t >= 0.0f) {
+          continue; /* the launch sequence owns input until it completes */
+        }
+        switch (ev.code) {
+          case BTN_DPAD_LEFT:
+          case BTN_DPAD_UP:
+            if (target > 0) {
+              pos_from = ggfe_lerp(pos_from, pos_to,
+                                   ggfe_ease_back(scroll_t < 1.0f ? scroll_t
+                                                                  : 1.0f));
+              target--;
+              pos_to = (float)target;
+              scroll_t = 0.0f;
+            }
+            break;
+          case BTN_DPAD_RIGHT:
+          case BTN_DPAD_DOWN:
+            if (target < app.entry_count - 1) {
+              pos_from = ggfe_lerp(pos_from, pos_to,
+                                   ggfe_ease_back(scroll_t < 1.0f ? scroll_t
+                                                                  : 1.0f));
+              target++;
+              pos_to = (float)target;
+              scroll_t = 0.0f;
+            }
+            break;
+          case BTN_EAST: /* A */
+            launch_t = 0.0f;
+            break;
+          case BTN_SOUTH: /* B */
+          case BTN_START:
+            running = 0;
+            break;
+          default:
+            break;
+        }
+      }
+    }
+
+    scroll_t += dt / 0.24f;
+    if (scroll_t > 1.0f) {
+      scroll_t = 1.0f;
+    }
+    pos = ggfe_lerp(pos_from, pos_to, ggfe_ease_back(scroll_t));
+
+    if (launch_t >= 0.0f) {
+      ggfe_launch_frame(launch_t, (float)target, &frame);
+      launch_t += dt;
+    } else {
+      ggfe_browse_frame(pos, &frame);
+    }
+
+    ggfe_compose(&app, &frame, background);
+    ggfe_blit_panel(&renderer, app.target.rgb);
+    plumos_fbdev_present(&renderer);
+
+    if (launch_t > GGFE_LAUNCH_END) {
+      ggfe_launch_rom(&app, &renderer, &app.entries[target]);
+      launch_t = -1.0f;
+      last_ms = ggfe_now_ms();
+    }
+
+    {
+      long long spent = ggfe_now_ms() - now;
+      if (spent < 16) {
+        usleep((useconds_t)((16 - spent) * 1000));
+      }
+    }
+  }
+
+  ggfe_log(&app, "ggfe_exit=ok\n");
+  if (input_fd >= 0) {
+    close(input_fd);
+  }
+  plumos_fbdev_renderer_shutdown(&renderer);
+  if (app.log_fd >= 0) {
+    close(app.log_fd);
+  }
+  free(background);
+  ggfe_app_free(&app);
+  return 0;
+}
+#endif /* !PLUMOS_GGFE_HOST */
 
 #ifdef PLUMOS_GGFE_HOST
 static int ggfe_write_png(const char *path, const unsigned char *rgb, int w,

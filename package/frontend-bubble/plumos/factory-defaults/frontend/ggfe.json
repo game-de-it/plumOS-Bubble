@@ -4,6 +4,12 @@
   "rom_dirs": ["GG", "GameGear", "MD", "gamegear"],
   "rom_extensions": ["gg", "sms", "zip", "7z"],
   "extensions": ["png", "jpg", "jpeg", "webp"],
+  "launch": {
+    "launcher": "bin/plumos-retroarch-launch",
+    "system": "gamegear",
+    "core": "cores/genesis_plus_gx_libretro.so",
+    "cpu": "ondemand"
+  },
   "artwork": {
     "prefer": ["title", "boxart"],
     "sources": [

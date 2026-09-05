@@ -69,6 +69,11 @@ struct ggfe_config {
   int title_aspect_w;
   int title_aspect_h;
   int title_aspect_tol_permille;
+  /* how a selected cartridge is launched */
+  char launcher[160];
+  char launch_system[64];
+  char launch_core[192];
+  char launch_cpu[24];
 };
 
 struct ggfe_roots {
@@ -110,6 +115,12 @@ static void ggfe_config_defaults(struct ggfe_config *cfg) {
   cfg->title_aspect_w = 160;
   cfg->title_aspect_h = 144;
   cfg->title_aspect_tol_permille = 30;
+  copy_string(cfg->launcher, sizeof(cfg->launcher),
+              "bin/plumos-retroarch-launch");
+  copy_string(cfg->launch_system, sizeof(cfg->launch_system), "gamegear");
+  copy_string(cfg->launch_core, sizeof(cfg->launch_core),
+              "cores/genesis_plus_gx_libretro.so");
+  copy_string(cfg->launch_cpu, sizeof(cfg->launch_cpu), "ondemand");
 }
 
 static int ggfe_read_file(const char *path, char **out, size_t *len_out) {
@@ -250,6 +261,19 @@ static int ggfe_config_load(struct ggfe_config *cfg, const char *path) {
         json_get_bool(art, art_end, "use_plumos_lookup", 1);
     cfg->classify_by_aspect =
         json_get_bool(art, art_end, "classify_by_aspect", 1);
+  }
+  {
+    const char *launch, *launch_end;
+    if (json_find_object(text, end, "launch", &launch, &launch_end)) {
+      json_get_string(launch, launch_end, "launcher", cfg->launcher,
+                      sizeof(cfg->launcher));
+      json_get_string(launch, launch_end, "system", cfg->launch_system,
+                      sizeof(cfg->launch_system));
+      json_get_string(launch, launch_end, "core", cfg->launch_core,
+                      sizeof(cfg->launch_core));
+      json_get_string(launch, launch_end, "cpu", cfg->launch_cpu,
+                      sizeof(cfg->launch_cpu));
+    }
   }
   free(text);
   return 1;

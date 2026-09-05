@@ -482,7 +482,16 @@
   - artwork解決はGGFE固有sourceと、既存FEの`find_thumbnail()`と同一規則の両方を支持する。
     `Images/<alias>/`を先に、次に`Images/gamegear/`。alias=GG/GameGear/MD/gamegear、
     拡張子png/jpg/jpeg/webp、相対stem→flat stem、最終要素のみ大小無視。
-  - 残：ラベル合成、シーン（本体競り上がり/HUD）、アニメーション、入力、launch handoff、
-    build script組込み、実機acceptance。
+  - ラベル合成、シーン（本体競り上がり/HUD）、アニメーション、入力、launch handoff、
+    build script組込みまで完了。`scripts/build-bubble-frontend.sh`がGGFEをAArch64で
+    ビルドし、GL stack非リンクをgateし、checksums/manifestへ載せる。
+  - 導線はAppsへ`ggfe`を追加した。既存FEは`shell:`アプリの実行前にrendererを落とすため、
+    `plumos_controller_ui.c`は無改変でDRM handoffが成立する。共通項目は削除していない。
+    Bubble固有項目としてmanifestの`bubble_only_menu_entries`へ記録した。
+- [ ] GGFEの実機acceptanceを行う。FE→Apps→Game Gearでの起動、カルーセル操作、
+  A起動→RetroArch→復帰、B/STARTでFE復帰、DRM master再取得、60fps維持を確認する。
+- [ ] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
+  現行buildはlibpngのみリンクしており該当hitは`NO ARTWORK`板へ落ちる。
+  libjpeg導入はtools imageとfrontend/lib双方の変更になるため単独で実施する。
 - [ ] `plumos_json.h`と`plumos_path.h`はGGFE向けに`plumos_library_scan.c`から抽出した。
   同ファイル側の重複コピーを削除してこのheaderへ寄せる（機械的変更、単独で実施する）。
