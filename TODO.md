@@ -548,7 +548,9 @@
     GGFE DRM再取得まで実機合格。初回はRA終了用SELECT+STARTがGGFEのevdev queueへ残り
     GGFEも誤終了したが、source `e7b08d9`でgame起動前close・復帰後reopenを実装。
     `ggfe_input=reopened-after-launch`後にD-pad操作を継続でき、物理BでのみGGFE終了して
-    通常FEへ戻ることを再試験合格。60 fpsとmotionの物理acceptanceは未完了。
+    通常FEへ戻ることを再試験合格。source `bc27cd4`でも通常のSTART > Apps > Game Gear導線から
+    `performance`適用、D-pad連続操作、物理B終了、FE 1 process復帰、`ondemand`復元、checksumと
+    mutable設定保持まで合格。60 fpsとmotionの物理acceptanceは未完了。
 - [ ] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
   現行buildはlibpngのみリンクしており該当hitは`NO ARTWORK`板へ落ちる。
   libjpeg導入はtools imageとfrontend/lib双方の変更になるため単独で実施する。

@@ -208,3 +208,22 @@ seconds the normal frontend start was dispatched.  The running state had one
 frontend renderer, no GGFE/RetroArch process, `ondemand`, no validation hold,
 valid 212-entry frontend checksums, unchanged mutable settings, and listening
 FTP, SSH, and Samba services.
+
+The final test used the actual `START > Apps > Game Gear` route rather than the
+validation hold.  The frontend action log recorded `Apps ready` and then
+`Game Gear finished`.  GGFE acquired DRM with `threads=4`, applied
+`performance`, accepted sustained physical D-pad input, and physical B emitted
+code 304.  After exit, exactly one normal frontend renderer was present, no
+GGFE/RetroArch/broker process remained, and the policy was restored to
+`ondemand`:
+
+```text
+ggfe_cpu=apply result=ok requested=performance active=performance
+ggfe_input=exit code=304 physical=B
+ggfe_exit=ok
+ggfe_cpu=restore result=ok active=ondemand
+```
+
+The component checksum and all three mutable-setting hashes remained unchanged.
+This accepts the normal Apps lifecycle and governor wrapper.  It does not close
+the separate 60 fps motion gate.
