@@ -489,14 +489,20 @@ if [ "$emulator_id" = drastic ]; then
     done
 
     "$BB" rm -f /dev/shm/NDS_SHM /tmp/NDS_SHM
+    drastic_debug_level=${PLUMOS_DRASTIC_DEBUG_LEVEL:-DEBUG}
+    case "$drastic_debug_level" in
+        FATAL|ERROR|DEBUG|TRACE) ;;
+        *) drastic_debug_level=DEBUG ;;
+    esac
     (
         cd "$runtime"
         LD_LIBRARY_PATH="$runtime/runner-lib:$PLUMOS_ROOT/emulator/lib:/usr/lib" \
+        LD_PRELOAD="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
         SDL_VIDEO_EGL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
         SDL_VIDEO_GL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
         SDL_VIDEODRIVER=kmsdrm \
         SDL_VIDEO_KMSDRM_DEVICE_INDEX=0 \
-        NDS_DEBUG_LEVEL=DEBUG \
+        NDS_DEBUG_LEVEL="$drastic_debug_level" \
             "$runner"
     ) >>"$log" 2>&1 &
     runner_pid=$!

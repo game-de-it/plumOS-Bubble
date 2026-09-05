@@ -20,7 +20,7 @@ RELEASE_SHA256="9e4ed98047dea0f014daea7c3530793f92f19d60073fceb9fd2a040696f66491
 COMMON_SHA256="8a9f3c3d0c6a948868385ddfea26549ad2f0873e4e21111fa674bd1a88f2e240"
 DETOUR_SHA256="36a32d3208d5948d29264e26eabe9ff487d8fd48333bb866a1a42aea6271b29d"
 SDL2_SHA256="57891c787c296fc820c4bfaf2ced3b4af0df47b0c8c50398e2bb403ec2d5eabb"
-RUNNER_SHA256="395f8eaaa585f548cff3cedaff9bfe06931297df9883eb3642078262e740aed3"
+RUNNER_SHA256="8e9f0980b3dde673b98a11ee0ff7ff768a6ec9719cbc3ccb09793905070493a8"
 PATCH="$ROOT_DIR/package/standalone-bubble/patches/drastic/steward-fu-nds-bubble-toolchain.patch"
 COMPAT_SOURCE="$ROOT_DIR/package/standalone-bubble/src/drastic-mmap-compat.c"
 JOBS="${JOBS:-4}"
@@ -97,7 +97,10 @@ if [ -z "$PREBUILT_LIB_ROOT" ]; then
         runner \
         sdl2
     git -C "$SOURCE_DIR" checkout "$SOURCE_REF"
-    git -C "$SOURCE_DIR" apply "$PATCH"
+    # The pinned upstream runner contains whitespace-only blank lines. Apply
+    # the functional patch without making those unstable spaces part of the
+    # reproducibility contract.
+    git -C "$SOURCE_DIR" apply --ignore-space-change --ignore-whitespace "$PATCH"
     ln -sf libSDL2_image-2.0.so.0 \
         "$SOURCE_DIR/assets/gkd_miniplus/lib/libSDL2_image.so"
     ln -sf libSDL2_ttf-2.0.so.0 \

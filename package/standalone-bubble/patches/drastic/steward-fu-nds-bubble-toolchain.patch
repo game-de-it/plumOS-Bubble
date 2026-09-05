@@ -106,14 +106,134 @@ index 689d67f..9ddf5fb 100644
 +    return ERROR_LEVEL;
 +}
  
-@@ -361,5 +381,5 @@ int main(int argc, char **argv)
+@@ -81,6 +101,28 @@ static int running = 0;
+ static int frame_cnt = 0;
+ static runner_t myrunner = { 0 };
+ 
++static int check_shader(GLuint shader, const char *name)
++{
++    GLint ok = GL_FALSE;
++    GLchar log[1024] = { 0 };
++
++    glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
++    glGetShaderInfoLog(shader, sizeof(log) - 1, NULL, log);
++    debug("gles shader=%s compiled=%d log=%s\n", name, ok, log);
++    return ok == GL_TRUE ? 0 : -1;
++}
++
++static int check_program(GLuint program)
++{
++    GLint ok = GL_FALSE;
++    GLchar log[1024] = { 0 };
++
++    glGetProgramiv(program, GL_LINK_STATUS, &ok);
++    glGetProgramInfoLog(program, sizeof(log) - 1, NULL, log);
++    debug("gles program linked=%d log=%s\n", ok, log);
++    return ok == GL_TRUE ? 0 : -1;
++}
++
+ static int init_shm(void)
+ {
+     trace("call %s()\n", __func__);
+@@ -118,20 +160,47 @@ static int init_gles(void)
+     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+ 
+     myrunner.sdl2.win = SDL_CreateWindow("DraStic", 0, 0, R_LCD_W, R_LCD_H, SDL_WINDOW_OPENGL);
++    if (!myrunner.sdl2.win) {
++        error("failed to create sdl window: %s\n", SDL_GetError());
++        return -1;
++    }
+     myrunner.gles.ctx = SDL_GL_CreateContext(myrunner.sdl2.win);
++    if (!myrunner.gles.ctx) {
++        error("failed to create gles context: %s\n", SDL_GetError());
++        return -1;
++    }
++    if (SDL_GL_MakeCurrent(myrunner.sdl2.win, myrunner.gles.ctx) != 0) {
++        error("failed to make gles context current: %s\n", SDL_GetError());
++        return -1;
++    }
++    debug("gles context sdl=%p current_sdl=%p current_egl=%p display=%p draw=%p read=%p\n",
++        myrunner.gles.ctx, SDL_GL_GetCurrentContext(), eglGetCurrentContext(),
++        eglGetCurrentDisplay(), eglGetCurrentSurface(EGL_DRAW),
++        eglGetCurrentSurface(EGL_READ));
++    debug("gles vendor=%s renderer=%s version=%s\n",
++        glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION));
+  
+     myrunner.gles.vert.shader = glCreateShader(GL_VERTEX_SHADER);
+     glShaderSource(myrunner.gles.vert.shader, 1, &vert_shader_code, NULL);
+     glCompileShader(myrunner.gles.vert.shader);
++    if (check_shader(myrunner.gles.vert.shader, "vertex") < 0) {
++        return -1;
++    }
+  
+     myrunner.gles.frag.shader = glCreateShader(GL_FRAGMENT_SHADER);
+     glShaderSource(myrunner.gles.frag.shader, 1, &frag_shader_code, NULL);
+     glCompileShader(myrunner.gles.frag.shader);
++    if (check_shader(myrunner.gles.frag.shader, "fragment") < 0) {
++        return -1;
++    }
+  
+     myrunner.gles.object = glCreateProgram();
+     glAttachShader(myrunner.gles.object, myrunner.gles.vert.shader);
+     glAttachShader(myrunner.gles.object, myrunner.gles.frag.shader);
+     glLinkProgram(myrunner.gles.object);
++    if (check_program(myrunner.gles.object) < 0) {
++        return -1;
++    }
+     glUseProgram(myrunner.gles.object);
+  
+     myrunner.gles.vert.tex_pos = glGetAttribLocation(myrunner.gles.object, "vert_tex_pos");
+@@ -143,6 +212,7 @@ static int init_gles(void)
+ 
+     glUniform1f(myrunner.gles.frag.rotate, 0);
+     glUniform1f(myrunner.gles.frag.aspect, (float)R_LCD_W / R_LCD_H);
++    glUniform1f(myrunner.gles.frag.alpha, 1.0f);
+       
+     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+     glGenTextures(TEXTURE_MAX, myrunner.gles.texture);
+@@ -166,6 +236,10 @@ static int init_gles(void)
+     glUniform1i(myrunner.gles.frag.tex_main, 0);
+     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, vert_indices);
+ 
++    debug("gles init error=0x%x attrib_pos=%d attrib_coord=%d uniform_alpha=%d\n",
++        glGetError(), myrunner.gles.vert.tex_pos, myrunner.gles.vert.tex_coord,
++        myrunner.gles.frag.alpha);
++
+     myrunner.gles.bg.pixels = malloc(R_LCD_W * R_LCD_H * 4);
+     if (!myrunner.gles.bg.pixels) {
+         error("failed to allocate buffer for bg image\n");
+@@ -301,13 +375,21 @@ static void* runner_handler(void *param)
+                 (myrunner.shm.buf->layout == LAYOUT_MODE_N1)) &&
+                 (myrunner.shm.buf->tex == TEXTURE_LCD0))
+             {
+-                glUniform1f(myrunner.gles.frag.alpha, 0.0);
++                glUniform1f(myrunner.gles.frag.alpha, 1.0f);
+                 glDisable(GL_BLEND);
+             }
+             break;
+         case SHM_CMD_FLIP:
+             frame_cnt += 1;
+             trace("recv SHM_CMD_FLIP\n");
++            if (frame_cnt <= 3) {
++                unsigned char pixel[4] = { 0 };
++                glReadPixels(R_LCD_W / 2, R_LCD_H / 2, 1, 1,
++                    GL_RGBA, GL_UNSIGNED_BYTE, pixel);
++                debug("gles frame=%d center=%u,%u,%u,%u error=0x%x\n",
++                    frame_cnt, pixel[0], pixel[1], pixel[2], pixel[3],
++                    glGetError());
++            }
+             SDL_GL_SwapWindow(myrunner.sdl2.win);
+ 
+             glActiveTexture(GL_TEXTURE0);
+@@ -361,5 +443,6 @@ int main(int argc, char **argv)
  {
      pthread_t id = 0;
  
++    setvbuf(stdout, NULL, _IONBF, 0);
 -    nds_debug_level = get_debug_level(0);
 +    nds_debug_level = runner_debug_level();
      trace("log level \"%s\"\n", DEBUG_LEVEL_STR[nds_debug_level]);
-@@ -365,16 +385,21 @@ int main(int argc, char **argv)
+@@ -365,16 +448,21 @@ int main(int argc, char **argv)
  
      pthread_create(&id, NULL, runner_handler, NULL);
  

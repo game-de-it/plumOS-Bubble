@@ -24,10 +24,42 @@ stable acceptance result.
 - Runner logging uses `DEBUG`, so readiness, GLES, shared-memory and content
   initialization remain distinguishable in a later failure.
 
-The source-built AArch64 runner has SHA-256
+The startup-race source-built AArch64 runner had SHA-256
 `395f8eaaa585f548cff3cedaff9bfe06931297df9883eb3642078262e740aed3`.
 The previously validated ARMHF integration libraries and closed DraStic core
 were retained unchanged.
+
+## Black scanout follow-up
+
+A subsequent frontend launch proved that process, shared-memory and audio
+progress were not sufficient acceptance: the active KMS plane was present but
+all 1,228,800 bytes of its 640x480 BGRA buffer were zero. A TRACE run showed
+continuous `SHM_CMD_FLUSH` and `SHM_CMD_FLIP`, so the failure was between the
+AArch64 runner's GLES calls and KMS presentation.
+
+The packaged `libGLESv2.so.2` and the SDL-selected `libmali.so.1` are separate
+files containing the same vendor binary. The dynamic loader therefore created
+two Mali library instances. SDL reported a non-null context while the GLES
+instance used by the runner reported no current EGL context; shader compilation
+failed, and the old runner ignored that failure. The launcher now preloads the
+canonical `libmali.so.1` only for the AArch64 runner, so SDL/EGL and direct GLES
+symbols resolve through one instance without changing other emulator routes.
+
+The runner now also validates SDL window/context creation, current-context
+selection, shader compilation and program linking. It records the Mali vendor,
+renderer, GLES version and the first three centre pixels. Fragment alpha is
+initialized and restored to 1.0 after the translucent secondary-screen draw;
+without this, RGB was present but the scanout alpha channel remained zero.
+
+With both corrections applied temporarily, the real-ROM scanout contained
+1,090,978 non-zero bytes and SHA-256
+`094382b0e527d753fb8f93c1ac7857f3272d5467e8dbb8998b83d77ba30bee13`.
+The captured frame visibly showed the Japanese New Super Mario Bros. game
+selection screen at 640x480. The new source-built runner has SHA-256
+`8e9f0980b3dde673b98a11ee0ff7ff768a6ec9719cbc3ccb09793905070493a8`.
+The test used temporary bind mounts, restored volume from 0 to 3, removed all
+test mounts and NDS children, and returned to exactly one frontend process.
+Managed deployment and user physical acceptance are recorded separately.
 
 ## Real-device result
 

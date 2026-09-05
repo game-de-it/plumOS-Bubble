@@ -374,6 +374,13 @@
     DRM/Mali ownership、ALSA `RUNNING`とhardware pointer進行まで合格。実LCDのdual-screen配置、
     全入力、Function1 menu、通常終了とFE復帰は利用者による物理確認を残す。詳細は
     `docs/validation/2026-09-05-bubble-nds-startup-race.md`。
+  - 続く黒画面をactive KMS planeの全zero readbackで再現。SDLが明示loadする`libmali.so.1`と
+    runnerがlinkする同内容の`libGLESv2.so.2`が別ファイルのため、Maliが2インスタンスに分離し、
+    SDL contextは非NULLでもrunner側EGL current contextがNULL、shader compile失敗となっていた。
+    DraStic runnerだけcanonical Maliを`LD_PRELOAD`し、GL context/shader/program/初回pixel診断と
+    不透明alpha初期化を追加した候補では、実ROMの640x480 scanoutが1,090,978 non-zero bytes、
+    日本語ゲーム選択画面になった。managed deploy後の利用者LCD確認、Function1 menu、入力、
+    通常終了・FE復帰を残す。
   - 同試験後、active `config/standalone/*`がglobal checksumへ誤収録され、DraSticによる正当な
     `drastic.cf2`更新でapp-layer検証が失敗することを検出。active standalone設定をmanaged
     inventoryから除外し、factory defaultはstandalone component checksumで引き続き管理する。
