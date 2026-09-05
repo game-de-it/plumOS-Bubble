@@ -496,13 +496,13 @@ if [ "$emulator_id" = drastic ]; then
         SDL_VIDEO_GL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
         SDL_VIDEODRIVER=kmsdrm \
         SDL_VIDEO_KMSDRM_DEVICE_INDEX=0 \
-        NDS_DEBUG_LEVEL=INFO \
+        NDS_DEBUG_LEVEL=DEBUG \
             "$runner"
     ) >>"$log" 2>&1 &
     runner_pid=$!
     runner_ready=0
     runner_wait=0
-    while [ "$runner_wait" -lt 20 ]; do
+    while [ "$runner_wait" -lt 100 ]; do
         if [ -e /dev/shm/NDS_SHM ]; then
             runner_ready=1
             break
@@ -512,11 +512,24 @@ if [ "$emulator_id" = drastic ]; then
         runner_wait=$((runner_wait + 1))
     done
     [ "$runner_ready" -eq 1 ] || {
+        runner_rc=running
+        if ! kill -0 "$runner_pid" 2>/dev/null; then
+            set +e
+            wait "$runner_pid" 2>/dev/null
+            runner_rc=$?
+            set -e
+            runner_pid=""
+        fi
         printf 'stage=S62_RUNTIME result=failed emulator=drastic reason=runner-not-ready\n' \
             >>"$route_log"
+        printf 'drastic_runner=result=not-ready wait_ms=%s rc=%s\n' \
+            "$((runner_wait * 50))" "$runner_rc" >>"$log"
         restore_drastic_runtime
         exit 1
     }
+
+    printf 'drastic_runner=result=ready wait_ms=%s pid=%s\n' \
+        "$((runner_wait * 50))" "$runner_pid" >>"$log"
 
     printf 'drastic_start=armhf-gkd-event2-runner content-%s\n' \
         "${content##*/}" >>"$log"

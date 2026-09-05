@@ -113,6 +113,30 @@ index 689d67f..9ddf5fb 100644
 -    nds_debug_level = get_debug_level(0);
 +    nds_debug_level = runner_debug_level();
      trace("log level \"%s\"\n", DEBUG_LEVEL_STR[nds_debug_level]);
+@@ -365,16 +385,21 @@ int main(int argc, char **argv)
+ 
+     pthread_create(&id, NULL, runner_handler, NULL);
+ 
+-    usleep(1500000);
++    /* Bubble can need more than one second to acquire DRM and initialize GLES.
++     * Wait for the ARMHF producer's first frame without racing the launcher's
++     * shared-memory readiness probe. */
++    for (int startup_wait = 0; startup_wait < 200 && frame_cnt == 0; startup_wait++) {
++        usleep(50000);
++    }
+ 
+     if (frame_cnt == 0) {
+         running = 0;
+         error("no receive any frame from emulator\n");
+ 
+ #if defined(TRIMUI_BRICK)
+         system("kill -9 `pidof ld-linux-armhf.so.3`");
+ #endif
+ 
+-#if defined(GKD_PIXEL2) || defined(GKD_MINIPLUS)
++#if defined(GKD_PIXEL2)
+         system("kill -9 `pidof drastic`");
+ #endif
 diff --git a/sdl2/src/video/nds/nds_event.h b/sdl2/src/video/nds/nds_event.h
 index 6e2d240..46cc8ad 100644
 --- a/sdl2/src/video/nds/nds_event.h
