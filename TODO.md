@@ -172,7 +172,9 @@
     request後にFEが終了せず、PID 1がrequestを消費できないことを特定。成功時にFE ready PIDも
     TERM→bounded KILLし、失敗し得るstorage処理より後へnetwork/volume停止を移動した。
     誤選択済みのpending ShutdownをRebootへ安全に差替える経路も追加。保留中Shutdownを新経路へ
-    渡して実機電源断まで合格。次boot後、black PSPからReboot/Shutdown双方とclean判定を残す。
+    渡して実機電源断まで合格。canonical Mali修正後のPSPを正常終了してFEへ戻った後のRebootは、
+    SD2解除、p4 clean unmount、PID 1 request、新bootの`previous_shutdown=clean`まで実機合格。
+    実行中game/appをterminal actionが強制終了するReboot/Shutdown双方の物理確認を残す。
 - [ ] `BUB-P4-I05` normalized Bubble controller を公開し、FE/RetroArch/standaloneで1入力1反応を確認する。
   - FEとRetroArch RGUIでD-pad/A/B、SELECT+START終了を物理確認した。standaloneと全buttonを残す。
   - PicoArch QuickNESで物理A/B、Function1/2 menu、menu A決定/B戻る、FE復帰を利用者確認済み。
@@ -440,7 +442,9 @@
     compile段階で失敗し暗転したため仮説を棄却。実機では同一Maliバイナリの`libEGL.so.1`と
     `libGLESv2.so.2`が別inodeで、SDL/EGLとdirect GLESが別インスタンスになるDraStic既知問題と
     同型だった。不要な精度patchを撤回し、PPSSPPだけcanonical `libmali.so.1`をpreloadする。
-    software rendererは使用しない。Star Soldierの映像・音・操作・終了を再確認する。
+    software rendererは使用しない。source `0d8d1ee`をstandalone 860/860と変更global 4件で
+    live deployし、Star Soldierの映像・音・操作を利用者確認、ログではshader compile/link error
+    0件、実ROM boot、正常終了`rc-0`、FE復帰まで合格した。
   - PCM pointerは起動168導線中163で進行。Atari800、FreeChaF、SquirrelJME、Numero、
     VeMUlatorはbounded probe内で進行せず、音量0のため全導線の実聴と併せて物理確認を残す。
     最新aggregateのgeometry 123件とPyxel fit 1件は全て640x480内・中央・aspect一致。

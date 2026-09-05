@@ -44,8 +44,8 @@ Bubble and MF use the same PPSSPP 1.20.4 revision, factory configuration,
 GLES2 backend and Cortex-A55 build flags. The Bubble log repeatedly showed
 Thin3D program link failures for both the synthetic PSP probe and Star Soldier.
 The affected Thin3D vertex shaders use the GLES vertex default precision while
-their fragment partners explicitly selected `lowp`. Bubble's captured Mali
-driver rejects the mismatched varying interface.
+their fragment partners explicitly selected `lowp`. The first hypothesis was
+that Bubble's captured Mali driver rejected this mismatched varying interface.
 
 Patch `ppsspp-1.20.4-bubble-mali-thin3d-precision.patch` changed the three
 Thin3D fragment shaders to `mediump`. The source-built binary had SHA-256
@@ -70,9 +70,27 @@ The PPSSPP launcher now scopes `LD_PRELOAD`, `SDL_VIDEO_EGL_DRIVER` and
 KMSDRM/GLES2 hardware renderer and does not change the PPSSPP configuration or
 enable software rendering.
 
-Physical acceptance still requires launching Star
-Soldier through the frontend and checking picture, sound, controls, normal
-return, Reboot and Shutdown.
+## PPSSPP physical acceptance after canonical Mali correction
+
+Source `0d8d1ee` was rebuilt without the rejected precision patch and deployed
+with the standalone component passing 860/860 checks. The four changed global
+checksum entries also passed device readback. The user then launched
+`Star Soldier (Japan).chd` through the frontend and reported normal PSP
+operation. The latest canonical-Mali session recorded:
+
+- `PPSSPP v1.20.4` and a successful real-content `Booted` event;
+- the Mali `g13p0-01eac0` runtime rather than a software renderer;
+- zero shader compilation, program-link, G3D, abort or segmentation errors;
+- normal `Leaving main`, `ppsspp_exit=rc-0` and frontend resume.
+
+After PPSSPP had returned normally to the frontend, the user selected Reboot.
+The power path unbound the SD2 ROM and BIOS views, unmounted SD2, cleanly
+unmounted p4, wrote both clean markers and committed the reboot request to PID
+1. The next boot has a new boot ID, reached frontend-ready with no foreground
+owner, and recorded `previous_shutdown=clean automatic_repair=no`. This proves
+the normal post-game Reboot path. Physical terminal-action coverage that kills
+a still-running or hung game remains separate and still requires both Reboot
+and Shutdown acceptance.
 
 ## Metadata note
 
