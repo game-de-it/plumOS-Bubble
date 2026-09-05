@@ -436,9 +436,11 @@
     llvmpipe/softpipe/swrast mapping 0。geometryを出す123導線はhorizontal 112、vertical 11。
     VarthでArcade/CPS1 9導線を再試験し全起動、geometry出力8導線は3:4・360x480中央配置。
     MAME2003 Plusを含むgeometry非出力45導線とPPSSPPを物理LCD確認に残す。PPSSPPはStar Soldier
-    CHDで暗転し、Thin3Dの頂点側既定highpとfragment側lowpのvarying精度不一致をBubble Maliが
-    link拒否していた。software rendererへ逃がさずmediumpへ統一したsource `7c8f39b`をbuildし、
-    standalone 860/860で実機deploy済み。Star Soldierの映像・音・操作・終了を再確認する。
+    CHDで暗転した。初回のvarying精度仮説に基づくmediump統一後も、頂点・fragment双方が
+    compile段階で失敗し暗転したため仮説を棄却。実機では同一Maliバイナリの`libEGL.so.1`と
+    `libGLESv2.so.2`が別inodeで、SDL/EGLとdirect GLESが別インスタンスになるDraStic既知問題と
+    同型だった。不要な精度patchを撤回し、PPSSPPだけcanonical `libmali.so.1`をpreloadする。
+    software rendererは使用しない。Star Soldierの映像・音・操作・終了を再確認する。
   - PCM pointerは起動168導線中163で進行。Atari800、FreeChaF、SquirrelJME、Numero、
     VeMUlatorはbounded probe内で進行せず、音量0のため全導線の実聴と併せて物理確認を残す。
     最新aggregateのgeometry 123件とPyxel fit 1件は全て640x480内・中央・aspect一致。

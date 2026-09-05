@@ -34,7 +34,6 @@ YABASANSHIRO_SCHED_OTHER_PATCH="$ROOT_DIR/patches/libretro-cores-bubble/yabasans
 DRASTIC_BUILD_PATCH="$ROOT_DIR/package/standalone-bubble/patches/drastic/steward-fu-nds-bubble-toolchain.patch"
 DRASTIC_MMAP_COMPAT="$ROOT_DIR/package/standalone-bubble/src/drastic-mmap-compat.c"
 PPSSPP_PATCH="$ROOT_DIR/package/standalone-bubble/patches/ppsspp/ppsspp-1.20.4-bubble-no-sdl2-ttf.patch"
-PPSSPP_MALI_PRECISION_PATCH="$ROOT_DIR/package/standalone-bubble/patches/ppsspp/ppsspp-1.20.4-bubble-mali-thin3d-precision.patch"
 OPENBOR_PATCH="$ROOT_DIR/package/standalone-bubble/patches/openbor/openbor-v6391-bubble.patch"
 
 for path in \
@@ -84,7 +83,6 @@ for path in \
     "$DRASTIC_BUILD_PATCH" \
     "$DRASTIC_MMAP_COMPAT" \
     "$PPSSPP_PATCH" \
-    "$PPSSPP_MALI_PRECISION_PATCH" \
     "$OPENBOR_PATCH"; do
     [ -e "$path" ] || {
         printf 'error: missing standalone build input: %s\n' "$path" >&2
@@ -158,7 +156,6 @@ YABASANSHIRO_SCHED_OTHER_PATCH_SHA256="$(
 DRASTIC_BUILD_PATCH_SHA256="$(sha256sum "$DRASTIC_BUILD_PATCH" | awk '{ print $1 }')"
 DRASTIC_MMAP_COMPAT_SHA256="$(sha256sum "$DRASTIC_MMAP_COMPAT" | awk '{ print $1 }')"
 PPSSPP_PATCH_SHA256="$(sha256sum "$PPSSPP_PATCH" | awk '{ print $1 }')"
-PPSSPP_MALI_PRECISION_PATCH_SHA256="$(sha256sum "$PPSSPP_MALI_PRECISION_PATCH" | awk '{ print $1 }')"
 OPENBOR_PATCH_SHA256="$(sha256sum "$OPENBOR_PATCH" | awk '{ print $1 }')"
 
 rm -rf "$OUT_ROOT"
@@ -275,7 +272,6 @@ cat >"$PLUMOS_DIR/components/standalone/manifest.json" <<EOF
     "steward-fu-nds-bubble-toolchain": "$DRASTIC_BUILD_PATCH_SHA256",
     "drastic-bubble-mmap-compat": "$DRASTIC_MMAP_COMPAT_SHA256",
     "ppsspp-bubble-no-sdl2-ttf": "$PPSSPP_PATCH_SHA256",
-    "ppsspp-bubble-mali-thin3d-precision": "$PPSSPP_MALI_PRECISION_PATCH_SHA256",
     "openbor-v6391-bubble": "$OPENBOR_PATCH_SHA256"
   },
   "render_contract": "builtin-neon-default-with-vendor-mali-g52-presentation",

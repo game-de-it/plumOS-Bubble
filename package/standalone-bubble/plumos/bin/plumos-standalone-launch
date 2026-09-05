@@ -155,7 +155,7 @@ if [ "$emulator_id" = ppsspp ]; then
     if [ -x "$PLUMOS_ROOT/bin/plumos-volume-control" ]; then
         "$BB" sh "$PLUMOS_ROOT/bin/plumos-volume-control" apply >>"$log" 2>&1 || true
     fi
-    printf 'ppsspp_start=renderer-mali-g52-gles content-%s\n' \
+    printf 'ppsspp_start=renderer-mali-g52-gles loader-canonical-libmali content-%s\n' \
         "${content##*/}" >>"$log"
     set +e
     (
@@ -165,6 +165,14 @@ if [ "$emulator_id" = ppsspp ]; then
         export XDG_DATA_HOME="$state_root/data"
         export XDG_CACHE_HOME="$cache_root"
         export LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib:$runtime/lib:/usr/lib"
+        # The captured Bubble loader aliases are separate regular files with
+        # identical libmali contents. Without a canonical preload SDL/EGL and
+        # PPSSPP's directly linked GLES entrypoints resolve through different
+        # Mali instances, so GLES sees no current context and every shader
+        # compilation fails. Keep this scoped to PPSSPP, as for DraStic.
+        export LD_PRELOAD="$PLUMOS_ROOT/emulator/lib/libmali.so.1"
+        export SDL_VIDEO_EGL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1"
+        export SDL_VIDEO_GL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1"
         export SDL_VIDEODRIVER=kmsdrm
         export SDL_AUDIODRIVER=alsa
         export AUDIODEV="$alsa_device"

@@ -38,7 +38,7 @@ previously pending Shutdown was then handed to PID 1 by terminating frontend
 PID 1915; the device stopped answering ping immediately, confirming physical
 power-off.
 
-## PPSSPP correction
+## PPSSPP first hypothesis (rejected)
 
 Bubble and MF use the same PPSSPP 1.20.4 revision, factory configuration,
 GLES2 backend and Cortex-A55 build flags. The Bubble log repeatedly showed
@@ -47,14 +47,30 @@ The affected Thin3D vertex shaders use the GLES vertex default precision while
 their fragment partners explicitly selected `lowp`. Bubble's captured Mali
 driver rejects the mismatched varying interface.
 
-Patch `ppsspp-1.20.4-bubble-mali-thin3d-precision.patch` changes the three
-Thin3D fragment shaders to `mediump`, matching PPSSPP's existing fragment
-prelude and retaining the Mali KMSDRM/GLES2 hardware renderer. It does not
-enable software rendering. The source-built binary has SHA-256
-`7e60cd2bb02bdf3f325577b653ef23b07fedc20545ed0a6c0aa50ae0935b8199`.
-The standalone component verified at 860/860 after deployment.
+Patch `ppsspp-1.20.4-bubble-mali-thin3d-precision.patch` changed the three
+Thin3D fragment shaders to `mediump`. The source-built binary had SHA-256
+`7e60cd2bb02bdf3f325577b653ef23b07fedc20545ed0a6c0aa50ae0935b8199`
+and the standalone component verified at 860/860 after deployment. Physical
+retest still produced a black display. The new log showed both vertex and
+fragment shader compilation failing before program linking, so the varying
+precision explanation was wrong. This patch is removed rather than retained
+as an unexplained Bubble-only divergence.
 
-Physical acceptance still requires a normal boot followed by launching Star
+## PPSSPP confirmed cause and second correction
+
+PPSSPP directly needs both `libEGL.so.1` and `libGLESv2.so.2`. On the device,
+those names and `libmali.so.1` are five separate regular files with different
+inodes, although all have the same vendor binary SHA-256. SDL creates the EGL
+context through one loaded copy while PPSSPP sends GLES calls through another.
+The GLES instance therefore has no current context and rejects every shader,
+which is the same loader failure already confirmed and corrected for DraStic.
+
+The PPSSPP launcher now scopes `LD_PRELOAD`, `SDL_VIDEO_EGL_DRIVER` and
+`SDL_VIDEO_GL_DRIVER` to the canonical `libmali.so.1`. This preserves the
+KMSDRM/GLES2 hardware renderer and does not change the PPSSPP configuration or
+enable software rendering.
+
+Physical acceptance still requires launching Star
 Soldier through the frontend and checking picture, sound, controls, normal
 return, Reboot and Shutdown.
 

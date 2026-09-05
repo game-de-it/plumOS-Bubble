@@ -6,7 +6,6 @@ SOURCE_DIR="$ROOT_DIR/build/ppsspp-bubble/source"
 BUILD_DIR="$ROOT_DIR/build/ppsspp-bubble/build"
 OUT_ROOT="$ROOT_DIR/${PLUMOS_BUBBLE_PPSSPP_OUT:-output/ppsspp/bubble}"
 PATCH_FILE="$ROOT_DIR/package/standalone-bubble/patches/ppsspp/ppsspp-1.20.4-bubble-no-sdl2-ttf.patch"
-MALI_PRECISION_PATCH="$ROOT_DIR/package/standalone-bubble/patches/ppsspp/ppsspp-1.20.4-bubble-mali-thin3d-precision.patch"
 PPSSPP_REPO="${PLUMOS_BUBBLE_PPSSPP_REPO:-https://github.com/hrydgard/ppsspp.git}"
 PPSSPP_REF="${PLUMOS_BUBBLE_PPSSPP_REF:-v1.20.4}"
 PPSSPP_COMMIT="fa50bb1976065c4f8b1b47af227d367fe9771555"
@@ -18,7 +17,6 @@ command -v git >/dev/null
 command -v ninja >/dev/null
 command -v readelf >/dev/null
 [ -s "$PATCH_FILE" ]
-[ -s "$MALI_PRECISION_PATCH" ]
 
 if [ ! -d "$SOURCE_DIR/.git" ]; then
     [ ! -e "$SOURCE_DIR" ] || {
@@ -40,8 +38,6 @@ git -C "$SOURCE_DIR" checkout --detach "$PPSSPP_COMMIT"
 git -C "$SOURCE_DIR" submodule sync --recursive
 git -C "$SOURCE_DIR" submodule update --init --recursive
 restore_source() {
-    git -C "$SOURCE_DIR" apply --reverse "$MALI_PRECISION_PATCH" >/dev/null 2>&1 ||
-        true
     git -C "$SOURCE_DIR" apply --reverse "$PATCH_FILE" >/dev/null 2>&1 ||
         true
 }
@@ -49,8 +45,6 @@ trap restore_source EXIT
 
 git -C "$SOURCE_DIR" apply --check "$PATCH_FILE"
 git -C "$SOURCE_DIR" apply "$PATCH_FILE"
-git -C "$SOURCE_DIR" apply --check "$MALI_PRECISION_PATCH"
-git -C "$SOURCE_DIR" apply "$MALI_PRECISION_PATCH"
 
 cmake -S "$SOURCE_DIR" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
