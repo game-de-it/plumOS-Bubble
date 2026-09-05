@@ -304,48 +304,32 @@ static int plumos_fbdev_drm_disable_foreground_planes(
     saved->fb_id = plane->fb_id;
     saved->crtc_x = plane->crtc_x;
     saved->crtc_y = plane->crtc_y;
-    if (!plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
-                                         "CRTC_W", &plane_type)) {
-      snprintf(error, error_size, "DRM plane %u has no CRTC_W",
-               plane->plane_id);
-      drmModeFreePlane(plane);
-      drmModeFreePlaneResources(resources);
-      plumos_fbdev_drm_restore_planes(r);
-      return 0;
+    if (plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
+                                        "CRTC_W", &plane_type)) {
+      saved->crtc_w = (uint32_t)plane_type;
+    } else {
+      saved->crtc_w = r->drm_mode.hdisplay;
     }
-    saved->crtc_w = (uint32_t)plane_type;
-    if (!plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
-                                         "CRTC_H", &plane_type)) {
-      snprintf(error, error_size, "DRM plane %u has no CRTC_H",
-               plane->plane_id);
-      drmModeFreePlane(plane);
-      drmModeFreePlaneResources(resources);
-      plumos_fbdev_drm_restore_planes(r);
-      return 0;
+    if (plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
+                                        "CRTC_H", &plane_type)) {
+      saved->crtc_h = (uint32_t)plane_type;
+    } else {
+      saved->crtc_h = r->drm_mode.vdisplay;
     }
-    saved->crtc_h = (uint32_t)plane_type;
     saved->src_x = plane->x;
     saved->src_y = plane->y;
-    if (!plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
-                                         "SRC_W", &plane_type)) {
-      snprintf(error, error_size, "DRM plane %u has no SRC_W",
-               plane->plane_id);
-      drmModeFreePlane(plane);
-      drmModeFreePlaneResources(resources);
-      plumos_fbdev_drm_restore_planes(r);
-      return 0;
+    if (plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
+                                        "SRC_W", &plane_type)) {
+      saved->src_w = (uint32_t)plane_type;
+    } else {
+      saved->src_w = (uint32_t)r->drm_mode.hdisplay << 16;
     }
-    saved->src_w = (uint32_t)plane_type;
-    if (!plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
-                                         "SRC_H", &plane_type)) {
-      snprintf(error, error_size, "DRM plane %u has no SRC_H",
-               plane->plane_id);
-      drmModeFreePlane(plane);
-      drmModeFreePlaneResources(resources);
-      plumos_fbdev_drm_restore_planes(r);
-      return 0;
+    if (plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
+                                        "SRC_H", &plane_type)) {
+      saved->src_h = (uint32_t)plane_type;
+    } else {
+      saved->src_h = (uint32_t)r->drm_mode.vdisplay << 16;
     }
-    saved->src_h = (uint32_t)plane_type;
     if (drmModeSetPlane(r->drm_fd, plane->plane_id, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0) != 0) {
       snprintf(error, error_size, "DRM disable plane %u: %s",

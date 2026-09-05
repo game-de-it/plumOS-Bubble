@@ -88,7 +88,7 @@ PLUMOS_BUSYBOX="$BB" \
 PLUMOS_FRONTEND_MODE=manual \
 PLUMOS_POWER_MENU_SELECTION="$SELECTION_FILE" \
 LD_LIBRARY_PATH="$PLUMOS_ROOT/frontend/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
-    "$BB" sh "$MENU" --power-overlay
+    "$BB" sh "$MENU" --power-overlay >>"$LOG_FILE" 2>&1
 menu_rc=$?
 selection=$(read_selection)
 log "menu end rc=$menu_rc selection=${selection:-cancel}"

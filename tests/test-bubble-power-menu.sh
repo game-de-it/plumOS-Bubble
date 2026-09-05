@@ -144,6 +144,9 @@ grep -q 'DRM_PLANE_TYPE_PRIMARY' \
     "$repo_root/src/frontend/plumos_fbdev_renderer.h"
 grep -q 'action=disable' "$repo_root/src/frontend/plumos_fbdev_renderer.h"
 grep -q 'action=restore' "$repo_root/src/frontend/plumos_fbdev_renderer.h"
+grep -q 'drm_mode.hdisplay << 16' \
+    "$repo_root/src/frontend/plumos_fbdev_renderer.h"
+grep -q 'power-overlay >>"$LOG_FILE" 2>&1' "$overlay"
 grep -q 'PLUMOS_DRM_SHARE_LIBRARY' "$retroarch_launch"
 grep -q 'PLUMOS_DRM_SHARE_LIBRARY' "$retroarch_menu"
 grep -q 'PLUMOS_DRM_SHARE_LIBRARY' "$picoarch_launch"
