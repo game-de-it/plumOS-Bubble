@@ -68,12 +68,20 @@ managed by the standalone component checksum.
 Source `47d8438` was deployed as the launcher, runner, DraStic build manifest,
 standalone component manifest/checksum, and app manifest. Staged hashes matched
 the host before switching. The device passed all 860 standalone component
-checksums. The mutable-config inventory correction was deployed separately and
-the final live app-layer checksum count is recorded after that switch. Rollback
-for the NDS runtime change is retained at:
+checksums. The mutable-config inventory correction was deployed as source
+`d5693a5`; active standalone configuration had 13 files and zero were present
+in the corrected inventory. The final 12,885-file live app-layer verification
+passed after the real NDS launch. Rollback for the NDS runtime change is
+retained at:
 
 ```text
 /storage/plumos/state/update-rollback/973edcf-to-47d8438-nds-20260905T0630Z
+```
+
+The inventory-only switch is separately recoverable from:
+
+```text
+/storage/plumos/state/update-rollback/47d8438-to-d5693a5-mutable-checksum-20260905T0645Z
 ```
 
 No release was published. DraStic and the captured vendor Mali runtime remain
