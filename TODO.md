@@ -378,9 +378,10 @@
     runnerがlinkする同内容の`libGLESv2.so.2`が別ファイルのため、Maliが2インスタンスに分離し、
     SDL contextは非NULLでもrunner側EGL current contextがNULL、shader compile失敗となっていた。
     DraStic runnerだけcanonical Maliを`LD_PRELOAD`し、GL context/shader/program/初回pixel診断と
-    不透明alpha初期化を追加した候補では、実ROMの640x480 scanoutが1,090,978 non-zero bytes、
-    日本語ゲーム選択画面になった。managed deploy後の利用者LCD確認、Function1 menu、入力、
-    通常終了・FE復帰を残す。
+    不透明alpha初期化を追加。source `a97d26c`をstandalone 860/860、app-layer 12,885/12,885で
+    live deployした。通常launcherでも実ROMの640x480 scanoutが1,090,978 non-zero bytes、
+    日本語ゲーム選択画面となり、終了時`rc-0`、mount/shm残留なし、FE 1 processへ復帰した。
+    利用者LCD確認、Function1 menu、全入力、通常メニュー終了・FE復帰を残す。
   - 同試験後、active `config/standalone/*`がglobal checksumへ誤収録され、DraSticによる正当な
     `drastic.cf2`更新でapp-layer検証が失敗することを検出。active standalone設定をmanaged
     inventoryから除外し、factory defaultはstandalone component checksumで引き続き管理する。

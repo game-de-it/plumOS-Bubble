@@ -57,9 +57,27 @@ With both corrections applied temporarily, the real-ROM scanout contained
 The captured frame visibly showed the Japanese New Super Mario Bros. game
 selection screen at 640x480. The new source-built runner has SHA-256
 `8e9f0980b3dde673b98a11ee0ff7ff768a6ec9719cbc3ccb09793905070493a8`.
-The test used temporary bind mounts, restored volume from 0 to 3, removed all
-test mounts and NDS children, and returned to exactly one frontend process.
-Managed deployment and user physical acceptance are recorded separately.
+The candidate test used temporary bind mounts, restored volume from 0 to 3,
+removed all test mounts and NDS children, and returned to exactly one frontend
+process.
+
+Implementation source `a97d26c` was then deployed as the launcher, runner,
+DraStic build manifest, standalone component manifest/checksum and app manifest.
+All 860 standalone checksums and all 12,885 global app-layer checksums passed.
+The deployed normal launcher reproduced the same scanout SHA-256 without bind
+mounts or caller-supplied environment variables. Its diagnostics reported a
+current EGL context, Mali-G52, GLES 3.2, both shaders compiled, program linked,
+and no GL error. The ARMHF core was terminated normally; the launcher returned
+`drastic_exit=rc-0`, removed all seven mutable-directory bind mounts and shared
+memory, restored volume 0 to 3, and returned to exactly one frontend process.
+Rollback is retained at:
+
+```text
+/storage/plumos/state/update-rollback/d5693a5-to-a97d26c-nds-gles-20260905T0820Z
+```
+
+User physical acceptance remains for LCD layout, controls, Function1 menu,
+normal menu exit and frontend return.
 
 ## Real-device result
 
