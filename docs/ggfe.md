@@ -51,10 +51,11 @@ Notes:
 * Physical A is `BTN_EAST` and physical B is `BTN_SOUTH` on this device, per
   `configs/input/bubble-controller-map.json`. GGFE uses those codes, not
   positions.
-* A one-slot carousel move is a 0.45-second smoothstep made from 27 presented
-  positions at the 60 Hz target. Artwork for the visible destination range is
-  decoded before the transition starts, so first-use PNG work cannot skip the
-  motion. `logs/ggfe.log` reports measured FPS, maximum frame time and slow
+* Carousel motion uses the same policy as plumOS Gallery: a 360 ms time-based
+  smoothstep refreshed at the 60 Hz target, with one further D-pad move queued
+  until the current move finishes. Artwork for the visible destination range
+  is decoded before the transition starts, so first-use PNG work cannot skip
+  the motion. `logs/ggfe.log` reports measured FPS, maximum frame time and slow
   frame count once per second.
 * B/START returns to the stock frontend when GGFE was opened from Apps. During
   the standalone validation procedure, `frontend-hold` deliberately prevents

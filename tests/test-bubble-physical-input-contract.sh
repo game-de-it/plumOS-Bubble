@@ -30,8 +30,8 @@ grep -Fq '{ BTN_SOUTH,  IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_B }' "$pico
 grep -Fq 'case BTN_EAST: /* physical A on Bubble */' src/frontend/plumos_ggfe.c
 grep -Fq 'case BTN_SOUTH: /* physical B on Bubble */' src/frontend/plumos_ggfe.c
 grep -Fq '#define GGFE_TARGET_FPS 60.0f' src/frontend/plumos_ggfe.c
-grep -Fq '#define GGFE_SCROLL_SECONDS 0.45f' src/frontend/plumos_ggfe.c
-grep -Fq 'ggfe_warm_labels(&app, target);' src/frontend/plumos_ggfe.c
+grep -Fq '#define GGFE_SCROLL_MS 360' src/frontend/plumos_ggfe.c
+grep -Fq 'ggfe_warm_labels(app, next);' src/frontend/plumos_ggfe.c
 grep -Fq '{ BTN_THUMBL, IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_L3 }' "$pico_patch"
 grep -Fq '{ BTN_THUMBR, IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_R3 }' "$pico_patch"
 grep -Fq '{ BTN_TRIGGER_HAPPY1, IN_BINDTYPE_EMU, EACTION_MENU }' "$pico_patch"

@@ -112,7 +112,7 @@ static int plumos_fbdev_load_png_rgba(const char *path, unsigned char **out,
 #define GGFE_LABEL_CACHE 12
 #define GGFE_MAX_DRAWS 6144
 #define GGFE_TARGET_FPS 60.0f
-#define GGFE_SCROLL_SECONDS 0.45f
+#define GGFE_SCROLL_MS 360
 
 struct ggfe_image {
   unsigned char *rgb; /* RGB8 */
@@ -1475,6 +1475,80 @@ static long long ggfe_now_ms(void) {
   return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
 }
 
+/* Match plumOS gallery motion: one time-based smoothstep is allowed to finish,
+ * while one further direction press is queued behind it.  This keeps a held
+ * or rapidly tapped D-pad from snapping the interpolation origin repeatedly. */
+struct ggfe_scroll_state {
+  int target;
+  int from;
+  int to;
+  int active;
+  int pending_target;
+  int pending_active;
+  long long start_ms;
+};
+
+static void ggfe_scroll_request(struct ggfe_app *app,
+                                struct ggfe_scroll_state *scroll, int delta) {
+  int next;
+
+  if (!app || !scroll || delta == 0) {
+    return;
+  }
+  next = scroll->target + (delta < 0 ? -1 : 1);
+  if (next < 0 || next >= app->entry_count) {
+    return;
+  }
+  ggfe_warm_labels(app, next);
+  if (scroll->active) {
+    scroll->pending_target = next;
+    scroll->pending_active = 1;
+    ggfe_log(app, "ggfe_scroll=queued target=%d\n", next);
+    return;
+  }
+  scroll->from = scroll->target;
+  scroll->target = next;
+  scroll->to = next;
+  scroll->start_ms = ggfe_now_ms();
+  scroll->active = 1;
+  ggfe_log(app, "ggfe_scroll=start from=%d to=%d duration_ms=%d\n",
+           scroll->from, scroll->to, GGFE_SCROLL_MS);
+}
+
+static float ggfe_scroll_position(struct ggfe_app *app,
+                                  struct ggfe_scroll_state *scroll,
+                                  long long now_ms) {
+  long long elapsed;
+  float progress;
+
+  if (!scroll->active) {
+    return (float)scroll->target;
+  }
+  elapsed = now_ms - scroll->start_ms;
+  if (elapsed >= GGFE_SCROLL_MS) {
+    scroll->active = 0;
+    if (scroll->pending_active) {
+      int next = scroll->pending_target;
+      scroll->pending_active = 0;
+      scroll->from = scroll->target;
+      scroll->target = next;
+      scroll->to = next;
+      scroll->start_ms = now_ms;
+      scroll->active = 1;
+      ggfe_log(app, "ggfe_scroll=start from=%d to=%d duration_ms=%d queued=1\n",
+               scroll->from, scroll->to, GGFE_SCROLL_MS);
+      return (float)scroll->from;
+    }
+    return (float)scroll->target;
+  }
+  if (elapsed <= 0) {
+    return (float)scroll->from;
+  }
+  progress = (float)elapsed / (float)GGFE_SCROLL_MS;
+  return ggfe_lerp((float)scroll->from, (float)scroll->to,
+                   ggfe_ease_in_out(progress));
+}
+
 int main(int argc, char **argv) {
   struct ggfe_app app;
   struct ggfe_frame frame;
@@ -1485,8 +1559,7 @@ int main(int argc, char **argv) {
   const char *sdcard_root = getenv("PLUMOS_SDCARD_ROOT");
   char log_path[PATH_MAX];
   int input_fd;
-  int target = 0;
-  float pos_from = 0.0f, pos_to = 0.0f, scroll_t = 1.0f;
+  struct ggfe_scroll_state scroll;
   float launch_t = -1.0f;
   long long last_ms;
   long long last_present_ms;
@@ -1539,6 +1612,7 @@ int main(int argc, char **argv) {
   last_ms = ggfe_now_ms();
   last_present_ms = last_ms;
   stats_start_ms = last_ms;
+  memset(&scroll, 0, sizeof(scroll));
 
   while (running) {
     long long now = ggfe_now_ms();
@@ -1569,41 +1643,23 @@ int main(int argc, char **argv) {
         switch (ev.code) {
           case BTN_DPAD_LEFT:
           case BTN_DPAD_UP:
-            if (target > 0) {
-              pos_from = ggfe_lerp(pos_from, pos_to,
-                                   ggfe_ease_in_out(scroll_t < 1.0f ? scroll_t
-                                                                    : 1.0f));
-              target--;
-              pos_to = (float)target;
-              ggfe_warm_labels(&app, target);
-              scroll_t = 0.0f;
-              ggfe_log(&app, "ggfe_input=move target=%d\n", target);
-            }
+            ggfe_scroll_request(&app, &scroll, -1);
             break;
           case BTN_DPAD_RIGHT:
           case BTN_DPAD_DOWN:
-            if (target < app.entry_count - 1) {
-              pos_from = ggfe_lerp(pos_from, pos_to,
-                                   ggfe_ease_in_out(scroll_t < 1.0f ? scroll_t
-                                                                    : 1.0f));
-              target++;
-              pos_to = (float)target;
-              ggfe_warm_labels(&app, target);
-              scroll_t = 0.0f;
-              ggfe_log(&app, "ggfe_input=move target=%d\n", target);
-            }
+            ggfe_scroll_request(&app, &scroll, 1);
             break;
           case BTN_EAST: /* physical A on Bubble */
           {
             char why[96];
             ggfe_log(&app, "ggfe_input=launch code=%u physical=A target=%d\n",
-                     (unsigned int)ev.code, target);
-            if (ggfe_can_launch(&app, &app.entries[target], why,
+                     (unsigned int)ev.code, scroll.target);
+            if (ggfe_can_launch(&app, &app.entries[scroll.target], why,
                                 sizeof(why))) {
               launch_t = 0.0f;
             } else {
               ggfe_log(&app, "ggfe_launch=unavailable rom=%s reason=%s\n",
-                       app.entries[target].rel, why);
+                       app.entries[scroll.target].rel, why);
             }
             break;
           }
@@ -1620,17 +1676,10 @@ int main(int argc, char **argv) {
       }
     }
 
-    /* A transition always gets 27 presented positions at the 60 Hz target.
-     * A one-off slow frame therefore stretches the duration instead of
-     * skipping most of the motion. */
-    scroll_t += 1.0f / (GGFE_TARGET_FPS * GGFE_SCROLL_SECONDS);
-    if (scroll_t > 1.0f) {
-      scroll_t = 1.0f;
-    }
-    pos = ggfe_lerp(pos_from, pos_to, ggfe_ease_in_out(scroll_t));
+    pos = ggfe_scroll_position(&app, &scroll, ggfe_now_ms());
 
     if (launch_t >= 0.0f) {
-      ggfe_launch_frame(launch_t, (float)target, &frame);
+      ggfe_launch_frame(launch_t, (float)scroll.target, &frame);
       launch_t += dt;
     } else {
       ggfe_browse_frame(pos, &frame);
@@ -1669,7 +1718,7 @@ int main(int argc, char **argv) {
     }
 
     if (launch_t > GGFE_LAUNCH_END) {
-      ggfe_launch_rom(&app, &renderer, &app.entries[target]);
+      ggfe_launch_rom(&app, &renderer, &app.entries[scroll.target]);
       launch_t = -1.0f;
       last_ms = ggfe_now_ms();
       last_present_ms = last_ms;
