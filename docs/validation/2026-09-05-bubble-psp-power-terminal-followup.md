@@ -92,6 +92,14 @@ the normal post-game Reboot path. Physical terminal-action coverage that kills
 a still-running or hung game remains separate and still requires both Reboot
 and Shutdown acceptance.
 
+`previous_shutdown=clean` is plumOS transaction evidence, not an assertion
+that every FAT volume was already healthy. On this boot the kernel still
+reported the pre-existing FAT dirty bit for p4 (`mmcblk1p4`) and SD2
+(`mmcblk3p1`). No new I/O, invalid-cluster, kernel trace or ext4 error appeared,
+and plumOS intentionally did not repair either user volume automatically.
+Offline user-directed filesystem checking remains a separate media-health
+action.
+
 ## Metadata note
 
 The device's existing global `checksums.sha256` has 12,890 entries and predates
