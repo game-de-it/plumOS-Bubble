@@ -7,8 +7,76 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 #include <drm.h>
+
+static int operate_via_broker(pid_t pid, int set_master) {
+  const char *runtime_root = getenv("PLUMOS_RUNTIME_ROOT");
+  char socket_path[sizeof(((struct sockaddr_un *)0)->sun_path)];
+  char status_path[64];
+  char status[512];
+  char request[8];
+  struct sockaddr_un address;
+  int attempts;
+
+  if (!runtime_root || !runtime_root[0]) {
+    runtime_root = "/run/plumos";
+  }
+  for (attempts = 0; attempts < 32 && pid > 1; attempts++) {
+    FILE *file;
+    long parent = 0;
+    int socket_fd;
+    ssize_t length;
+
+    if (snprintf(socket_path, sizeof(socket_path),
+                 "%s/drm-handoff/%ld.sock", runtime_root, (long)pid) <
+        (int)sizeof(socket_path)) {
+      socket_fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+      if (socket_fd >= 0) {
+        memset(&address, 0, sizeof(address));
+        address.sun_family = AF_UNIX;
+        snprintf(address.sun_path, sizeof(address.sun_path), "%s",
+                 socket_path);
+        if (connect(socket_fd, (struct sockaddr *)&address,
+                    sizeof(address)) == 0) {
+          snprintf(request, sizeof(request), "%s\n",
+                   set_master ? "set" : "drop");
+          if (write(socket_fd, request, strlen(request)) ==
+              (ssize_t)strlen(request)) {
+            length = read(socket_fd, status, sizeof(status) - 1);
+            if (length > 0) {
+              status[length] = '\0';
+              close(socket_fd);
+              return strncmp(status, "ok", 2) == 0 ? 0 : 1;
+            }
+          }
+        }
+        close(socket_fd);
+      }
+    }
+    if (snprintf(status_path, sizeof(status_path), "/proc/%ld/status",
+                 (long)pid) >= (int)sizeof(status_path)) {
+      break;
+    }
+    file = fopen(status_path, "r");
+    if (!file) {
+      break;
+    }
+    while (fgets(status, sizeof(status), file)) {
+      if (sscanf(status, "PPid:%ld", &parent) == 1) {
+        break;
+      }
+    }
+    fclose(file);
+    if (parent <= 1 || parent == pid) {
+      break;
+    }
+    pid = (pid_t)parent;
+  }
+  return 1;
+}
 
 static int operate_on_pid(pid_t pid, int set_master) {
   char directory_path[64];
@@ -80,5 +148,8 @@ int main(int argc, char **argv) {
     return 2;
   }
   set_master = strcmp(argv[1], "set") == 0;
+  if (operate_via_broker((pid_t)pid_value, set_master) == 0) {
+    return 0;
+  }
   return operate_on_pid((pid_t)pid_value, set_master);
 }

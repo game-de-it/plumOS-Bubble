@@ -195,7 +195,8 @@ set -- "$PLUMOS_ROOT/bin/retroarch" -v -c "$config"
 [ -z "$append_config" ] || set -- "$@" --appendconfig "$append_config"
 set -- "$@" -L "$core"
 [ "$no_content" -eq 1 ] || set -- "$@" "$rom"
-"$@" >>"$PLUMOS_ROOT/logs/retroarch-${system}-${core_id}.log" 2>&1 &
+LD_PRELOAD="${PLUMOS_DRM_SHARE_LIBRARY:-}" \
+    "$@" >>"$PLUMOS_ROOT/logs/retroarch-${system}-${core_id}.log" 2>&1 &
 retroarch_pid=$!
 wait "$retroarch_pid"
 rc=$?

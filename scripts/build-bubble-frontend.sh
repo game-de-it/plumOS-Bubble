@@ -59,6 +59,10 @@ gcc "${common[@]}" src/services/plumos_bubble_volume_keys.c \
     -o "$bin/plumos-volume-keys"
 gcc "${common[@]}" $drm_cflags src/services/plumos_drm_master.c \
     -o "$bin/plumos-drm-master"
+gcc "${common[@]}" $drm_cflags src/services/plumos_drm_broker_run.c \
+    -o "$bin/plumos-drm-broker-run"
+gcc "${common[@]}" -fPIC -shared src/services/plumos_drm_share.c \
+    -o "$lib/libplumos-drm-share.so" -ldl
 for name in plumos_library_scan plumos_text_ui plumos_frontend; do
     gcc "${common[@]}" "src/frontend/${name}.c" -o "$bin/${name//_/-}"
 done
@@ -112,7 +116,10 @@ cat >"$component/manifest.json" <<EOF
     "foreground_policy": "quiesce-display-owner-and-handoff-drm",
     "overlay": "bin/plumos-power-menu-overlay",
     "runtime_quiesce": "bin/plumos-runtime-quiesce",
-    "drm_handoff": "bin/plumos-drm-master"
+    "drm_handoff": "scm-rights-broker",
+    "drm_broker": "bin/plumos-drm-broker-run",
+    "drm_share": "frontend/lib/libplumos-drm-share.so",
+    "drm_control": "bin/plumos-drm-master"
   },
   "library_scope": "frontend/lib",
   "cpu_backend": "bin/plumos-cpu-control",

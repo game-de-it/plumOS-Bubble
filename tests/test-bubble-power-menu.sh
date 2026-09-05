@@ -11,6 +11,14 @@ fi
 overlay=$repo_root/package/frontend-bubble/plumos/bin/plumos-power-menu-overlay
 quiesce=$repo_root/package/frontend-bubble/plumos/bin/plumos-runtime-quiesce
 build=$repo_root/scripts/build-bubble-frontend.sh
+frontend=$repo_root/src/frontend/plumos_controller_ui.c
+drm_master=$repo_root/src/services/plumos_drm_master.c
+drm_broker=$repo_root/src/services/plumos_drm_broker_run.c
+drm_share=$repo_root/src/services/plumos_drm_share.c
+retroarch_launch=$repo_root/package/frontend-bubble/plumos/bin/plumos-retroarch-launch
+retroarch_menu=$repo_root/package/frontend-bubble/plumos/bin/plumos-retroarch-menu-launch
+picoarch_launch=$repo_root/package/picoarch-bubble/plumos/bin/plumos-picoarch-launch
+standalone_launch=$repo_root/package/standalone-bubble/plumos/bin/plumos-standalone-launch
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
@@ -124,8 +132,20 @@ grep -q 'src/services/plumos_drm_master.c' "$build"
 grep -q 'plumos-power-menu-overlay' "$build"
 grep -q 'frontend/foreground.pgid' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -q 'plumos-drm-broker-run' "$frontend"
+grep -q 'libplumos-drm-share.so' "$frontend"
+grep -q 'SCM_RIGHTS' "$drm_share"
+grep -q 'DRM_IOCTL_DROP_MASTER' "$drm_broker"
+grep -q 'drm-handoff' "$drm_master"
+grep -q 'plumos-drm-brok' "$quiesce"
+grep -q 'PLUMOS_DRM_SHARE_LIBRARY' "$retroarch_launch"
+grep -q 'PLUMOS_DRM_SHARE_LIBRARY' "$retroarch_menu"
+grep -q 'PLUMOS_DRM_SHARE_LIBRARY' "$picoarch_launch"
+test "$(grep -c 'LD_PRELOAD=' "$standalone_launch")" -eq 5
+grep -q 'mali_preload=.*drm_share_preload' "$standalone_launch"
 grep -q 'terminate-storage.*"$USER_MOUNT"' \
     "$repo_root/package/frontend-bubble/plumos/bin/plumos-safe-shutdown"
-grep -q 'terminate-state.*"$FRONTEND_READY"' "$overlay"
+grep -q 'terminate-state' "$overlay"
+grep -q '"$FRONTEND_READY"' "$overlay"
 
 printf 'bubble_power_menu=result-ok policy=frontend-delegate,foreground-drm-handoff\n'

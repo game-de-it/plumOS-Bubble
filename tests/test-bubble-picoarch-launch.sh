@@ -22,6 +22,15 @@ cp package/picoarch-bubble/plumos/bin/plumos-picoarch-launch \
 : >"$root/cores/quicknes_libretro.so"
 : >"$root/share/alsa/alsa.conf"
 : >"$rom_root/nes/test.nes"
+cat >"$root/bin/plumos-cpu-control" <<'EOF'
+#!/bin/sh
+case $1 in
+    snapshot) : >"$2" ;;
+    apply) : ;;
+    restore) rm -f "$2" ;;
+    *) exit 2 ;;
+esac
+EOF
 
 cat >"$root/picoarch/bin/picoarch" <<'EOF'
 #!/bin/sh
@@ -34,7 +43,8 @@ if [ "${TEST_HOLD:-0}" = 1 ]; then
 fi
 exit 0
 EOF
-chmod 0755 "$root/bin/plumos-picoarch-launch" "$root/picoarch/bin/picoarch"
+chmod 0755 "$root/bin/plumos-picoarch-launch" \
+    "$root/bin/plumos-cpu-control" "$root/picoarch/bin/picoarch"
 
 TEST_TRACE=$tmp/normal PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
 PLUMOS_BIOS_ROOT=$tmp/bios PLUMOS_RUNTIME_ROOT=$runtime \

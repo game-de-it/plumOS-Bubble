@@ -58,7 +58,8 @@ printf 'retroarch_menu=stage-S60 begin\n' >>"$PLUMOS_ROOT/logs/session.log"
 set +e
 set -- "$PLUMOS_ROOT/bin/retroarch" -v -c "$config"
 [ -z "$append_config" ] || set -- "$@" --appendconfig "$append_config"
-"$@" >>"$PLUMOS_ROOT/logs/retroarch-menu.log" 2>&1
+LD_PRELOAD="${PLUMOS_DRM_SHARE_LIBRARY:-}" \
+    "$@" >>"$PLUMOS_ROOT/logs/retroarch-menu.log" 2>&1
 rc=$?
 set -e
 printf 'retroarch_menu=stage-S69 end rc=%s\n' "$rc" >>"$PLUMOS_ROOT/logs/session.log"

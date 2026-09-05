@@ -4179,12 +4179,41 @@ static void clear_foreground_process_group(pid_t pgid) {
 static int run_foreground_shell_command(const char *cmd) {
   const char *shell_path;
   char *shell_argv[5];
+  char broker_path[PATH_MAX];
+  char share_path[PATH_MAX];
+  char *broker_argv[12];
+  const char *plumos_root;
+  int broker_argc = 0;
+  int shell_argc;
+  volatile int use_broker = 0;
   pid_t pid;
   int status = 0;
 
   if (!prepare_runtime_shell_command(cmd, &shell_path, shell_argv)) {
     errno = EINVAL;
     return -1;
+  }
+  plumos_root = getenv("PLUMOS_ROOT");
+  if (!plumos_root || !plumos_root[0]) {
+    plumos_root = "/storage/plumos";
+  }
+  if (snprintf(broker_path, sizeof(broker_path),
+               "%s/bin/plumos-drm-broker-run", plumos_root) <
+          (int)sizeof(broker_path) &&
+      snprintf(share_path, sizeof(share_path),
+               "%s/frontend/lib/libplumos-drm-share.so", plumos_root) <
+          (int)sizeof(share_path) &&
+      access(broker_path, X_OK) == 0 && access(share_path, R_OK) == 0) {
+    broker_argv[broker_argc++] = broker_path;
+    broker_argv[broker_argc++] = (char *)"--library";
+    broker_argv[broker_argc++] = share_path;
+    broker_argv[broker_argc++] = (char *)"--";
+    for (shell_argc = 0; shell_argv[shell_argc] && broker_argc < 11;
+         shell_argc++) {
+      broker_argv[broker_argc++] = shell_argv[shell_argc];
+    }
+    broker_argv[broker_argc] = NULL;
+    use_broker = shell_argv[shell_argc] == NULL;
   }
   pid = vfork();
   if (pid < 0) {
@@ -4193,6 +4222,10 @@ static int run_foreground_shell_command(const char *cmd) {
   if (pid == 0) {
     if (setpgid(0, 0) != 0) {
       _exit(126);
+    }
+    if (use_broker) {
+      execve(broker_path, broker_argv, environ);
+      _exit(127);
     }
     execve(shell_path, shell_argv, environ);
     _exit(127);

@@ -15,6 +15,8 @@ audio_output="$PLUMOS_ROOT/bin/plumos-audio-output"
 audio_log="$PLUMOS_ROOT/logs/standalone-audio.log"
 route_log="$PLUMOS_ROOT/logs/standalone-route.log"
 alsa_device="${PLUMOS_ALSA_DEVICE:-default}"
+drm_share_preload="${PLUMOS_DRM_SHARE_LIBRARY:-}"
+mali_preload="${drm_share_preload:+$drm_share_preload:}$PLUMOS_ROOT/emulator/lib/libmali.so.1"
 cpu_snapshot=""
 cpu_snapshot_active=0
 
@@ -170,7 +172,7 @@ if [ "$emulator_id" = ppsspp ]; then
         # PPSSPP's directly linked GLES entrypoints resolve through different
         # Mali instances, so GLES sees no current context and every shader
         # compilation fails. Keep this scoped to PPSSPP, as for DraStic.
-        export LD_PRELOAD="$PLUMOS_ROOT/emulator/lib/libmali.so.1"
+        export LD_PRELOAD="$mali_preload"
         export SDL_VIDEO_EGL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1"
         export SDL_VIDEO_GL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1"
         export SDL_VIDEODRIVER=kmsdrm
@@ -338,6 +340,7 @@ if [ "$emulator_id" = openbor ]; then
         XDG_CONFIG_HOME="$config_root" \
         XDG_DATA_HOME="$state_root" \
         LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib:$runtime/lib:/usr/lib" \
+        LD_PRELOAD="$drm_share_preload" \
         SDL_VIDEO_EGL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
         SDL_VIDEO_GL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
         SDL_VIDEODRIVER=kmsdrm \
@@ -505,7 +508,7 @@ if [ "$emulator_id" = drastic ]; then
     (
         cd "$runtime"
         LD_LIBRARY_PATH="$runtime/runner-lib:$PLUMOS_ROOT/emulator/lib:/usr/lib" \
-        LD_PRELOAD="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
+        LD_PRELOAD="$mali_preload" \
         SDL_VIDEO_EGL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
         SDL_VIDEO_GL_DRIVER="$PLUMOS_ROOT/emulator/lib/libmali.so.1" \
         SDL_VIDEODRIVER=kmsdrm \
@@ -650,6 +653,7 @@ if [ "$emulator_id" = yabasanshiro ]; then
     HOME="$home" \
     XDG_CACHE_HOME="$config_root/cache" \
     LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib:$runtime/lib:/usr/lib" \
+    LD_PRELOAD="$drm_share_preload" \
     SDL_VIDEODRIVER=kmsdrm \
     SDL_AUDIODRIVER=alsa \
     AUDIODEV="$alsa_device" \
@@ -752,6 +756,7 @@ set +e
 HOME="$home" \
 XDG_CACHE_HOME="$config_root/cache" \
 LD_LIBRARY_PATH="$PLUMOS_ROOT/emulator/lib:$runtime/lib:/usr/lib" \
+LD_PRELOAD="$drm_share_preload" \
 SDL_VIDEODRIVER=kmsdrm \
 SDL_RENDER_DRIVER=opengles2 \
 SDL_AUDIODRIVER=alsa \

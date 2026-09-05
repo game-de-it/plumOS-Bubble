@@ -26,4 +26,5 @@ export LD_LIBRARY_PATH="$PLUMOS_FRONTEND_LIB_DIR"
 [ -z "$controller" ] || export PLUMOS_INPUT_EVENT="$controller"
 
 printf 'ggfe_launch=start controller=%s\n' "${controller:-none}" >>"$LOG"
-exec "$PLUMOS_ROOT/bin/plumos-ggfe" >>"$LOG" 2>&1
+LD_PRELOAD="${PLUMOS_DRM_SHARE_LIBRARY:-}" \
+    exec "$PLUMOS_ROOT/bin/plumos-ggfe" >>"$LOG" 2>&1

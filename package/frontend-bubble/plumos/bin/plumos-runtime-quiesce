@@ -23,6 +23,11 @@ display_owner_pids() {
         esac
         pid=${fd#/proc/}
         pid=${pid%%/*}
+        comm=$($BB cat "/proc/$pid/comm" 2>/dev/null || true)
+        # The foreground broker deliberately retains an SCM_RIGHTS duplicate
+        # of the runtime's exact DRM file. It must remain runnable while the
+        # emulator is stopped so the overlay can drop and restore master.
+        case $comm in plumos-drm-brok*) continue ;; esac
         printf '%s\n' "$pid"
     done | $BB sort -n -u
 }
