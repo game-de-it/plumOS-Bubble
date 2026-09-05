@@ -499,6 +499,8 @@
   - 導線はAppsへ`ggfe`を追加した。既存FEは`shell:`アプリの実行前にrendererを落とすため、
     `plumos_controller_ui.c`は無改変でDRM handoffが成立する。共通項目は削除していない。
     Bubble固有項目としてmanifestの`bubble_only_menu_entries`へ記録した。
+- [x] GGFEの操作説明と移植リファレンスを`docs/ggfe.md`へ書く。画面上のボタン凡例は置かず、
+  ドキュメントで告知する方針。他plumOS機種へ移植する際もこの文書を起点にする。
 - [ ] GGFEのコア選択UIを実装する。解決結果と各profileの`未対応`理由は既に取得できるので、
   カート上のオーバーレイで選ばせ、`state/frontend/ggfe-overrides.json`へ書き戻す。
   plumOS側の`core-overrides.json`へは書かない（参照のみ）。
