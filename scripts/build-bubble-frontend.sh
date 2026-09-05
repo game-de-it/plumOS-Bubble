@@ -55,6 +55,8 @@ gcc "${common[@]}" $png_cflags $ft_cflags $drm_cflags \
     -DPLUMOS_FBDEV_ENABLE_FREETYPE=1 -DPLUMOS_FBDEV_ENABLE_DRM=1 \
     src/frontend/plumos_ggfe.c -o "$bin/plumos-ggfe" \
     $png_libs $ft_libs $drm_libs -lm
+gcc "${common[@]}" src/services/plumos_bubble_volume_keys.c \
+    -o "$bin/plumos-volume-keys"
 for name in plumos_library_scan plumos_text_ui plumos_frontend; do
     gcc "${common[@]}" "src/frontend/${name}.c" -o "$bin/${name//_/-}"
 done
@@ -94,6 +96,13 @@ cat >"$component/manifest.json" <<EOF
   "display": "runtime-discovered-640x480-dsi",
   "input": "retrogame_joypad",
   "input_mapping": "bubble-physical-labels",
+  "volume_keys": {
+    "daemon": "bin/plumos-volume-keys",
+    "service": "bin/plumos-volume-keys-service",
+    "input_name": "gpio-keys",
+    "codes": [114, 115],
+    "policy": "single-persistent-owner"
+  },
   "library_scope": "frontend/lib",
   "cpu_backend": "bin/plumos-cpu-control",
   "start_menu_contract": "config/frontend/start-menu-coverage.json",

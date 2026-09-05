@@ -153,6 +153,10 @@
     だけを三者比較で移行し、利用者変更値と旧cfg backupを保持する。全エミュmenuを
     Function1へ統一し、RA screenshotはFunction2へ移動。旧managed pairだけをbackup付きで
     実機移行済み（active menu=17/screenshot=10）。物理hotkey確認を残す。
+  - Bubbleの物理音量キーはV90Sと同じ常駐単独ownerとし、`gpio-keys`名で探索して
+    FE/emulatorの寿命から独立させる。0..20 runtime変更、長押しrepeat、750ms後の設定保存、
+    safe shutdown時flushを実装。FE設定画面も同じ`plumos-volume-control`を使用する。
+    host fixtureは合格。物理キーとFE設定の実機操作確認を残す。
 - [ ] `BUB-P4-I05` normalized Bubble controller を公開し、FE/RetroArch/standaloneで1入力1反応を確認する。
   - FEとRetroArch RGUIでD-pad/A/B、SELECT+START終了を物理確認した。standaloneと全buttonを残す。
   - PicoArch QuickNESで物理A/B、Function1/2 menu、menu A決定/B戻る、FE復帰を利用者確認済み。

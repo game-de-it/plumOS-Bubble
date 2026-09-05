@@ -4,8 +4,11 @@ set -eu
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 audio=$repo_root/package/frontend-bubble/plumos/bin/plumos-audio-output
 volume=$repo_root/package/frontend-bubble/plumos/bin/plumos-volume-control
+service=$repo_root/package/frontend-bubble/plumos/bin/plumos-volume-keys-service
+frontend=$repo_root/package/frontend-bubble/plumos/bin/plumos-frontend-launch
+shutdown=$repo_root/package/frontend-bubble/plumos/bin/plumos-safe-shutdown
 
-sh -n "$audio" "$volume"
+sh -n "$audio" "$volume" "$service" "$frontend" "$shutdown"
 grep -q '^pcm\.plumos_softvol {' "$audio"
 grep -q '^ctl\.hw {' "$audio"
 grep -q 'card \$CARD' "$audio"
@@ -16,6 +19,11 @@ grep -q 'min_dB -90.0' "$audio"
 grep -q 'plumos-aplay' "$volume"
 grep -q 'value \* 255' "$volume"
 grep -q 'apply "$next" || return 1' "$volume"
+grep -q 'plumos-volume-keys-service.*start' "$frontend"
+grep -q 'plumos-volume-keys-service' "$shutdown"
+grep -q 'gpio-keys' "$repo_root/src/services/plumos_bubble_volume_keys.c"
+grep -q 'KEY_VOLUMEUP' "$repo_root/src/services/plumos_bubble_volume_keys.c"
+grep -q 'KEY_VOLUMEDOWN' "$repo_root/src/services/plumos_bubble_volume_keys.c"
 
 for launcher in \
     "$repo_root/package/frontend-bubble/plumos/bin/plumos-retroarch-launch" \

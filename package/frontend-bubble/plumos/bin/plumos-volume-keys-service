@@ -1,0 +1,107 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+RUN_DIR=${PLUMOS_VOLUME_KEYS_RUN_DIR:-$RUNTIME_ROOT/volume-keys}
+PID_FILE=$RUN_DIR/service.pid
+LOG_FILE=$RUN_DIR/service.log
+DAEMON=${PLUMOS_VOLUME_KEYS_DAEMON:-$PLUMOS_ROOT/bin/plumos-volume-keys}
+
+read_pid() {
+    [ -r "$PID_FILE" ] || return 1
+    pid=$($BB sed -n '1p' "$PID_FILE" 2>/dev/null)
+    case $pid in ''|*[!0-9]*) return 1 ;; esac
+    printf '%s\n' "$pid"
+}
+
+discover_pid() {
+    for proc in /proc/[0-9]*; do
+        [ -r "$proc/exe" ] || continue
+        executable=$($BB readlink -f "$proc/exe" 2>/dev/null || true)
+        [ "$executable" = "$DAEMON" ] || continue
+        printf '%s\n' "${proc##*/}"
+        return 0
+    done
+    return 1
+}
+
+running_pid() {
+    pid=$(read_pid 2>/dev/null || true)
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        executable=$($BB readlink -f "/proc/$pid/exe" 2>/dev/null || true)
+        if [ "$executable" = "$DAEMON" ]; then
+            printf '%s\n' "$pid"
+            return 0
+        fi
+    fi
+    pid=$(discover_pid 2>/dev/null || true)
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        $BB mkdir -p "$RUN_DIR" 2>/dev/null || true
+        printf '%s\n' "$pid" >"$PID_FILE" 2>/dev/null || true
+        printf '%s\n' "$pid"
+        return 0
+    fi
+    return 1
+}
+
+start_service() {
+    if pid=$(running_pid 2>/dev/null); then
+        printf 'volume_keys=running\npid=%s\n' "$pid"
+        return 0
+    fi
+    [ -x "$DAEMON" ] || {
+        printf 'plumos-volume-keys-service: daemon missing: %s\n' "$DAEMON" >&2
+        return 1
+    }
+    $BB mkdir -p "$RUN_DIR" || return 1
+    $BB rm -f "$PID_FILE"
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+        "$DAEMON" >>"$LOG_FILE" 2>&1 </dev/null &
+    pid=$!
+    tmp=$PID_FILE.tmp.$$
+    printf '%s\n' "$pid" >"$tmp" && $BB mv -f "$tmp" "$PID_FILE"
+    $BB usleep 100000
+    if ! kill -0 "$pid" 2>/dev/null; then
+        $BB rm -f "$PID_FILE"
+        printf 'plumos-volume-keys-service: daemon failed to start\n' >&2
+        return 1
+    fi
+    printf 'volume_keys=running\npid=%s\n' "$pid"
+}
+
+stop_service() {
+    if ! pid=$(running_pid 2>/dev/null); then
+        $BB rm -f "$PID_FILE"
+        printf 'volume_keys=stopped\n'
+        return 0
+    fi
+    kill -TERM "$pid" 2>/dev/null || true
+    attempts=0
+    while kill -0 "$pid" 2>/dev/null && [ "$attempts" -lt 30 ]; do
+        $BB usleep 100000
+        attempts=$((attempts + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+        printf 'plumos-volume-keys-service: pid %s did not stop\n' "$pid" >&2
+        return 1
+    fi
+    $BB rm -f "$PID_FILE"
+    printf 'volume_keys=stopped\n'
+}
+
+case ${1:-start} in
+    start) start_service ;;
+    stop) stop_service ;;
+    restart) stop_service && start_service ;;
+    status)
+        if pid=$(running_pid 2>/dev/null); then
+            printf 'volume_keys=running\npid=%s\n' "$pid"
+        else
+            printf 'volume_keys=stopped\n'
+            exit 1
+        fi
+        ;;
+    *) printf 'usage: %s start|stop|restart|status\n' "$0" >&2; exit 2 ;;
+esac

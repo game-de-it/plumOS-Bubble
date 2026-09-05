@@ -13,6 +13,7 @@ CLEAN_P4_MARKER=${PLUMOS_CLEAN_P4_MARKER:-$USER_MOUNT/.plumos-clean-shutdown}
 MOUNTS_FILE=${PLUMOS_MOUNTS_FILE:-/proc/mounts}
 POWER_REQUEST=${PLUMOS_POWER_REQUEST:-$RUNTIME_ROOT/power-action/request}
 NETWORK_SERVICES=${PLUMOS_NETWORK_SERVICES:-$PLUMOS_ROOT/bin/plumos-network-services}
+VOLUME_KEYS_SERVICE=${PLUMOS_VOLUME_KEYS_SERVICE:-$PLUMOS_ROOT/bin/plumos-volume-keys-service}
 ACTION=shutdown
 POWER_OFF=0
 DRY_RUN=0
@@ -63,6 +64,11 @@ fi
 log "stage=begin action=$ACTION poweroff=$POWER_OFF"
 "$BB" sync
 if [ "$ACTION" != shutdown ] || [ "$POWER_OFF" -eq 1 ]; then
+    if [ -x "$VOLUME_KEYS_SERVICE" ]; then
+        PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+            "$BB" sh "$VOLUME_KEYS_SERVICE" stop >/dev/null 2>&1 ||
+            log 'stage=volume-keys-stop result=failed'
+    fi
     if [ -x "$NETWORK_SERVICES" ]; then
         "$BB" sh "$NETWORK_SERVICES" quiesce >/dev/null 2>&1 ||
             log 'stage=network-quiesce result=failed'
