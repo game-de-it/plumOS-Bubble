@@ -197,6 +197,12 @@ network_package="$repo_root/package/network-services-bubble/plumos"
 sh -n "$network_package/bin/plumos-network-services"
 grep -q "name __pycache__ -empty -delete" \
     "$repo_root/scripts/build-bubble-frontend.sh"
+grep -q '^install_scraper_runtime()' \
+    "$repo_root/scripts/build-bubble-frontend.sh"
+grep -q 'PLUMOS_SCRAPER_LIB_DIR' \
+    "$repo_root/scripts/build-bubble-frontend.sh"
+grep -q 'find bin config factory-defaults fonts frontend/lib scraper share themes' \
+    "$repo_root/scripts/build-bubble-frontend.sh"
 grep -q "print_status sftp running 'SFTP port 22'" \
     "$network_package/bin/plumos-network-services"
 ! grep -q 'SFTP_PORT.*2222' "$network_package/bin/plumos-network-services"

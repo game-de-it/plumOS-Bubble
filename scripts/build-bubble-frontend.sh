@@ -17,6 +17,7 @@ out=$repo_root/output/frontend/bubble
 root=$out/plumos
 bin=$root/bin
 lib=$root/frontend/lib
+scraper_lib=$root/scraper/lib
 component=$root/components/frontend
 version=${PLUMOS_BUBBLE_VERSION:-0.1.0-dev}
 source_ref=$(git -c safe.directory="$repo_root" -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
@@ -31,7 +32,7 @@ cp -a "$repo_root/package/frontend-bubble/plumos/." "$root/"
 # update helper.  It is neither runtime input nor reproducible release data.
 find "$root" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
 find "$root" -depth -type d -name __pycache__ -empty -delete
-mkdir -p "$bin" "$lib" "$component" "$root/state/frontend" \
+mkdir -p "$bin" "$lib" "$scraper_lib" "$component" "$root/state/frontend" \
     "$root/config/frontend" "$root/config/system" "$root/logs"
 
 common=(-std=gnu99 -Os -pipe -Wall -Wextra -D_GNU_SOURCE)
@@ -90,6 +91,91 @@ stage_libraries "$bin/plumos-controller-ui-fbdev" "$bin/plumos-ggfe" \
     "$bin/plumos-text-ui" "$bin/plumos-frontend" "$bin/plumos-amixer" \
     "$bin/plumos-aplay" "$bin/plumos-openssl.bin"
 
+# The stock Bubble BusyBox wget crashes during HTTPS transfers.  Keep the
+# scraper independent from the stock rootfs, as MF and Pixel2 do, by packaging
+# curl with its complete recursive runtime closure and CA bundle.
+scraper_runtime_libs=""
+
+scraper_runtime_needed() {
+    readelf -d "$1" 2>/dev/null |
+        awk '/NEEDED/ { gsub(/[][]/, "", $5); print $5 }'
+}
+
+find_scraper_runtime_library() {
+    local soname="$1" candidate
+    for candidate in \
+        "/lib/aarch64-linux-gnu/$soname" \
+        "/usr/lib/aarch64-linux-gnu/$soname" \
+        "/lib/$soname" "/usr/lib/$soname"; do
+        if [[ -e $candidate ]]; then
+            readlink -f "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+copy_scraper_runtime_library() {
+    local soname="$1" source child
+    case " $scraper_runtime_libs " in *" $soname "*) return 0 ;; esac
+    source=$(find_scraper_runtime_library "$soname") || {
+        printf 'error: scraper runtime library not found: %s\n' "$soname" >&2
+        exit 1
+    }
+    install -m 0755 "$source" "$scraper_lib/$soname"
+    scraper_runtime_libs="$scraper_runtime_libs $soname"
+    while IFS= read -r child; do
+        [[ -n $child ]] || continue
+        copy_scraper_runtime_library "$child"
+    done < <(scraper_runtime_needed "$source")
+}
+
+install_scraper_runtime() {
+    local curl_bin=/usr/bin/curl loader soname
+    local doc_dir=$root/share/doc/frontend
+
+    [[ -x $curl_bin ]] || {
+        printf 'error: toolchain curl is unavailable: %s\n' "$curl_bin" >&2
+        exit 1
+    }
+    install -m 0755 "$curl_bin" "$scraper_lib/plumos-curl"
+    while IFS= read -r soname; do
+        [[ -n $soname ]] || continue
+        copy_scraper_runtime_library "$soname"
+    done < <(scraper_runtime_needed "$curl_bin")
+
+    loader=$(readlink -f /lib/ld-linux-aarch64.so.1 2>/dev/null || true)
+    [[ -n $loader && -f $loader ]] || \
+        loader=$(readlink -f /lib/aarch64-linux-gnu/ld-linux-aarch64.so.1)
+    install -m 0755 "$loader" "$scraper_lib/ld-linux-aarch64.so.1"
+    install -m 0644 /etc/ssl/certs/ca-certificates.crt \
+        "$scraper_lib/ca-certificates.crt"
+
+    mkdir -p "$doc_dir"
+    install -m 0644 /usr/share/doc/curl/copyright "$doc_dir/curl-copyright"
+    [[ ! -r /usr/share/doc/libcurl4/copyright ]] || \
+        install -m 0644 /usr/share/doc/libcurl4/copyright \
+            "$doc_dir/libcurl-copyright"
+    [[ ! -r /usr/share/doc/ca-certificates/copyright ]] || \
+        install -m 0644 /usr/share/doc/ca-certificates/copyright \
+            "$doc_dir/ca-certificates-copyright"
+
+    cat >"$bin/curl" <<'EOF'
+#!/bin/sh
+set -eu
+PLUMOS_ROOT="${PLUMOS_ROOT:-/storage/plumos}"
+PLUMOS_SCRAPER_LIB_DIR="${PLUMOS_SCRAPER_LIB_DIR:-$PLUMOS_ROOT/scraper/lib}"
+export CURL_CA_BUNDLE="${CURL_CA_BUNDLE:-$PLUMOS_SCRAPER_LIB_DIR/ca-certificates.crt}"
+export SSL_CERT_FILE="${SSL_CERT_FILE:-$CURL_CA_BUNDLE}"
+exec "$PLUMOS_SCRAPER_LIB_DIR/ld-linux-aarch64.so.1" \
+    --library-path "$PLUMOS_SCRAPER_LIB_DIR" \
+    "$PLUMOS_SCRAPER_LIB_DIR/plumos-curl" "$@"
+EOF
+    chmod 0755 "$bin/curl"
+}
+
+install_scraper_runtime
+
 cat >"$component/manifest.json" <<EOF
 {
   "name": "plumOS Bubble frontend",
@@ -122,6 +208,8 @@ cat >"$component/manifest.json" <<EOF
     "drm_control": "bin/plumos-drm-master"
   },
   "library_scope": "frontend/lib",
+  "scraper_http_client": "bin/curl",
+  "scraper_runtime": "scraper/lib",
   "cpu_backend": "bin/plumos-cpu-control",
   "start_menu_contract": "config/frontend/start-menu-coverage.json",
   "ggfe": {
@@ -142,7 +230,7 @@ EOF
 printf '%s\n' "$version" >"$root/VERSION"
 (
     cd "$root"
-    find bin config factory-defaults fonts frontend/lib share themes -type f \
+    find bin config factory-defaults fonts frontend/lib scraper share themes -type f \
         ! -path 'bin/plumos-network-services' -print | LC_ALL=C sort |
         while IFS= read -r path; do sha256sum "$path"; done
     sha256sum components/frontend/manifest.json VERSION
