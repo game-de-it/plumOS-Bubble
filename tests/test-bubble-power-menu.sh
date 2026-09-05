@@ -138,6 +138,12 @@ grep -q 'SCM_RIGHTS' "$drm_share"
 grep -q 'DRM_IOCTL_DROP_MASTER' "$drm_broker"
 grep -q 'drm-handoff' "$drm_master"
 grep -q 'plumos-drm-brok' "$quiesce"
+grep -q 'drmModeGetPlaneResources' \
+    "$repo_root/src/frontend/plumos_fbdev_renderer.h"
+grep -q 'DRM_PLANE_TYPE_PRIMARY' \
+    "$repo_root/src/frontend/plumos_fbdev_renderer.h"
+grep -q 'action=disable' "$repo_root/src/frontend/plumos_fbdev_renderer.h"
+grep -q 'action=restore' "$repo_root/src/frontend/plumos_fbdev_renderer.h"
 grep -q 'PLUMOS_DRM_SHARE_LIBRARY' "$retroarch_launch"
 grep -q 'PLUMOS_DRM_SHARE_LIBRARY' "$retroarch_menu"
 grep -q 'PLUMOS_DRM_SHARE_LIBRARY' "$picoarch_launch"

@@ -86,6 +86,56 @@ struct plumos_fbdev_png_cache_slot {
 };
 #endif
 
+#ifdef PLUMOS_FBDEV_ENABLE_DRM
+#define PLUMOS_FBDEV_DRM_SAVED_PLANES 16
+struct plumos_fbdev_drm_plane_state {
+  uint32_t plane_id;
+  uint32_t crtc_id;
+  uint32_t fb_id;
+  uint32_t crtc_x;
+  uint32_t crtc_y;
+  uint32_t crtc_w;
+  uint32_t crtc_h;
+  uint32_t src_x;
+  uint32_t src_y;
+  uint32_t src_w;
+  uint32_t src_h;
+};
+
+static int plumos_fbdev_drm_plane_property(int fd, uint32_t plane_id,
+                                           const char *name,
+                                           uint64_t *value_out) {
+  drmModeObjectProperties *properties;
+  uint32_t index;
+  int found = 0;
+
+  if (!name || !value_out) {
+    return 0;
+  }
+  properties =
+      drmModeObjectGetProperties(fd, plane_id, DRM_MODE_OBJECT_PLANE);
+  if (!properties) {
+    return 0;
+  }
+  for (index = 0; index < properties->count_props; index++) {
+    drmModePropertyRes *property =
+        drmModeGetProperty(fd, properties->props[index]);
+    if (!property) {
+      continue;
+    }
+    if (strcmp(property->name, name) == 0) {
+      *value_out = properties->prop_values[index];
+      found = 1;
+      drmModeFreeProperty(property);
+      break;
+    }
+    drmModeFreeProperty(property);
+  }
+  drmModeFreeObjectProperties(properties);
+  return found;
+}
+#endif
+
 struct plumos_fbdev_renderer {
   int fd;
   unsigned char *mem;
@@ -103,6 +153,7 @@ struct plumos_fbdev_renderer {
   struct fb_var_screeninfo var;
   struct fb_fix_screeninfo fix;
 #ifdef PLUMOS_FBDEV_ENABLE_DRM
+
   int drm_fd;
   int drm_active;
   int drm_page_flip_pending;
@@ -117,6 +168,9 @@ struct plumos_fbdev_renderer {
   int drm_draw;
   drmModeModeInfo drm_mode;
   drmModeCrtc *drm_saved_crtc;
+  struct plumos_fbdev_drm_plane_state
+      drm_saved_planes[PLUMOS_FBDEV_DRM_SAVED_PLANES];
+  size_t drm_saved_plane_count;
 #endif
 #ifdef PLUMOS_FBDEV_ENABLE_PNG
   struct plumos_fbdev_png_cache_slot png_cache[PLUMOS_FBDEV_PNG_CACHE_SLOTS];
@@ -185,6 +239,130 @@ static int __attribute__((unused)) plumos_fbdev_drm_set_connector_property(
   return r && r->drm_active &&
          plumos_fbdev_drm_connector_property(r->drm_fd, r->drm_connector_id,
                                              name, 1, &value);
+}
+
+static void plumos_fbdev_drm_restore_planes(
+    struct plumos_fbdev_renderer *r) {
+  size_t index;
+
+  if (!r || r->drm_fd < 0) {
+    return;
+  }
+  for (index = 0; index < r->drm_saved_plane_count; index++) {
+    const struct plumos_fbdev_drm_plane_state *saved =
+        &r->drm_saved_planes[index];
+    int rc = drmModeSetPlane(
+        r->drm_fd, saved->plane_id, saved->crtc_id, saved->fb_id, 0,
+        saved->crtc_x, saved->crtc_y, saved->crtc_w, saved->crtc_h,
+        saved->src_x, saved->src_y, saved->src_w, saved->src_h);
+    fprintf(stderr,
+            "plumos-drm-overlay plane=%u action=restore fb=%u result=%s\n",
+            saved->plane_id, saved->fb_id, rc == 0 ? "ok" : "failed");
+  }
+  r->drm_saved_plane_count = 0;
+}
+
+static int plumos_fbdev_drm_disable_foreground_planes(
+    struct plumos_fbdev_renderer *r, char *error, size_t error_size) {
+  drmModePlaneRes *resources;
+  uint32_t index;
+
+  if (!r || r->drm_fd < 0 || !r->drm_crtc_id) {
+    return 0;
+  }
+  resources = drmModeGetPlaneResources(r->drm_fd);
+  if (!resources) {
+    snprintf(error, error_size, "DRM get planes: %s", strerror(errno));
+    return 0;
+  }
+  for (index = 0; index < resources->count_planes; index++) {
+    drmModePlane *plane = drmModeGetPlane(r->drm_fd, resources->planes[index]);
+    uint64_t plane_type = UINT64_MAX;
+    struct plumos_fbdev_drm_plane_state *saved;
+
+    if (!plane) {
+      continue;
+    }
+    (void)plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
+                                          "type", &plane_type);
+    if (!plane->crtc_id || !plane->fb_id ||
+        plane->crtc_id != r->drm_crtc_id ||
+        plane_type == DRM_PLANE_TYPE_PRIMARY) {
+      drmModeFreePlane(plane);
+      continue;
+    }
+    if (r->drm_saved_plane_count >= PLUMOS_FBDEV_DRM_SAVED_PLANES) {
+      snprintf(error, error_size, "DRM active plane limit exceeded");
+      drmModeFreePlane(plane);
+      drmModeFreePlaneResources(resources);
+      plumos_fbdev_drm_restore_planes(r);
+      return 0;
+    }
+    saved = &r->drm_saved_planes[r->drm_saved_plane_count];
+    saved->plane_id = plane->plane_id;
+    saved->crtc_id = plane->crtc_id;
+    saved->fb_id = plane->fb_id;
+    saved->crtc_x = plane->crtc_x;
+    saved->crtc_y = plane->crtc_y;
+    if (!plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
+                                         "CRTC_W", &plane_type)) {
+      snprintf(error, error_size, "DRM plane %u has no CRTC_W",
+               plane->plane_id);
+      drmModeFreePlane(plane);
+      drmModeFreePlaneResources(resources);
+      plumos_fbdev_drm_restore_planes(r);
+      return 0;
+    }
+    saved->crtc_w = (uint32_t)plane_type;
+    if (!plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
+                                         "CRTC_H", &plane_type)) {
+      snprintf(error, error_size, "DRM plane %u has no CRTC_H",
+               plane->plane_id);
+      drmModeFreePlane(plane);
+      drmModeFreePlaneResources(resources);
+      plumos_fbdev_drm_restore_planes(r);
+      return 0;
+    }
+    saved->crtc_h = (uint32_t)plane_type;
+    saved->src_x = plane->x;
+    saved->src_y = plane->y;
+    if (!plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
+                                         "SRC_W", &plane_type)) {
+      snprintf(error, error_size, "DRM plane %u has no SRC_W",
+               plane->plane_id);
+      drmModeFreePlane(plane);
+      drmModeFreePlaneResources(resources);
+      plumos_fbdev_drm_restore_planes(r);
+      return 0;
+    }
+    saved->src_w = (uint32_t)plane_type;
+    if (!plumos_fbdev_drm_plane_property(r->drm_fd, plane->plane_id,
+                                         "SRC_H", &plane_type)) {
+      snprintf(error, error_size, "DRM plane %u has no SRC_H",
+               plane->plane_id);
+      drmModeFreePlane(plane);
+      drmModeFreePlaneResources(resources);
+      plumos_fbdev_drm_restore_planes(r);
+      return 0;
+    }
+    saved->src_h = (uint32_t)plane_type;
+    if (drmModeSetPlane(r->drm_fd, plane->plane_id, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0) != 0) {
+      snprintf(error, error_size, "DRM disable plane %u: %s",
+               plane->plane_id, strerror(errno));
+      drmModeFreePlane(plane);
+      drmModeFreePlaneResources(resources);
+      plumos_fbdev_drm_restore_planes(r);
+      return 0;
+    }
+    fprintf(stderr,
+            "plumos-drm-overlay plane=%u action=disable fb=%u result=ok\n",
+            plane->plane_id, plane->fb_id);
+    r->drm_saved_plane_count++;
+    drmModeFreePlane(plane);
+  }
+  drmModeFreePlaneResources(resources);
+  return 1;
 }
 #endif
 
@@ -286,6 +464,7 @@ static int plumos_fbdev_drm_init(struct plumos_fbdev_renderer *r,
              strerror(errno));
     return 0;
   }
+  (void)drmSetClientCap(r->drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
   resources = drmModeGetResources(r->drm_fd);
   if (!resources) {
     snprintf(error, error_size, "DRM get resources: %s", strerror(errno));
@@ -353,6 +532,9 @@ static int plumos_fbdev_drm_init(struct plumos_fbdev_renderer *r,
   }
   r->drm_crtc_id = encoder->crtc_id;
   r->drm_saved_crtc = drmModeGetCrtc(r->drm_fd, r->drm_crtc_id);
+  if (!plumos_fbdev_drm_disable_foreground_planes(r, error, error_size)) {
+    goto out;
+  }
   if (!plumos_fbdev_drm_create_buffer(
           r, 0, r->drm_mode.hdisplay, r->drm_mode.vdisplay, error,
           error_size) ||
@@ -394,6 +576,7 @@ static int plumos_fbdev_drm_init(struct plumos_fbdev_renderer *r,
 
 out:
   if (!ok) {
+    plumos_fbdev_drm_restore_planes(r);
     plumos_fbdev_drm_destroy_buffer(r, 1);
     plumos_fbdev_drm_destroy_buffer(r, 0);
     if (r->drm_saved_crtc) {
@@ -4131,6 +4314,7 @@ static void plumos_fbdev_renderer_shutdown(struct plumos_fbdev_renderer *r) {
           r->drm_saved_crtc->y, &r->drm_connector_id, 1,
           &r->drm_saved_crtc->mode);
     }
+    plumos_fbdev_drm_restore_planes(r);
     plumos_fbdev_drm_destroy_buffer(r, 1);
     plumos_fbdev_drm_destroy_buffer(r, 0);
     if (r->drm_saved_crtc) {
