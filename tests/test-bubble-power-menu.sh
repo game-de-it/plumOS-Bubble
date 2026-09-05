@@ -50,6 +50,7 @@ printf 'quiesce:%s\n' "$*" >>"${TEST_POWER_TRACE:?}"
 case $1 in
     hold) : >"$2" ;;
     terminate) rm -f "$2" "$3" ;;
+    terminate-state) : ;;
     release) rm -f "$2" ;;
 esac
 EOF
@@ -64,6 +65,7 @@ sed -n '1p' "$tmp/terminal.trace" | grep -q '^quiesce:hold '
 sed -n '2p' "$tmp/terminal.trace" | grep -q '^menu:shutdown$'
 sed -n '3p' "$tmp/terminal.trace" | grep -q '^quiesce:terminate '
 sed -n '4p' "$tmp/terminal.trace" | grep -q '^safe:--shutdown '
+sed -n '5p' "$tmp/terminal.trace" | grep -q '^quiesce:terminate-state '
 
 # The real quiesce helper must terminate a dedicated process group, escalating
 # as needed, and separately catch storage users with no display descriptor.
@@ -105,6 +107,16 @@ wait "$storage_pid" 2>/dev/null || true
 wait "$quiesce_pid"
 grep -q 'label=storage-blocker.*signal=TERM' "$tmp/storage.log"
 
+/bin/busybox sleep 30 &
+state_pid=$!
+printf 'pid=%s\n' "$state_pid" >"$tmp/frontend.ready"
+"$root/bin/plumos-runtime-quiesce" terminate-state "$tmp/frontend.ready" \
+    >"$tmp/state.log" 2>&1 &
+quiesce_pid=$!
+wait "$state_pid" 2>/dev/null || true
+wait "$quiesce_pid"
+grep -q 'label=state-owner.*signal=TERM' "$tmp/state.log"
+
 grep -Fq '/dev/fb0|/dev/dri/*|/dev/mali*|/dev/disp' "$quiesce"
 grep -Fq '"$DRM_MASTER" drop "$pid"' "$quiesce"
 grep -Fq '"$DRM_MASTER" set "$pid"' "$quiesce"
@@ -114,5 +126,6 @@ grep -q 'frontend/foreground.pgid' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
 grep -q 'terminate-storage.*"$USER_MOUNT"' \
     "$repo_root/package/frontend-bubble/plumos/bin/plumos-safe-shutdown"
+grep -q 'terminate-state.*"$FRONTEND_READY"' "$overlay"
 
 printf 'bubble_power_menu=result-ok policy=frontend-delegate,foreground-drm-handoff\n'

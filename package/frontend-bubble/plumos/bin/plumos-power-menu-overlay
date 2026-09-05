@@ -13,6 +13,7 @@ LOCK_DIR=${PLUMOS_POWER_MENU_LOCK_DIR:-$RUNTIME_ROOT/power-menu-overlay.lock}
 SELECTION_FILE=${PLUMOS_POWER_MENU_SELECTION_FILE:-$RUNTIME_ROOT/power-menu-overlay.$$.selection}
 QUIESCE_STATE=$RUNTIME_ROOT/power-menu-overlay.$$.quiesce
 FOREGROUND_MARKER=$RUNTIME_ROOT/frontend/foreground.pgid
+FRONTEND_READY=${PLUMOS_FRONTEND_READY:-/tmp/plumos-fe-ready}
 TERMINAL_ACTION=0
 
 $BB mkdir -p "$LOG_DIR" "$RUNTIME_ROOT" 2>/dev/null || true
@@ -111,8 +112,24 @@ case $selection in
             exit 1
         fi
         TERMINAL_ACTION=1
-        run_power_action "$selection"
-        action_rc=$?
+        if run_power_action "$selection"; then
+            # PID 1 consumes the committed request only after its supervised
+            # frontend returns.  The overlay is owned by the volume-key
+            # service, so a successful request must explicitly end the FE.
+            # Otherwise it resumes after the game is killed and the request
+            # remains pending forever.
+            if ! PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+                PLUMOS_BUSYBOX="$BB" "$BB" sh "$QUIESCE" terminate-state \
+                "$FRONTEND_READY" >>"$LOG_FILE" 2>&1; then
+                log 'frontend termination failed; pid1 handoff incomplete'
+                action_rc=1
+            else
+                log "terminal request committed action=$selection owner=pid1 frontend=terminated"
+                action_rc=0
+            fi
+        else
+            action_rc=$?
+        fi
         TERMINAL_ACTION=0
         exit "$action_rc"
         ;;

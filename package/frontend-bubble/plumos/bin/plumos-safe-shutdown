@@ -65,17 +65,6 @@ fi
 
 log "stage=begin action=$ACTION poweroff=$POWER_OFF"
 "$BB" sync
-if [ "$ACTION" != shutdown ] || [ "$POWER_OFF" -eq 1 ]; then
-    if [ -x "$VOLUME_KEYS_SERVICE" ]; then
-        PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
-            "$BB" sh "$VOLUME_KEYS_SERVICE" stop >/dev/null 2>&1 ||
-            log 'stage=volume-keys-stop result=failed'
-    fi
-    if [ -x "$NETWORK_SERVICES" ]; then
-        "$BB" sh "$NETWORK_SERVICES" quiesce >/dev/null 2>&1 ||
-            log 'stage=network-quiesce result=failed'
-    fi
-fi
 if [ -x "$RUNTIME_QUIESCE" ]; then
     PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
         PLUMOS_BUSYBOX="$BB" "$BB" sh "$RUNTIME_QUIESCE" \
@@ -116,11 +105,30 @@ clean_markers=0
 # instead of deleting its clean-shutdown evidence and trapping the UI in the
 # running system with /storage/user unavailable.
 pending_action=$($BB sed -n '1p' "$POWER_REQUEST" 2>/dev/null || true)
-if ! "$BB" grep -qs " $USER_MOUNT " "$MOUNTS_FILE" 2>/dev/null &&
-    [ "$pending_action" = "$ACTION" ]; then
-    log "result=requested action=$ACTION owner=pid1 pending=reused"
-    printf 'result=requested action=%s owner=pid1 pending=reused\n' "$ACTION"
-    exit 0
+if ! "$BB" grep -qs " $USER_MOUNT " "$MOUNTS_FILE" 2>/dev/null; then
+    case "$pending_action" in
+        reboot|shutdown)
+            if [ "$pending_action" = "$ACTION" ]; then
+                pending_result=reused
+            else
+                printf '%s\n' "$ACTION" >"$POWER_REQUEST.next.$$" || {
+                    log 'result=error stage=power-request-restage'
+                    exit 1
+                }
+                "$BB" mv -f "$POWER_REQUEST.next.$$" "$POWER_REQUEST" || {
+                    "$BB" rm -f "$POWER_REQUEST.next.$$" 2>/dev/null || true
+                    log 'result=error stage=power-request-recommit'
+                    exit 1
+                }
+                pending_result="updated-from-$pending_action"
+            fi
+            "$BB" sync
+            log "result=requested action=$ACTION owner=pid1 pending=$pending_result"
+            printf 'result=requested action=%s owner=pid1 pending=%s\n' \
+                "$ACTION" "$pending_result"
+            exit 0
+            ;;
+    esac
 fi
 printf '%s\n' "$ACTION" >"$POWER_REQUEST.next.$$" || {
     log 'result=error stage=power-request-stage'
@@ -163,6 +171,18 @@ if [ "$clean_markers" -ne 1 ]; then
     exit 1
 fi
 "$BB" sync
+# Stop background services only after every fallible storage step has passed.
+# A refused transaction therefore leaves SSH, shares and volume keys usable
+# for diagnosis instead of returning to FE with networking silently stopped.
+if [ -x "$VOLUME_KEYS_SERVICE" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+        "$BB" sh "$VOLUME_KEYS_SERVICE" stop >/dev/null 2>&1 ||
+        log 'stage=volume-keys-stop result=failed'
+fi
+if [ -x "$NETWORK_SERVICES" ]; then
+    "$BB" sh "$NETWORK_SERVICES" quiesce >/dev/null 2>&1 ||
+        log 'stage=network-quiesce result=failed'
+fi
 if ! "$BB" mv -f "$POWER_REQUEST.next.$$" "$POWER_REQUEST"; then
     "$BB" rm -f "$CLEAN_P3_MARKER" 2>/dev/null || true
     "$BB" sync

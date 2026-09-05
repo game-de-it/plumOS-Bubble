@@ -165,6 +165,21 @@ PLUMOS_POWER_REQUEST="$tmp/power-request" \
     sh "$package/bin/plumos-safe-shutdown" --reboot >"$tmp/power-repeat.log"
 grep -q 'pending=reused' "$tmp/power-repeat.log"
 [[ -f "$tmp/power-root/provision/clean-shutdown" ]]
+# A user may correct an accidental Shutdown selection to Reboot while the
+# original request is still awaiting PID 1.  The clean unmount remains valid.
+PLUMOS_ROOT="$tmp/power-root" \
+PLUMOS_RUNTIME_ROOT="$tmp/power-runtime" \
+PLUMOS_USER_MOUNT="$tmp/power-user" \
+PLUMOS_MOUNTS_FILE="$tmp/mounts" \
+PLUMOS_BUSYBOX="$tmp/fake-busybox" \
+PLUMOS_TEST_POWER_CALLS="$tmp/power-calls.log" \
+PLUMOS_NETWORK_SERVICES=/nonexistent \
+PLUMOS_POWER_REQUEST="$tmp/power-request" \
+    sh "$package/bin/plumos-safe-shutdown" --shutdown --poweroff \
+    >"$tmp/power-switch.log"
+grep -q 'pending=updated-from-reboot' "$tmp/power-switch.log"
+grep -qx shutdown "$tmp/power-request"
+[[ -f "$tmp/power-root/provision/clean-shutdown" ]]
 grep -q 'finalize_power_action' "$repo_root/rootfs/bubble-frontend/init"
 grep -q 'ui->exit_requested = 1' "$repo_root/src/frontend/plumos_controller_ui.c"
 

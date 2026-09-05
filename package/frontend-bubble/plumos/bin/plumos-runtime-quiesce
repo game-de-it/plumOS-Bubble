@@ -213,6 +213,12 @@ state_pids() {
     $BB sed -n 's/^pid=//p' "$state" 2>/dev/null
 }
 
+terminate_state() {
+    state=$1
+    pids=$(state_pids "$state")
+    terminate_pid_list state-owner $pids
+}
+
 terminate_active() {
     state=$1
     marker=$2
@@ -270,11 +276,16 @@ case ${1:-} in
         shift
         terminate_storage "$@"
         ;;
+    terminate-state)
+        [ "$#" -eq 2 ] || exit 2
+        terminate_state "$2"
+        ;;
     *)
         printf '%s\n' \
             "usage: $0 hold STATE [DROP_DRM_0_OR_1] | release STATE" \
             "       $0 terminate STATE FOREGROUND_MARKER" \
             "       $0 terminate-active FOREGROUND_MARKER" \
+            "       $0 terminate-state STATE" \
             "       $0 terminate-storage PATH..." >&2
         exit 2
         ;;

@@ -512,8 +512,12 @@
 - [ ] macOSのbash 3.2は`set -e`で`[[ ]]`の失敗を無視するため、`tests/`配下の
   `[[ ]]`アサーションはmacOS上で無言パスする。container（bash 5.2）では正しく落ちる。
   既存testを`if ... then fail; fi`形式へ寄せる（GGFE testは対応済み）。
-- [ ] GGFEの実機acceptanceを行う。FE→Apps→Game Gearでの起動、カルーセル操作、
-  A起動→RetroArch→復帰、B/STARTでFE復帰、DRM master再取得、60fps維持を確認する。
+- [ ] GGFEの実機acceptanceを行う。手順と確認項目は`docs/ggfe-bubble-handover.md`。
+  FE経由の前にvalidation holdで単体起動して切り分けること。FEをSSHから繰り返し
+  killするとearly initの4回制限を消費するため行わない。
+  - 先に`plumos-text-ui launch gamegear <rel>`のdry runだけ実行し、GGFEの相対パス
+    規約が`load_selected_rom()`と一致するかを確認する。ここが最も可能性が高い
+    失敗要因で、1コマンドで切り分けられる。
 - [ ] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
   現行buildはlibpngのみリンクしており該当hitは`NO ARTWORK`板へ落ちる。
   libjpeg導入はtools imageとfrontend/lib双方の変更になるため単独で実施する。
