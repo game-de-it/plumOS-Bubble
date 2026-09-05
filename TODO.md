@@ -475,3 +475,14 @@
     代表contentのruntime結果は
     `docs/validation/2026-09-02-bubble-emulator-device-acceptance.md`へ記録した。
     次は物理LCD/aspect/speaker確認、N64 audio修正、visible first-boot progressを行う。
+- [ ] GGFE（Game Gear専用フロントエンド）を実装する。カートリッジをCPU software 3Dで描画し、
+  GLもEGLも`/dev/mali0`も使わず、RetroArchとGPU/DRM masterを奪い合わない構成とする。
+  - `plumos_cart3d.h`（3Dラスタライザ）、`plumos_ggfe_model.h`（実物採寸のカート/ケース形状）、
+    `plumos_ggfe_art.h`（GGFE設定＋サムネ解決）とhost検証harnessまで完了。
+  - artwork解決はGGFE固有sourceと、既存FEの`find_thumbnail()`と同一規則の両方を支持する。
+    `Images/<alias>/`を先に、次に`Images/gamegear/`。alias=GG/GameGear/MD/gamegear、
+    拡張子png/jpg/jpeg/webp、相対stem→flat stem、最終要素のみ大小無視。
+  - 残：ラベル合成、シーン（本体競り上がり/HUD）、アニメーション、入力、launch handoff、
+    build script組込み、実機acceptance。
+- [ ] `plumos_json.h`と`plumos_path.h`はGGFE向けに`plumos_library_scan.c`から抽出した。
+  同ファイル側の重複コピーを削除してこのheaderへ寄せる（機械的変更、単独で実施する）。

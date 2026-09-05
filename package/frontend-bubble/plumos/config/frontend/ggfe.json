@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "system": "gamegear",
+  "rom_dirs": ["GG", "GameGear", "MD", "gamegear"],
+  "rom_extensions": ["gg", "sms", "zip", "7z"],
+  "extensions": ["png", "jpg", "jpeg", "webp"],
+  "artwork": {
+    "prefer": ["title", "boxart"],
+    "sources": [
+      { "kind": "title",  "root": "sdcard", "path": "Images/gamegear/titles" },
+      { "kind": "boxart", "root": "sdcard", "path": "Images/gamegear/boxarts" },
+      { "kind": "title",  "root": "sdcard", "path": "thumbnails/Sega - Game Gear/Named_Titles" },
+      { "kind": "boxart", "root": "sdcard", "path": "thumbnails/Sega - Game Gear/Named_Boxarts" }
+    ],
+    "use_plumos_lookup": true,
+    "plumos_lookup": [
+      { "root": "sdcard", "path": "Images/gamegear" }
+    ],
+    "classify_by_aspect": true
+  }
+}
