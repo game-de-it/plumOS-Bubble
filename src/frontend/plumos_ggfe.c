@@ -16,6 +16,7 @@
 
 #include <errno.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <signal.h>
 #include <unistd.h>
 #include <stdarg.h>
@@ -161,6 +162,15 @@ struct ggfe_worker {
   pthread_t thread;
 };
 
+/* The pool runs whichever per-stripe job the frame currently needs.  Clearing
+ * and the panel conversion are as parallel as the rasterising is, and were
+ * both still running on one core. */
+enum ggfe_job {
+  GGFE_JOB_RASTER = 0,
+  GGFE_JOB_PREPARE, /* background copy and depth clear */
+  GGFE_JOB_BLIT     /* RGB to the panel's own pixel format */
+};
+
 struct ggfe_pool {
   struct ggfe_worker worker[GGFE_MAX_BANDS];
   int count;
@@ -173,10 +183,16 @@ struct ggfe_pool {
   int pending;
   int next_stripe; /* claimed by workers; fixed bands starve at the edges */
   /* the job every worker runs, clipped to the stripes it claims */
+  enum ggfe_job job;
   struct cart3d_target *target;
   const struct cart3d_draw *draws;
   int draw_count;
   int zwrite;
+  const unsigned char *background;
+  unsigned char *panel;
+  long panel_stride;
+  int panel_bpp;
+  uint32_t panel_r_shift, panel_g_shift, panel_b_shift, panel_alpha;
 };
 
 struct ggfe_app {
@@ -233,8 +249,37 @@ static void ggfe_run_stripes(struct ggfe_pool *p) {
     }
     y0 = p->target->height * stripe / GGFE_STRIPES;
     y1 = p->target->height * (stripe + 1) / GGFE_STRIPES;
-    cart3d_draw_list_band(p->target, p->draws, p->draw_count, p->zwrite, y0,
-                          y1);
+    switch (p->job) {
+      case GGFE_JOB_RASTER:
+        cart3d_draw_list_band(p->target, p->draws, p->draw_count, p->zwrite,
+                              y0, y1);
+        break;
+      case GGFE_JOB_PREPARE: {
+        size_t off = (size_t)y0 * (size_t)p->target->width;
+        size_t rows = (size_t)(y1 - y0) * (size_t)p->target->width;
+        memcpy(p->target->rgb + off * 3, p->background + off * 3, rows * 3);
+        memset(p->target->depth + off, 0, rows * sizeof(float));
+        break;
+      }
+      case GGFE_JOB_BLIT: {
+        int x, y;
+        for (y = y0; y < y1; y++) {
+          const unsigned char *in =
+              p->target->rgb + (size_t)y * p->target->width * 3;
+          if (p->panel_bpp == 4) {
+            uint32_t *out =
+                (uint32_t *)(p->panel + (size_t)y * (size_t)p->panel_stride);
+            for (x = 0; x < p->target->width; x++) {
+              out[x] = ((uint32_t)in[0] << p->panel_r_shift) |
+                       ((uint32_t)in[1] << p->panel_g_shift) |
+                       ((uint32_t)in[2] << p->panel_b_shift) | p->panel_alpha;
+              in += 3;
+            }
+          }
+        }
+        break;
+      }
+    }
   }
 }
 
@@ -320,6 +365,35 @@ static void ggfe_pool_stop(struct ggfe_pool *p) {
   p->started = 0;
 }
 
+/* Dispatch whatever job the pool is currently configured for. */
+static void ggfe_pool_run(struct ggfe_pool *p) {
+  if (p->started <= 0) {
+    p->next_stripe = 0;
+    ggfe_run_stripes(p);
+    return;
+  }
+  pthread_mutex_lock(&p->lock);
+  p->pending = p->started;
+  p->next_stripe = 0;
+  p->generation++;
+  pthread_cond_broadcast(&p->work_ready);
+  pthread_mutex_unlock(&p->lock);
+  ggfe_run_stripes(p);
+  pthread_mutex_lock(&p->lock);
+  while (p->pending > 0) {
+    pthread_cond_wait(&p->work_done, &p->lock);
+  }
+  pthread_mutex_unlock(&p->lock);
+}
+
+static void ggfe_prepare_parallel(struct ggfe_pool *p, struct cart3d_target *t,
+                                  const unsigned char *background) {
+  p->job = GGFE_JOB_PREPARE;
+  p->target = t;
+  p->background = background;
+  ggfe_pool_run(p);
+}
+
 /* Rasterise one draw list across every band, blocking until all are done. */
 static void ggfe_draw_parallel(struct ggfe_pool *p, struct cart3d_target *t,
                                const struct cart3d_draw *draws, int count,
@@ -327,28 +401,12 @@ static void ggfe_draw_parallel(struct ggfe_pool *p, struct cart3d_target *t,
   if (count <= 0) {
     return;
   }
-  if (p->started <= 0) {
-    cart3d_draw_list(t, draws, count, zwrite);
-    return;
-  }
-  pthread_mutex_lock(&p->lock);
+  p->job = GGFE_JOB_RASTER;
   p->target = t;
   p->draws = draws;
   p->draw_count = count;
   p->zwrite = zwrite;
-  p->pending = p->started;
-  p->next_stripe = 0;
-  p->generation++;
-  pthread_cond_broadcast(&p->work_ready);
-  pthread_mutex_unlock(&p->lock);
-
-  ggfe_run_stripes(p);
-
-  pthread_mutex_lock(&p->lock);
-  while (p->pending > 0) {
-    pthread_cond_wait(&p->work_done, &p->lock);
-  }
-  pthread_mutex_unlock(&p->lock);
+  ggfe_pool_run(p);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1269,8 +1327,7 @@ static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
   if (sel > app->entry_count - 1) sel = app->entry_count - 1;
 
   GGFE_STAGE_BEGIN();
-  memcpy(app->target.rgb, background, (size_t)GGFE_W * GGFE_H * 3);
-  cart3d_target_clear_depth(&app->target);
+  ggfe_prepare_parallel(&app->pool, &app->target, background);
   GGFE_STAGE_END(GGFE_STAGE_CLEAR);
   if (show_console) {
     ggfe_draw_console(&app->target, f->console_dy, f->shadow, 0);
@@ -1507,8 +1564,17 @@ static void ggfe_app_free(struct ggfe_app *app) {
 /* One packed write per pixel when the panel is the usual 32bpp unrotated
  * surface; put_pixel otherwise.  307k put_pixel calls a frame would not fit
  * the budget. */
-static void ggfe_blit_panel(struct plumos_fbdev_renderer *r,
-                            const unsigned char *rgb) {
+/*
+ * Convert the composed RGB frame into the panel's own pixel format.
+ *
+ * On the usual 32bpp unrotated surface this is one packed word per pixel and
+ * runs on every core through the same stripe pool as the rasteriser - it was
+ * measured at 2.2 ms single-threaded on the device, an eighth of the whole
+ * frame budget spent moving bytes.  Anything unusual falls back to put_pixel.
+ */
+static void ggfe_blit_panel(struct ggfe_pool *pool,
+                            struct plumos_fbdev_renderer *r,
+                            struct cart3d_target *t) {
   int x, y;
   int fast = (r->bytes_per_pixel == 4 && !r->rotation_180 &&
               r->var.red.length == 8 && r->var.green.length == 8 &&
@@ -1516,26 +1582,24 @@ static void ggfe_blit_panel(struct plumos_fbdev_renderer *r,
               (int)r->var.yres == GGFE_H);
 
   if (fast) {
-    unsigned char *base = r->shadow ? r->shadow : r->mem + r->active_offset;
-    uint32_t alpha = 0;
-    if (r->var.transp.length) {
-      alpha = plumos_fbdev_scale_channel(255, r->var.transp.length,
-                                         r->var.transp.offset);
-    }
-    for (y = 0; y < GGFE_H; y++) {
-      uint32_t *out = (uint32_t *)(base + (size_t)y * r->fix.line_length);
-      const unsigned char *in = rgb + (size_t)y * GGFE_W * 3;
-      for (x = 0; x < GGFE_W; x++) {
-        out[x] = ((uint32_t)in[0] << r->var.red.offset) |
-                 ((uint32_t)in[1] << r->var.green.offset) |
-                 ((uint32_t)in[2] << r->var.blue.offset) | alpha;
-        in += 3;
-      }
-    }
+    pool->job = GGFE_JOB_BLIT;
+    pool->target = t;
+    pool->panel = r->shadow ? r->shadow : r->mem + r->active_offset;
+    pool->panel_stride = (long)r->fix.line_length;
+    pool->panel_bpp = 4;
+    pool->panel_r_shift = r->var.red.offset;
+    pool->panel_g_shift = r->var.green.offset;
+    pool->panel_b_shift = r->var.blue.offset;
+    pool->panel_alpha =
+        r->var.transp.length
+            ? plumos_fbdev_scale_channel(255, r->var.transp.length,
+                                         r->var.transp.offset)
+            : 0;
+    ggfe_pool_run(pool);
     return;
   }
   for (y = 0; y < GGFE_H; y++) {
-    const unsigned char *in = rgb + (size_t)y * GGFE_W * 3;
+    const unsigned char *in = t->rgb + (size_t)y * GGFE_W * 3;
     for (x = 0; x < GGFE_W; x++) {
       plumos_fbdev_put_pixel(r, x, y,
                              plumos_fbdev_pack_color(r, in[0], in[1], in[2]));
@@ -1954,7 +2018,7 @@ int main(int argc, char **argv) {
     compose_start_us = ggfe_now_us();
     ggfe_compose(&app, &frame, background);
     compose_end_us = ggfe_now_us();
-    ggfe_blit_panel(&renderer, app.target.rgb);
+    ggfe_blit_panel(&app.pool, &renderer, &app.target);
     blit_end_us = ggfe_now_us();
     present_ok = plumos_fbdev_present(&renderer);
     present_end_us = ggfe_now_us();

@@ -330,6 +330,12 @@ the closed cases contribute about 43% of compose for a frosted overlay, and
 their hidden faces - the tray back plate behind the cartridge, the lid back
 face - are the candidates.
 
+**Clearing and the panel conversion were still single-threaded.** Both are as
+parallel as the rasterising, and the panel conversion alone was measured at
+2.2 ms on the device - an eighth of the whole frame budget spent moving bytes.
+They now run through the same stripe pool, which also gives the depth clear
+better locality: a worker clears the stripe it is about to draw into.
+
 GGFE also raises the CPU governor for its own lifetime and restores it on
 every exit path, the same shape the RetroArch and Pyxel launchers use. It is
 one of the few plumOS routes that is genuinely CPU bound, and ondemand was
@@ -338,6 +344,12 @@ measured on this device reaching full clock in only a third of samples.
 Span bounds are computed with one multiply where the original loop accumulated
 additions, so a handful of edge pixels round differently against the pre-span
 build: 0.13% of pixels by at most 18 levels, invisible at 24x amplification.
+
+Also rejected after measuring: merging the tray and lid into one layer while
+the case is shut. The two do cover the same area and compositing their alphas
+is arithmetically right, but they carry different surface normals and the
+tray's rim and back plate supply the case's edge definition - the merged
+version reads flat and washed out. It was worth 20% and was not taken.
 
 Rejected after measuring: baking the label sheen into its texture removed an
 expf per fragment but was only 5% and shifted the label's appearance, because

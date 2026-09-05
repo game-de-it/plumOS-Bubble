@@ -29,7 +29,7 @@ expect_line() {
 
 cc=${CC:-cc}
 $cc -std=gnu99 -O1 -Wall -D_GNU_SOURCE -DPLUMOS_GGFE_HOST=1 \
-    "$repo_root/src/frontend/plumos_ggfe.c" -o "$tmp/ggfe-host" -lm \
+    "$repo_root/src/frontend/plumos_ggfe.c" -o "$tmp/ggfe-host" -lm -lpthread \
     $(pkg-config --cflags --libs libpng freetype2) 2>/dev/null ||
     fail "cannot build the GGFE host harness"
 
