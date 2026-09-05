@@ -110,3 +110,101 @@ valid frontend component checksums, and unchanged mutable configuration.
 
 The physical appearance of the improved motion has not been accepted and the
 60 fps gate remains open.  Post-game input isolation is accepted.
+
+## Four-core stripe follow-up
+
+Commit `bcaa959` adds a four-core worker pool.  Twenty-four horizontal stripes
+are claimed dynamically so the centre-heavy cartridge scene does not leave the
+top and bottom workers idle.  `GGFE_PROFILE` was enabled in the device build.
+Review found that the commit and documentation claimed lifetime CPU-governor
+control, but `plumos-ggfe-launch` still used `exec` and contained no snapshot,
+apply, or restore operation.  Commit `bc27cd4` adds the missing
+`ondemand -> performance -> ondemand` contract and tests non-zero child exit,
+apply failure, and TERM cleanup.
+
+The complete 212-entry frontend component was rebuilt from `bc27cd4`.  Device
+hashes after deployment were:
+
+```text
+f2ec0a9f13815f7cf2f4e75fd90d1fe1ce47c1ec827b0c8daf2d344ee7d378bc  bin/plumos-ggfe
+09718b768aed5fd44103fbd29df05f7252a65dabc6c0deb805cc78d1ecc01880  bin/plumos-ggfe-launch
+a53c78fa23db63f8d9d8d3876e3af65e652ea361ce508ecb4a8bc85a69e0584d  components/frontend/checksums.sha256
+```
+
+The component's 212 checksums and the corresponding 213 global-catalog entries
+passed.  Frontend settings, system settings, and core overrides retained their
+pre-deployment hashes.  The initial deployment script treated root-level
+`VERSION` as a directory and stopped after switching 211 entries.  The original
+component had already been captured; `VERSION`, the component checksum, and the
+global entries were completed from the verified staging tree, followed by a
+full component check.  A corrected rollback archive is retained under
+`/storage/plumos/state/app-deploy/bc27cd4-ggfe-mt/`.
+
+The direct validation used the frontend hold, with GGFE as the only renderer.
+The expected runtime state was observed:
+
+```text
+ggfe_cpu=apply result=ok requested=performance active=performance
+ggfe_renderer=ready backend=drm xres=640 yres=480 bpp=32 shadow=0 double_buffer=1
+ggfe_stages=clear=528 console=0 label=715 cart3d=6265 glass=4802 console_front=0 hud=1991 flash=0 threads=4
+```
+
+The four-core renderer reduces a static compose interval to about 14.3 ms, with
+blit near 2.25 ms.  This is just over the complete 16.6 ms frame deadline, so a
+blocking page flip commonly pushes the next presentation to the following
+vblank and the observed steady rate remains about 30 to 32 fps.  `compose_us`
+alone being below 16.6 ms is therefore not a 60 fps pass.
+
+During physical continuous D-pad scrolling, frame rate ranged from about 27 to
+43 fps.  The sustained heavy intervals were normally 30 fps, with compose about
+19.5 to 22.1 ms, blit about 2.2 ms, and present about 9 to 16 ms.  A
+representative interval was:
+
+```text
+ggfe_frames=fps=30.00 frames=30 elapsed_ms=1000 max_frame_ms=34 slow_frames=30 compose_us=22026/22181 blit_us=2213/2226 present_us=9085/9234
+ggfe_stages=clear=537 console=0 label=1489 cart3d=9624 glass=7015 console_front=0 hud=3357 flash=0 threads=4
+```
+
+The physical A path produced code 305 and launched
+`gamegear/Eternal Legend (Japan).gg` through
+`retroarch:genesis_plus_gx`.  The launch animation also ran at about 30 fps,
+with a 19.1 ms compose average.  RetroArch exited with SELECT+START, GGFE logged
+status zero, reopened its input fd, and remained controllable:
+
+```text
+ggfe_input=launch code=305 physical=A target=1
+ggfe_launch=done status=0
+ggfe_input=reopened-after-launch
+```
+
+Physical B then produced code 304 and exited GGFE.  No frontend or emulator was
+drawing at the same time.  The wrapper restored the exact pre-launch policy:
+
+```text
+ggfe_input=exit code=304 physical=B
+ggfe_exit=ok
+ggfe_cpu=restore result=ok active=ondemand
+```
+
+Four workers and lifetime `performance` are accepted.  The 60 fps and motion
+acceptance gates remain open.  The next optimisation should reduce the
+scrolling scene's `cart3d` and `glass` work; together they account for roughly
+16.6 ms of the representative 22.0 ms compose interval.
+
+## Recovery-console power-request observation
+
+Removing the validation hold could not restart the frontend because earlier
+device work had already consumed all four restart attempts in that boot.  PID
+1 entered `E81_FRONTEND_RESTART_LIMIT_RECOVERY_CONSOLE`, whose current final
+action is `exec busybox sh`.  A later `plumos-safe-shutdown --reboot` correctly
+quiesced the foreground, SD2, p4, network services, and recorded a PID 1
+request, but no supervisor remained to consume it.  The device continued to
+answer ICMP with ports 21, 22, and 445 closed until a physical power cycle.
+This is a recovery-console lifecycle defect, not a GGFE or governor failure.
+
+The following cold boot accepted the clean-shutdown markers, performed no
+automatic filesystem repair, and retained `source_ref=bc27cd4`.  At 4.68
+seconds the normal frontend start was dispatched.  The running state had one
+frontend renderer, no GGFE/RetroArch process, `ondemand`, no validation hold,
+valid 212-entry frontend checksums, unchanged mutable settings, and listening
+FTP, SSH, and Samba services.

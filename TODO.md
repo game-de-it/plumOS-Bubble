@@ -356,6 +356,10 @@
   - SSH benchmarkがfrontendを複数回停止してPID 1の4回restart limitへ到達した。`sync`後の
     強制rebootで通常FE 1 processへ復旧。今後の繰返し性能試験は通常FE導線を各試行で使うか、
     validation hold中にfrontend restart attemptを消費しない専用supervision契約が必要。
+  - GGFE 4-core実機試験後にもrestart limitへ到達。`E81`はrecovery consoleへ`exec sh`するため、
+    その後のsafe reboot requestを消費するPID 1 supervisorが残らず、network/storage停止後も
+    本体がrebootしなかった。recovery consoleでもpower requestを監視・確定できるloopへ変更し、
+    意図的なrestart-limit到達からReboot/Shutdown双方を実機確認する。
 - [ ] `BUB-P6-08` 全system表示、全profile選択、全core load smoke、代表content起動をhostで通してから、
   ROMセットを変更せず一括実機acceptanceを開始する。
   - hostでは全system/profile解決と114/114 core load smokeまで合格。
@@ -519,8 +523,12 @@
     Bubble固有項目としてmanifestの`bubble_only_menu_entries`へ記録した。
   - source `7b208dd`のscanline spanラスタライザを実機へdeployし、連続scrollは
     約11.0〜14.3 fps、compose平均57〜71 ms、blit約2.2 ms、present約6〜10 msだった。
-    旧版より小幅改善したが60 fpsの16.6 ms予算には未達。`-DGGFE_PROFILE`によるstage別
-    実機計測と描画量削減を継続する。詳細は
+    source `bcaa959`の4-core動的stripe版と、source `bc27cd4`のGGFE生存期間だけ
+    `performance`へ切替・全終了経路で復元するlauncherを実機へdeployした。
+    `threads=4`、終了後`ondemand`復元、RA往復後の入力再開は合格。静止時composeは
+    約14.3 msまで短縮したが、blitとvblank待ちを含めると約30〜32 fps。連続scrollは
+    約27〜43 fps、重い区間はcompose約19.5〜22.1 msで約30 fpsだった。
+    60 fpsの16.6 ms全体予算には未達のため、cart3dとglassの描画量削減を継続する。詳細は
     `docs/validation/2026-09-06-bubble-ggfe-span-raster.md`。
 - [x] GGFEの操作説明と移植リファレンスを`docs/ggfe.md`へ書く。画面上のボタン凡例は置かず、
   ドキュメントで告知する方針。他plumOS機種へ移植する際もこの文書を起点にする。
