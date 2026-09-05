@@ -76,9 +76,9 @@ export PLUMOS_BIOS_ROOT PLUMOS_IMAGE_ROOT
 $BB mkdir -p "$PLUMOS_ROOT/logs" "$RUNTIME_ROOT/frontend" \
     "$PLUMOS_ROOT/state/frontend" "$PLUMOS_ROOT/config/frontend" \
     "$PLUMOS_ROOT/config/system"
-# SD2 content is deliberately exposed read-only.  Compatibility directories
-# are best-effort seeds for writable SD1 storage and must never make frontend
-# startup fail when a read-only SD2 bind is active.
+# Compatibility directories are best-effort seeds. SD2 is normally writable
+# for the transfer services, but errors=remount-ro can protect a damaged FAT;
+# either state must never prevent frontend startup.
 case "$PLUMOS_ROM_ROOT" in /storage/*) $BB mkdir -p "$PLUMOS_ROM_ROOT/FC" 2>/dev/null || true ;; esac
 case "$PLUMOS_BIOS_ROOT" in /storage/*) $BB mkdir -p "$PLUMOS_BIOS_ROOT" 2>/dev/null || true ;; esac
 case "$PLUMOS_IMAGE_ROOT" in /storage/*) $BB mkdir -p "$PLUMOS_IMAGE_ROOT/nes" 2>/dev/null || true ;; esac

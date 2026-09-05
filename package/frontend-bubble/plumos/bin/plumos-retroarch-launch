@@ -144,9 +144,8 @@ printf 'system_directory = "%s"\n' "$system_directory" >>"$append_config"
 # shared plumOS cfg otherwise redirects every core into one retroarch.log,
 # which makes mechanical per-core failure and geometry attribution ambiguous.
 printf '%s\n' 'log_to_file = "false"' >>"$append_config"
-# SD2 is intentionally mounted read-only after FAT corruption was detected.
-# Keep save/state ownership in plumOS even though the shared cfg supports
-# writable-media devices that place them beside content.
+# Keep save/state ownership in plumOS rather than beside content. This remains
+# valid when writable SD2 is present and if FAT errors force it read-only.
 {
     printf '%s\n' 'savefiles_in_content_dir = "false"'
     printf '%s\n' 'savestates_in_content_dir = "false"'

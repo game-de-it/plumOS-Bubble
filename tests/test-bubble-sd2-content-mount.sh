@@ -11,7 +11,7 @@ user=$tmp/user
 mkdir -p "$sd2/roms/FC" "$sd2/bios" "$user/Roms" "$user/BIOS" \
     "$tmp/root/logs" "$tmp/run"
 printf 'rom\n' >"$sd2/roms/FC/test.nes"
-printf '/dev/fake-sd2 %s vfat ro 0 0\n' "$sd2" >"$tmp/mounts"
+printf '/dev/fake-sd2 %s vfat rw 0 0\n' "$sd2" >"$tmp/mounts"
 
 cat >"$tmp/fake-busybox" <<'EOF'
 #!/bin/sh
@@ -19,14 +19,26 @@ command_name=$1
 shift
 case "$command_name" in
     mount)
-        [ "$1" = --bind ] || exit 2
-        source_dir=$2
-        target_dir=$3
-        device=$(awk -v path="$PLUMOS_TEST_SD2" '$2 == path { print $1; exit }' \
-            "$PLUMOS_MOUNTS_FILE")
-        printf '%s %s none ro,bind 0 0\n' "$device" "$target_dir" \
-            >>"$PLUMOS_MOUNTS_FILE"
-        printf '%s -> %s\n' "$source_dir" "$target_dir" >>"$PLUMOS_TEST_CALLS"
+        if [ "$1" = --bind ]; then
+            source_dir=$2
+            target_dir=$3
+            device=$(awk -v path="$PLUMOS_TEST_SD2" '$2 == path { print $1; exit }' \
+                "$PLUMOS_MOUNTS_FILE")
+            printf '%s %s none rw,bind 0 0\n' "$device" "$target_dir" \
+                >>"$PLUMOS_MOUNTS_FILE"
+            printf '%s -> %s\n' "$source_dir" "$target_dir" >>"$PLUMOS_TEST_CALLS"
+        elif [ "$1" = -o ]; then
+            options=$2
+            target_dir=$3
+            case ",$options," in *,rw,*) access=rw ;; *) access=ro ;; esac
+            awk -v path="$target_dir" -v access="$access" \
+                '{ if ($2 == path) $4 = access ",bind"; print }' \
+                "$PLUMOS_MOUNTS_FILE" >"$PLUMOS_MOUNTS_FILE.next"
+            mv "$PLUMOS_MOUNTS_FILE.next" "$PLUMOS_MOUNTS_FILE"
+            printf 'remount %s %s\n' "$target_dir" "$access" >>"$PLUMOS_TEST_CALLS"
+        else
+            exit 2
+        fi
         ;;
     umount)
         target=$1
@@ -56,18 +68,24 @@ run_helper() {
 
 run_helper start >"$tmp/start.log"
 grep -q 'sd2_content=result-started' "$tmp/start.log"
+grep -q 'access=rw' "$tmp/start.log"
 grep -q "/dev/fake-sd2 $user/Roms " "$tmp/mounts"
 grep -q "/dev/fake-sd2 $user/BIOS " "$tmp/mounts"
 test "$(grep -c "/dev/fake-sd2 $user/Roms " "$tmp/mounts")" -eq 1
 
+# A pre-existing read-only bind must follow a successful SD2 rw remount.
+awk -v path="$user/Roms" \
+    '{ if ($2 == path) $4 = "ro,bind"; print }' "$tmp/mounts" >"$tmp/mounts.next"
+mv "$tmp/mounts.next" "$tmp/mounts"
 run_helper start >"$tmp/restart.log"
-grep -q 'sd2_bind=result-already-mounted content=roms' "$tmp/restart.log"
+grep -q 'sd2_bind=result-remounted content=roms.*access=rw' "$tmp/restart.log"
 test "$(grep -c "/dev/fake-sd2 $user/Roms " "$tmp/mounts")" -eq 1
 
 run_helper status >"$tmp/status.log"
 grep -q "rom_target=$user/Roms" "$tmp/status.log"
 grep -q '^rom_source=/dev/fake-sd2$' "$tmp/status.log"
 grep -q '^bios_source=/dev/fake-sd2$' "$tmp/status.log"
+grep -q '^sd2_access=rw$' "$tmp/status.log"
 
 run_helper stop >"$tmp/stop.log"
 grep -q 'sd2_content=result-stopped fallback=sd1' "$tmp/stop.log"

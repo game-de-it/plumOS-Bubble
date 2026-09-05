@@ -254,6 +254,10 @@
     process状態、FTP/SFTPのSD2 ROM一覧、macOSからのSamba `SDCARD`直接mount、port 2222閉鎖を
     確認した。frontend/network componentと全12,373 managed fileが合格し、Wi-Fi、service、
     frontend、system設定は更新前後でbyte-for-byte不変だった。
+  - FTPの実書込み再試験でSD1 `/storage` とp4 `/storage/user` はdirectory作成可能だが、
+    SD2を明示的にread-only mountしていたためbind先の`Roms`/`BIOS`だけ550となることを特定。
+    V90Sと同じく通常は`rw,fmask=0022,dmask=0022,errors=remount-ro`とし、媒体異常時は
+    read-only fallback、保守時は`PLUMOS_SD2_ACCESS=ro`を選べる契約へ変更する。
 - [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
   - RetroArch v1.22.2とQuickNES `058d665`をAArch64 containerからbuildし、
     software DRM/RGUI/ALSA/udev、GPU runtime非依存、component checksumをhost検証済み。

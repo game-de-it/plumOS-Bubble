@@ -4,6 +4,7 @@ set -u
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 DEVICE=${PLUMOS_SD2_DEVICE:-/dev/mmcblk3p1}
 SD2_MOUNT=${PLUMOS_SD2_MOUNTPOINT:-/run/media/sd2}
+SD2_ACCESS=${PLUMOS_SD2_ACCESS:-rw}
 USER_ROOT=${PLUMOS_USERDATA_ROOT:-/storage/user}
 ROM_TARGET=${PLUMOS_ROM_BIND_TARGET:-$USER_ROOT/Roms}
 BIOS_TARGET=${PLUMOS_BIOS_BIND_TARGET:-$USER_ROOT/BIOS}
@@ -11,6 +12,15 @@ RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 STATE_DIR=$RUNTIME_ROOT/sd2-content
 LOG=${PLUMOS_ROOT:-/storage/plumos}/logs/storage-health.log
 MOUNTS_FILE=${PLUMOS_MOUNTS_FILE:-/proc/mounts}
+
+case $SD2_ACCESS in
+    rw|ro) ;;
+    *)
+        printf 'sd2_mount=result-refused reason=invalid-access access=%s\n' \
+            "$SD2_ACCESS" >&2
+        exit 2
+        ;;
+esac
 
 log() {
     message=$1
@@ -24,6 +34,15 @@ mount_source() {
 
 is_mounted() {
     [ -n "$(mount_source "$1")" ]
+}
+
+mount_access() {
+    options=$($BB awk -v path="$1" '$2 == path { print $4; exit }' \
+        "$MOUNTS_FILE" 2>/dev/null)
+    case ",$options," in
+        *,ro,*) printf 'ro\n' ;;
+        *) printf 'rw\n' ;;
+    esac
 }
 
 find_content_dir() {
@@ -47,8 +66,20 @@ bind_content_dir() {
     [ -n "$sd2_source" ] || return 1
     if [ -n "$current_source" ]; then
         if [ "$current_source" = "$sd2_source" ]; then
-            printf 'sd2_bind=result-already-mounted content=%s source=%s target=%s\n' \
-                "$label" "$source_dir" "$target_dir"
+            source_access=$(mount_access "$SD2_MOUNT")
+            target_access=$(mount_access "$target_dir")
+            if [ "$target_access" != "$source_access" ]; then
+                if ! $BB mount -o "remount,bind,$source_access" "$target_dir"; then
+                    printf 'sd2_bind=result-remount-failed content=%s target=%s requested=%s retained=%s\n' \
+                        "$label" "$target_dir" "$source_access" "$target_access" >&2
+                    return 1
+                fi
+                printf 'sd2_bind=result-remounted content=%s target=%s access=%s\n' \
+                    "$label" "$target_dir" "$source_access" | $BB tee -a "$LOG"
+            else
+                printf 'sd2_bind=result-already-mounted content=%s source=%s target=%s access=%s\n' \
+                    "$label" "$source_dir" "$target_dir" "$source_access"
+            fi
             return 0
         fi
         printf 'sd2_bind=result-refused reason=target-owned content=%s source=%s target=%s\n' \
@@ -59,8 +90,9 @@ bind_content_dir() {
     $BB mkdir -p "$target_dir" "$STATE_DIR" || return 1
     if $BB mount --bind "$source_dir" "$target_dir"; then
         printf '%s\n' "$target_dir" >"$STATE_DIR/$label.target"
-        printf 'sd2_bind=result-ok content=%s source=%s target=%s mode=read-only\n' \
-            "$label" "$source_dir" "$target_dir" | $BB tee -a "$LOG"
+        access=$(mount_access "$SD2_MOUNT")
+        printf 'sd2_bind=result-ok content=%s source=%s target=%s access=%s\n' \
+            "$label" "$source_dir" "$target_dir" "$access" | $BB tee -a "$LOG"
         return 0
     fi
     printf 'sd2_bind=result-failed content=%s source=%s target=%s\n' \
@@ -98,6 +130,17 @@ mount_sd2() {
     mounted_source=$(mount_source "$SD2_MOUNT")
     if [ -n "$mounted_source" ]; then
         if [ "$mounted_source" = "$DEVICE" ]; then
+            current_access=$(mount_access "$SD2_MOUNT")
+            if [ "$current_access" != "$SD2_ACCESS" ]; then
+                if $BB mount -o "remount,$SD2_ACCESS" "$DEVICE" "$SD2_MOUNT"; then
+                    printf 'sd2_mount=result-remounted device=%s target=%s access=%s\n' \
+                        "$DEVICE" "$SD2_MOUNT" "$SD2_ACCESS" | $BB tee -a "$LOG"
+                else
+                    printf 'sd2_mount=result-remount-failed device=%s target=%s requested=%s retained=%s\n' \
+                        "$DEVICE" "$SD2_MOUNT" "$SD2_ACCESS" "$current_access" | \
+                        $BB tee -a "$LOG" >&2
+                fi
+            fi
             return 0
         fi
         printf 'sd2_mount=result-refused reason=target-owned source=%s target=%s\n' \
@@ -117,10 +160,18 @@ mount_sd2() {
     fi
 
     $BB mkdir -p "$SD2_MOUNT" "${LOG%/*}"
-    if $BB mount -t vfat -o ro,utf8,shortname=mixed,errors=remount-ro \
-        "$DEVICE" "$SD2_MOUNT"; then
-        printf 'sd2_mount=result-ok device=%s target=%s mode=read-only\n' \
-            "$DEVICE" "$SD2_MOUNT" | $BB tee -a "$LOG"
+    mount_options="$SD2_ACCESS,utf8,shortname=mixed,fmask=0022,dmask=0022,errors=remount-ro"
+    if $BB mount -t vfat -o "$mount_options" "$DEVICE" "$SD2_MOUNT"; then
+        access=$(mount_access "$SD2_MOUNT")
+        printf 'sd2_mount=result-ok device=%s target=%s access=%s\n' \
+            "$DEVICE" "$SD2_MOUNT" "$access" | $BB tee -a "$LOG"
+        return 0
+    fi
+    if [ "$SD2_ACCESS" = rw ] &&
+        $BB mount -t vfat -o ro,utf8,shortname=mixed,fmask=0022,dmask=0022,errors=remount-ro \
+            "$DEVICE" "$SD2_MOUNT"; then
+        printf 'sd2_mount=result-fallback device=%s target=%s requested=rw access=ro\n' \
+            "$DEVICE" "$SD2_MOUNT" | $BB tee -a "$LOG" >&2
         return 0
     fi
     printf 'sd2_mount=result-failed device=%s target=%s\n' "$DEVICE" "$SD2_MOUNT" |
@@ -149,8 +200,9 @@ start_sd2() {
     else
         log 'sd2_bind=result-unavailable content=bios fallback=sd1'
     fi
-    printf 'sd2_content=result-started mount=%s roms=%s bios=%s mode=read-only\n' \
-        "$SD2_MOUNT" "${rom_source:-sd1}" "${bios_source:-sd1}"
+    access=$(mount_access "$SD2_MOUNT")
+    printf 'sd2_content=result-started mount=%s roms=%s bios=%s access=%s\n' \
+        "$SD2_MOUNT" "${rom_source:-sd1}" "${bios_source:-sd1}" "$access"
     return "$result"
 }
 
@@ -181,8 +233,10 @@ status_sd2() {
     sd2_source=$(mount_source "$SD2_MOUNT")
     rom_source=$(mount_source "$ROM_TARGET")
     bios_source=$(mount_source "$BIOS_TARGET")
-    printf 'sd2_mount=%s\nsd2_source=%s\nrom_target=%s\nrom_source=%s\nbios_target=%s\nbios_source=%s\n' \
-        "$SD2_MOUNT" "${sd2_source:-unmounted}" "$ROM_TARGET" \
+    access=unmounted
+    [ -z "$sd2_source" ] || access=$(mount_access "$SD2_MOUNT")
+    printf 'sd2_mount=%s\nsd2_source=%s\nsd2_access=%s\nrom_target=%s\nrom_source=%s\nbios_target=%s\nbios_source=%s\n' \
+        "$SD2_MOUNT" "${sd2_source:-unmounted}" "$access" "$ROM_TARGET" \
         "${rom_source:-sd1}" "$BIOS_TARGET" "${bios_source:-sd1}"
 }
 
