@@ -157,6 +157,9 @@
     FE/emulatorの寿命から独立させる。0..20 runtime変更、長押しrepeat、750ms後の設定保存、
     safe shutdown時flushを実装。FE設定画面も同じ`plumos-volume-control`を使用する。
     host fixtureは合格。物理キーとFE設定の実機操作確認を残す。
+  - BubbleのALSA softvolへ0..20を線形raw変換すると各段が約4.5 dBとなるため、Pixel2の
+    `n/20`線形振幅カーブを-90..0 dBのraw値へ変換した21段テーブルへ統一する。
+    最大値は従来どおり0 dB。hostで全21段のraw値と単調性を検証し、実聴確認を残す。
 - [ ] `BUB-P4-I05` normalized Bubble controller を公開し、FE/RetroArch/standaloneで1入力1反応を確認する。
   - FEとRetroArch RGUIでD-pad/A/B、SELECT+START終了を物理確認した。standaloneと全buttonを残す。
   - PicoArch QuickNESで物理A/B、Function1/2 menu、menu A決定/B戻る、FE復帰を利用者確認済み。

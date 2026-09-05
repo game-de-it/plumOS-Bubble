@@ -68,6 +68,37 @@ softvol_exists() {
     [ -x "$AMIXER" ] && "$AMIXER" cget iface=MIXER,name="$SOFTVOL_NAME" >/dev/null 2>&1
 }
 
+# Pixel2 applies logical volume as the linear sample-amplitude ratio n/20.
+# Bubble uses ALSA softvol whose 0..255 control is linear in dB, so feeding it
+# n*255/20 makes every button press a coarse ~4.5 dB jump. These raw values
+# convert the Pixel2 amplitude ratios to Bubble's -90..0 dB softvol scale.
+# Level 20 remains 0 dB/full scale and level 0 remains the softvol minimum.
+volume_to_raw() {
+    case $(normalize "$1") in
+        0) printf '0\n' ;;
+        1) printf '181\n' ;;
+        2) printf '198\n' ;;
+        3) printf '208\n' ;;
+        4) printf '215\n' ;;
+        5) printf '221\n' ;;
+        6) printf '225\n' ;;
+        7) printf '229\n' ;;
+        8) printf '232\n' ;;
+        9) printf '235\n' ;;
+        10) printf '238\n' ;;
+        11) printf '240\n' ;;
+        12) printf '242\n' ;;
+        13) printf '244\n' ;;
+        14) printf '246\n' ;;
+        15) printf '248\n' ;;
+        16) printf '250\n' ;;
+        17) printf '251\n' ;;
+        18) printf '252\n' ;;
+        19) printf '254\n' ;;
+        20) printf '255\n' ;;
+    esac
+}
+
 initialize() {
     [ -x "$AUDIO_OUTPUT" ] && [ -x "$AMIXER" ] && [ -x "$APLAY" ] || {
         printf 'required Bubble audio helper is missing\n' >"$LOG"
@@ -84,10 +115,11 @@ initialize() {
 apply() {
     value=$(normalize "${1:-$(read_runtime)}") || return 2
     initialize || return 1
-    raw=$(( (value * 255 + 10) / 20 ))
+    raw=$(volume_to_raw "$value") || return 2
     "$AMIXER" cset iface=MIXER,name="$SOFTVOL_NAME" "$raw" >"$LOG" 2>&1 || return 1
     write_runtime "$value"
-    printf 'volume=%s raw=%s\n' "$value" "$raw" >>"$LOG"
+    printf 'volume=%s raw=%s curve=pixel2-linear-amplitude-v1\n' \
+        "$value" "$raw" >>"$LOG"
 }
 
 change() {
