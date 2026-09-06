@@ -438,6 +438,10 @@
   - horizontal、vertical arcade、rotated handheld、square、wide、dual-screen、GLES経路を分離し、
     QuickNES一件の合格を他coreへ一般化しない。未試験導線はFEから消さず理由付きで維持する。
   - runtime logのframe/aspect/rotation/viewport/scanoutとPyxel fitを機械検査するverifierを追加。
+  - PicoArchのRGB565色順をFE公開20 coreすべて実機で補正ON/OFF比較し、同一frameの
+    RetroArch出力をNES/SNES/GB/GBA/GG/PCEの基準にした。18 coreはRGB565、FCEUmm/Nestopiaは
+    XRGB8888。Gambatte/Gearboy/Gearsystem/Supafaust/SuperGrafx/PicoDrive/VBA-Mの7 coreを
+    byte-swap対象とする機械可読表へ固定し、`systems.json`との全件一致をrelease gateへ追加した。
   - 起動168導線のrendererを再監査し、Mali 128、GL非使用CPU framebuffer 40、意図しない
     llvmpipe/softpipe/swrast mapping 0。geometryを出す123導線はhorizontal 112、vertical 11。
     VarthでArcade/CPS1 9導線を再試験し全起動、geometry出力8導線は3:4・360x480中央配置。

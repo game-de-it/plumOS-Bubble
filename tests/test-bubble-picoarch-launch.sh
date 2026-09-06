@@ -15,12 +15,15 @@ root=$tmp/plumos
 rom_root=$tmp/roms
 runtime=$tmp/run
 mkdir -p "$root/bin" "$root/picoarch/bin" "$root/picoarch/lib" \
-    "$root/emulator/lib" "$root/cores" "$root/share/alsa" \
+    "$root/emulator/lib" "$root/cores" "$root/share/alsa" "$root/share/picoarch" \
     "$rom_root/nes" "$rom_root/gamegear" "$runtime"
 cp package/picoarch-bubble/plumos/bin/plumos-picoarch-launch \
     "$root/bin/plumos-picoarch-launch"
+cp package/picoarch-bubble/plumos/share/picoarch/rgb565-byte-order.tsv \
+    "$root/share/picoarch/rgb565-byte-order.tsv"
 : >"$root/cores/quicknes_libretro.so"
 : >"$root/cores/gearsystem_libretro.so"
+: >"$root/cores/picodrive_libretro.so"
 : >"$root/share/alsa/alsa.conf"
 : >"$rom_root/nes/test.nes"
 : >"$rom_root/gamegear/test.gg"
@@ -57,16 +60,39 @@ grep -Fqx 'picoarch=stage-P19 system=nes core=quicknes rc=0' \
     "$root/logs/session.log"
 test "$(cat "$tmp/normal.rgb565")" = 0
 
-# Gearsystem's RGB565 output needs byte-order correction before PicoArch's
-# 16-bit scaler. A device screenshot otherwise turns the blue SEGA screen
-# green. Keep this per-core so correctly ordered cores remain untouched.
+TEST_TRACE=$tmp/forced-swap PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
+PLUMOS_BIOS_ROOT=$tmp/bios PLUMOS_RUNTIME_ROOT=$runtime \
+PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=nes \
+PLUMOS_PICOARCH_RGB565_BYTESWAP=1 \
+    "$root/bin/plumos-picoarch-launch" quicknes "$rom_root/nes/test.nes"
+test "$(cat "$tmp/forced-swap.rgb565")" = 1
+
+set +e
+TEST_TRACE=$tmp/invalid-swap PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
+PLUMOS_BIOS_ROOT=$tmp/bios PLUMOS_RUNTIME_ROOT=$runtime \
+PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=nes \
+PLUMOS_PICOARCH_RGB565_BYTESWAP=invalid \
+    "$root/bin/plumos-picoarch-launch" quicknes "$rom_root/nes/test.nes"
+invalid_swap_rc=$?
+set -e
+test "$invalid_swap_rc" -eq 2
+test ! -e "$tmp/invalid-swap.pid"
+
+# Gearsystem and PicoDrive both need byte-order correction before PicoArch's
+# 16-bit scaler. Device screenshots otherwise turn the blue SEGA screen green.
 TEST_TRACE=$tmp/gearsystem PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
 PLUMOS_BIOS_ROOT=$tmp/bios PLUMOS_RUNTIME_ROOT=$runtime \
 PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=gamegear \
     "$root/bin/plumos-picoarch-launch" gearsystem "$rom_root/gamegear/test.gg"
 test "$(cat "$tmp/gearsystem.rgb565")" = 1
-grep -Fqx 'picoarch=video-format core=gearsystem rgb565_byteswap=1' \
+grep -Fqx 'picoarch=video-format core=gearsystem pixel_format=rgb565 byte_order=byteswap rgb565_byteswap=1 evidence=device-ra-genesis-plus-gx-anchor-90f' \
     "$root/logs/picoarch-gamegear-gearsystem.log"
+
+TEST_TRACE=$tmp/picodrive PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
+PLUMOS_BIOS_ROOT=$tmp/bios PLUMOS_RUNTIME_ROOT=$runtime \
+PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=gamegear \
+    "$root/bin/plumos-picoarch-launch" picodrive "$rom_root/gamegear/test.gg"
+test "$(cat "$tmp/picodrive.rgb565")" = 1
 
 # The normal FE exposes content through /storage/user/Roms while the legacy
 # compatibility root is /storage/Roms -> user/Roms.  Both names must resolve to

@@ -14,6 +14,7 @@ CORE=$PLUMOS_ROOT/cores/${CORE_ID}_libretro.so
 LOG=$PLUMOS_ROOT/logs/picoarch-${SYSTEM_ID}-${CORE_ID}.log
 CPU_CONTROL=$PLUMOS_ROOT/bin/plumos-cpu-control
 PICOARCH_CONFIG=${PLUMOS_PICOARCH_CONFIG:-$PLUMOS_ROOT/config/standalone/picoarch.env}
+RGB565_BYTE_ORDER_TABLE=${PLUMOS_PICOARCH_RGB565_BYTE_ORDER_TABLE:-$PLUMOS_ROOT/share/picoarch/rgb565-byte-order.tsv}
 [ ! -r "$PICOARCH_CONFIG" ] || . "$PICOARCH_CONFIG"
 CPU_POLICY=${PLUMOS_PICOARCH_CPU_POLICY:-ondemand}
 PICOARCH_EFFECT=${PLUMOS_PICOARCH_EFFECT:-NONE}
@@ -66,12 +67,48 @@ if [ -x "$PLUMOS_ROOT/bin/plumos-audio-output" ]; then
 else
     ALSA_CONFIG="$PLUMOS_ROOT/share/alsa/alsa.conf"
 fi
-RGB565_BYTESWAP=0
-case "$CORE_ID" in
-    gearsystem|mednafen_ngp|mednafen_supergrafx|mednafen_supafaust) RGB565_BYTESWAP=1 ;;
+[ -r "$RGB565_BYTE_ORDER_TABLE" ] || {
+    echo "plumos-picoarch-launch: RGB565 byte-order table is missing" >&2
+    exit 1
+}
+RGB565_CLASSIFICATION=$($BB awk -F '\t' -v core="$CORE_ID" '
+    $1 == core {
+        count++
+        pixel_format = $2
+        byte_order = $3
+        evidence = $5
+    }
+    END {
+        if (count == 1)
+            printf "%s:%s:%s\n", pixel_format, byte_order, evidence
+        else
+            exit 1
+    }
+' "$RGB565_BYTE_ORDER_TABLE" 2>/dev/null || true)
+if [ -n "$RGB565_CLASSIFICATION" ]; then
+    PICOARCH_PIXEL_FORMAT=${RGB565_CLASSIFICATION%%:*}
+    RGB565_REMAINDER=${RGB565_CLASSIFICATION#*:}
+    RGB565_BYTE_ORDER=${RGB565_REMAINDER%%:*}
+    RGB565_EVIDENCE=${RGB565_REMAINDER#*:}
+else
+    PICOARCH_PIXEL_FORMAT=unclassified
+    RGB565_BYTE_ORDER=native
+    RGB565_EVIDENCE=unlisted-core
+fi
+case "$PICOARCH_PIXEL_FORMAT:$RGB565_BYTE_ORDER" in
+    rgb565:native|rgb565:byteswap|xrgb8888:native|unclassified:native) ;;
+    *) echo "plumos-picoarch-launch: invalid RGB565 byte-order classification: $CORE_ID" >&2; exit 2 ;;
 esac
-printf 'picoarch=video-format core=%s rgb565_byteswap=%s\n' \
-    "$CORE_ID" "$RGB565_BYTESWAP" >>"$LOG"
+RGB565_BYTESWAP_DEFAULT=0
+[ "$RGB565_BYTE_ORDER" != byteswap ] || RGB565_BYTESWAP_DEFAULT=1
+RGB565_BYTESWAP=${PLUMOS_PICOARCH_RGB565_BYTESWAP:-$RGB565_BYTESWAP_DEFAULT}
+case "$RGB565_BYTESWAP" in
+    0|1) ;;
+    *) echo "plumos-picoarch-launch: invalid RGB565 byte-order setting: $RGB565_BYTESWAP" >&2; exit 2 ;;
+esac
+printf 'picoarch=video-format core=%s pixel_format=%s byte_order=%s rgb565_byteswap=%s evidence=%s\n' \
+    "$CORE_ID" "$PICOARCH_PIXEL_FORMAT" "$RGB565_BYTE_ORDER" \
+    "$RGB565_BYTESWAP" "$RGB565_EVIDENCE" >>"$LOG"
 SYSTEM_DIR=$PLUMOS_BIOS_ROOT
 if [ "$CORE_ID" = scummvm ] && [ -f "$PLUMOS_ROOT/share/libretro-system/scummvm/extra/sky.cpt" ]; then
     SYSTEM_DIR=$PLUMOS_ROOT/share/libretro-system

@@ -1,0 +1,77 @@
+--- a/main.c
++++ b/main.c
+@@ -33,9 +33,34 @@
+ 
+ static uint32_t vsyncs;
+ static uint32_t renders;
++static uint32_t probe_frames;
++static uint32_t probe_max_frames;
++static const char *probe_screenshot;
++static int probe_failed;
+ 
+ static int64_t frame_deadline_ns;
+ 
++static int configure_frame_probe(void)
++{
++	const char *frames = getenv("PLUMOS_PICOARCH_PROBE_FRAMES");
++	char *end = NULL;
++	unsigned long value;
++
++	probe_screenshot = getenv("PLUMOS_PICOARCH_PROBE_SCREENSHOT");
++	if (!frames || !frames[0])
++		return probe_screenshot && probe_screenshot[0] ? -1 : 0;
++
++	errno = 0;
++	value = strtoul(frames, &end, 10);
++	if (errno || end == frames || *end || value == 0 || value > UINT32_MAX)
++		return -1;
++	probe_max_frames = (uint32_t)value;
++	PA_INFO("Frame probe armed: frames=%u screenshot=%s.bmp\n",
++	        probe_max_frames,
++	        probe_screenshot && probe_screenshot[0] ? probe_screenshot : "disabled");
++	return 0;
++}
++
+ static int64_t monotonic_ns(void)
+ {
+ 	struct timespec now;
+@@ -639,6 +664,10 @@
+ #endif
+ 	show_startup_message();
+ 	state_resume();
++	if (configure_frame_probe()) {
++		PA_ERROR("Invalid frame probe configuration\n");
++		quit(-1);
++	}
+ 
+ 	if (core_start_audio_callback())
+ 		quit(-1);
+@@ -648,13 +677,27 @@
+ 		adjust_audio();
+ 		core_run_frame_time_callback();
+ 		current_core.retro_run();
++		probe_frames++;
++		if (probe_max_frames && probe_frames >= probe_max_frames) {
++			if (probe_screenshot && probe_screenshot[0] &&
++			    plat_dump_screen(probe_screenshot) < 0) {
++				PA_ERROR("Frame probe screenshot failed: %s.bmp\n",
++				         probe_screenshot);
++				probe_failed = 1;
++			}
++			PA_INFO("Frame probe complete: frames=%u screenshot=%s.bmp\n",
++			        probe_frames,
++			        probe_screenshot && probe_screenshot[0]
++			          ? probe_screenshot : "disabled");
++			should_quit = true;
++		}
+ 		if (!should_quit) {
+ 			plat_video_flip();
+ 			pace_frame();
+ 		}
+ 	} while (!should_quit);
+ 
+-	return quit(0);
++	return quit(probe_failed ? 1 : 0);
+ }
+ 
+ int quit(int code) {

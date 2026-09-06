@@ -6,11 +6,16 @@ systems=${PLUMOS_BUBBLE_SYSTEMS_JSON:-$repo_root/package/frontend-bubble/plumos/
 apps=${PLUMOS_BUBBLE_APPS_JSON:-$repo_root/package/frontend-bubble/plumos/config/frontend/apps.json}
 coverage=${PLUMOS_BUBBLE_RUNTIME_COVERAGE_JSON:-$repo_root/package/frontend-bubble/plumos/config/frontend/runtime-coverage.json}
 rocknix_policy=${PLUMOS_BUBBLE_ROCKNIX_EXTENSION_POLICY:-$repo_root/package/frontend-bubble/plumos/config/frontend/rocknix-extension-policy.json}
+picoarch_rgb565_matrix=${PLUMOS_BUBBLE_PICOARCH_RGB565_MATRIX:-$repo_root/package/picoarch-bubble/plumos/share/picoarch/rgb565-byte-order.tsv}
 app_root=${PLUMOS_BUBBLE_APP_ROOT:-}
 
 for json in "$systems" "$apps" "$coverage" "$rocknix_policy"; do
     jq -e . "$json" >/dev/null
 done
+
+PLUMOS_BUBBLE_SYSTEMS_JSON=$systems \
+PLUMOS_BUBBLE_PICOARCH_RGB565_MATRIX=$picoarch_rgb565_matrix \
+    "$repo_root/tests/test-bubble-picoarch-rgb565-matrix.sh"
 
 test "$(jq '.systems | length' "$systems")" -eq 98
 test "$(jq '[.systems[].launch_profiles[]] | length' "$systems")" -eq 196
@@ -112,6 +117,7 @@ if [ -n "$app_root" ]; then
     test -x "$app_root/picoarch/bin/picoarch"
     test -f "$app_root/picoarch/lib/libSDL2-2.0.so.0"
     test -f "$app_root/licenses/picoarch-SDL2-LICENSE.txt"
+    cmp "$picoarch_rgb565_matrix" "$app_root/share/picoarch/rgb565-byte-order.tsv"
     jq -r '.systems[].launch_profiles[] | select(startswith("picoarch:")) | sub("^picoarch:"; "")' \
         "$systems" | sort -u | while IFS= read -r core_id; do
         test -f "$app_root/cores/${core_id}_libretro.so" || {
