@@ -35,7 +35,12 @@ The startup failure was not one fault:
    the trusted library path with only the adapter directory; and
 8. third-party scripts are allowed to replace `LD_LIBRARY_PATH` and
    `LD_PRELOAD`, so a correct initial environment alone did not protect child
-   processes or provide reliable session cleanup.
+   processes or provide reliable session cleanup; and
+9. the first normal-FE Apotris run produced audio but no image because the
+   installed-port launcher did not preload the canonical Mali mega-DSO or the
+   FE broker's DRM-sharing DSO. The process consequently mapped separate
+   `libEGL.so.1`, `libGLESv2.so.2` and `libgbm.so.1` copies of the vendor
+   runtime, matching the already-fixed PPSSPP/NDS black-screen failure mode.
 
 The final GPU fix is deliberately not a software fallback. Bubble's stock GPU
 runtime is one stateful mega-DSO, so the GUI preloads canonical
@@ -88,17 +93,24 @@ Additional focused tests cover:
   remain delegated to the stock applet.
 
 The reproducible component build passed all 244 SHA-256 entries with adapter
-28 at source commit `0a93de6`. Mutable `apps/portmaster/installed.json` remains
+29 at source commit `d39fd74`. Mutable `apps/portmaster/installed.json` remains
 a first-install seed but is deliberately excluded from component checksums.
 
 ## Device evidence
 
-Adapter 28 was staged, archive-hash verified, extracted, component-hash
+Adapter 29 was staged, archive-hash verified, extracted, component-hash
 verified and switched file by file with rollback before the final readback.
 
-- manifest: `adapter_version=28`, `source_ref=0a93de6`;
+- manifest: `adapter_version=29`, `source_ref=d39fd74`;
 - mutable `installed.json` SHA-256 before and after:
   `dda981ad47dc16b78e21c3fedc1fd118fe4ee8e5c122a603274bf72fdf4d506f`;
+- the installed-port launcher now keeps the FE broker's managed
+  `libplumos-drm-share.so`, preloads canonical
+  `/storage/plumos/emulator/lib/libmali.so.1`, and pins both SDL EGL/GL driver
+  paths to that same DSO. The environment guard carries the complete preload
+  chain through child `execve` and `posix_spawn` calls;
+- all 244 managed hashes passed again after the live switch and the two
+  changed runtime files matched the reproducible build byte-for-byte;
 - GUI remained alive beyond 22 seconds;
 - process mappings contained only
   `/storage/plumos/emulator/lib/libmali.so.1` and
@@ -124,14 +136,15 @@ acceptance.
 
 Apotris is the only installed port script on this device, so it is the current
 representative AArch64 runtime. Process/loader/lifecycle acceptance is complete.
-Physical LCD, controller and audio behavior through the normal FE selection is
-still a user-observed acceptance step; process liveness alone is not recorded
-as visual or input acceptance.
+Physical LCD and controller behavior through the normal FE selection after the
+adapter 29 renderer fix is still a user-observed acceptance step; process
+liveness and the previously observed audio alone are not recorded as visual or
+input acceptance.
 
 ## Capacity note
 
 Existing exact PortMaster rollback directories, including adapter 26 to 27 and
-27 to 28, were retained because deleting rollback data was not part of this
+27 to 28 and 28 to 29, were retained because deleting rollback data was not part of this
 validation. The device had about 107 MiB free before the final delta. Old
 intermediate rollback directories may be removed only with an explicit target
 boundary while retaining the latest known-good rollback.

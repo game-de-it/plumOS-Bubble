@@ -365,6 +365,11 @@
     tagged process/mount/holdが0、FE 1 processへ復帰、mutable `installed.json` hash不変。
     実機にあるport scriptはApotris 1件のみのため、物理LCD/input/audioのFE導線確認と、
     将来追加される異なるruntime種別の代表試験を残す。
+  - 通常FE導線のApotrisで音声のみ進み画面が出ない状態を再現。port launcherだけcanonical
+    `libmali.so.1`とFE DRM broker共有DSOを継承せず、EGL/GLES/GBM別名のmega-DSOを分離map
+    していた。adapter 29でmanaged DRM share、canonical Mali、SDL EGL/GL driverを同じ
+    preload chainへ固定し、実機live deploy後244/244 checksumとmutable state不変を確認。
+    修正後の物理LCD/input/終了復帰を残す。
 - [ ] `BUB-P6-07` app/game終了時に同一sessionだけを回収し、frontend/device ownershipを復元する。
   - SSH benchmarkがfrontendを複数回停止してPID 1の4回restart limitへ到達した。`sync`後の
     強制rebootで通常FE 1 processへ復旧。今後の繰返し性能試験は通常FE導線を各試行で使うか、
