@@ -147,6 +147,21 @@ prepare() {
   link_one libbrotlicommon.so.1 \
     "${ADAPTER_DIR}/lib/aarch64/libbrotlicommon.so.1" \
     "${NEXTCOMMANDER_LIB}/libbrotlicommon.so.1.0.9"
+  # fluidsynth is pulled in by SDL2_mixer and requires the GLib thread
+  # compatibility library before PortMaster has imported any GUI code.  Keep
+  # this closure component-local instead of relying on another app's search
+  # path; Bubble's stock userspace does not provide libgthread.
+  link_one libgthread-2.0.so.0 \
+    "${ADAPTER_DIR}/lib/aarch64/libgthread-2.0.so.0"
+  link_one libglib-2.0.so.0 \
+    "${ADAPTER_DIR}/lib/aarch64/libglib-2.0.so.0"
+  link_one libpcre2-8.so.0 \
+    "${ADAPTER_DIR}/lib/aarch64/libpcre2-8.so.0"
+  # The stock Bubble userspace omits the legacy librt DSO.  The manylinux
+  # fluidsynth payload still records this SONAME even though modern glibc has
+  # folded its implementation into libc.
+  link_one librt.so.1 \
+    "${ADAPTER_DIR}/lib/aarch64/librt.so.1"
   link_one libSDL2_gfx-1.0.so.0 \
     "${ADAPTER_DIR}/lib/aarch64/libSDL2_gfx-1.0.so.0"
   link_one libopenal.so.1 \

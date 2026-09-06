@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="${ROOT_DIR:-/workspace}"
+HOST_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+TOOLS_IMAGE="${PLUMOS_BUBBLE_TOOLS_IMAGE:-plumos-bubble-tools:dev}"
+if [[ ${1:-} != --inside ]]; then
+    docker image inspect "$TOOLS_IMAGE" >/dev/null 2>&1 ||
+        "$HOST_ROOT/scripts/build-bubble-tools-image.sh"
+    exec docker run --rm --platform linux/arm64 \
+        -e SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-}" \
+        -e PLUMOS_BUBBLE_VERSION="${PLUMOS_BUBBLE_VERSION:-0.1.0-dev}" \
+        -v "$HOST_ROOT:/work" -w /work "$TOOLS_IMAGE" \
+        ./scripts/build-portmaster-bubble.sh --inside
+fi
+shift
+
+ROOT_DIR="${ROOT_DIR:-/work}"
 OUT_DIR="${PLUMOS_BUBBLE_PORTMASTER_OUT:-${ROOT_DIR}/output/portmaster/bubble}"
 BUILD_DIR="${PLUMOS_BUBBLE_PORTMASTER_BUILD_DIR:-${ROOT_DIR}/build/portmaster-bubble}"
 CACHE_DIR="${PLUMOS_BUBBLE_PORTMASTER_CACHE_DIR:-${ROOT_DIR}/.cache/portmaster}"
@@ -51,7 +64,7 @@ CAIRO_COMPAT_SHA256="445ed8208a6e4823de1226a74ca319d3600e83f6369f99b14265006599c
 PIXMAN_RUNTIME_VERSION="0.42.2-1"
 SQUASHFS_TOOLS_VERSION="1:4.5.1-1"
 ZIP_VERSION="3.0-13"
-ADAPTER_VERSION="19"
+ADAPTER_VERSION="20"
 
 usage() {
     cat <<EOF
@@ -81,12 +94,18 @@ case "${1:-}" in
         ;;
 esac
 
-for tool in cmake curl dpkg-query make md5sum meson ninja sha256sum tar unzip python3 rsync zip; do
+for tool in cmake curl dpkg-query ldd make md5sum meson ninja readelf sha256sum tar unzip python3 rsync zip; do
     command -v "$tool" >/dev/null 2>&1 || {
         printf 'error: required tool is unavailable: %s\n' "$tool" >&2
         exit 1
     }
 done
+
+glib_runtime_version="$(dpkg-query -W -f='${Version}' libglib2.0-0)"
+[ -n "$glib_runtime_version" ] || {
+    printf 'error: GLib runtime dependency is unavailable\n' >&2
+    exit 1
+}
 
 actual_squashfs_tools_version="$(dpkg-query -W -f='${Version}' squashfs-tools)"
 [ "$actual_squashfs_tools_version" = "$SQUASHFS_TOOLS_VERSION" ] || {
@@ -625,6 +644,10 @@ libharfbuzz.so.0:libharfbuzz.so.0.*
 libgraphite2.so.3:libgraphite2.so.3.*
 libbrotlidec.so.1:libbrotlidec.so.1.*
 libbrotlicommon.so.1:libbrotlicommon.so.1.*
+libgthread-2.0.so.0:libgthread-2.0.so.0.*
+libglib-2.0.so.0:libglib-2.0.so.0.*
+libpcre2-8.so.0:libpcre2-8.so.0.*
+librt.so.1:librt.so.1
 EOF
 install -m 0755 /usr/bin/unsquashfs \
     "$stage_dir/plumos/apps/portmaster/adapter/bin/aarch64/unsquashfs"
@@ -701,6 +724,76 @@ done
 install -m 0644 \
     "$stage_dir/plumos/apps/portmaster/upstream/PortMaster/runtimes/love_11.5/libs.aarch64/libmodplug.so.1" \
     "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64/libmodplug.so.1"
+
+# Validate the same GUI DSO search path used on Bubble.  Direct NEEDED checks
+# missed fluidsynth's libgthread dependency once; ldd here verifies the full
+# transitive closure before a component can be emitted.
+pyxel_component="$ROOT_DIR/output/pyxel/bubble/plumos"
+nextcommander_component="$ROOT_DIR/output/nextcommander/bubble/plumos"
+libretro_component="$ROOT_DIR/output/libretro-cores/bubble-all/plumos"
+for required_dir in \
+    "$pyxel_component/apps/pyxel/lib" \
+    "$pyxel_component/apps/python/lib" \
+    "$pyxel_component/apps/pyxel/site/pygame.libs"; do
+    [ -d "$required_dir" ] || {
+        printf 'error: PortMaster GUI closure input is missing: %s\n' \
+            "$required_dir" >&2
+        exit 1
+    }
+done
+runtime_audit_dir="$stage_dir/.portmaster-runtime-audit"
+mkdir -p "$runtime_audit_dir"
+for library in "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64"/*; do
+    ln -sf "$library" "$runtime_audit_dir/$(basename "$library")"
+done
+ln -sf "$pyxel_component/apps/pyxel/lib/libSDL2-2.0.so.0" \
+    "$runtime_audit_dir/libSDL2-2.0.so.0"
+fluidsynth_library="$(find "$pyxel_component/apps/pyxel/site/pygame.libs" \
+    -maxdepth 1 -type f -name 'libfluidsynth-*.so.3.*' -print -quit)"
+[ -n "$fluidsynth_library" ] || {
+    printf 'error: PortMaster GUI fluidsynth closure input is missing\n' >&2
+    exit 1
+}
+ln -sf "$fluidsynth_library" "$runtime_audit_dir/libfluidsynth.so.3"
+if [ -f "$libretro_component/emulator/lib/libvorbisfile.so.3" ]; then
+    ln -sf "$libretro_component/emulator/lib/libvorbisfile.so.3" \
+        "$runtime_audit_dir/libvorbisfile.so.3"
+fi
+ln -sf "$pyxel_component/apps/python/lib/libbz2.so.1.0" \
+    "$runtime_audit_dir/libbz2.so.1.0"
+
+gui_library_path="$runtime_audit_dir:$pyxel_component/apps/pyxel/lib:$pyxel_component/apps/python/lib"
+[ ! -d "$nextcommander_component/apps/nextcommander/lib" ] || \
+    gui_library_path="$gui_library_path:$nextcommander_component/apps/nextcommander/lib"
+[ ! -d "$libretro_component/emulator/lib" ] || \
+    gui_library_path="$gui_library_path:$libretro_component/emulator/lib"
+gui_library_path="$gui_library_path:$pyxel_component/apps/pyxel/site/pygame.libs"
+for gui_library in \
+    libSDL2_image-2.0.so.0 \
+    libSDL2_mixer-2.0.so.0 \
+    libSDL2_ttf-2.0.so.0; do
+    closure="$(LD_LIBRARY_PATH="$gui_library_path" \
+        ldd "$runtime_audit_dir/$gui_library" 2>&1)"
+    if printf '%s\n' "$closure" | grep -q 'not found'; then
+        printf 'error: PortMaster GUI transitive dependency is missing for %s:\n%s\n' \
+            "$gui_library" "$closure" >&2
+        exit 1
+    fi
+done
+for owned_soname in libgthread-2.0.so.0 librt.so.1; do
+    owned_path="$(LD_LIBRARY_PATH="$gui_library_path" \
+        ldd "$runtime_audit_dir/libSDL2_mixer-2.0.so.0" |
+        awk -v soname="$owned_soname" '$1 == soname && $2 == "=>" {print $3; exit}')"
+    case "$owned_path" in
+        "$runtime_audit_dir/"*) ;;
+        *)
+            printf 'error: PortMaster GUI %s escaped component runtime: %s\n' \
+                "$owned_soname" "${owned_path:-missing}" >&2
+            exit 1
+            ;;
+    esac
+done
+rm -rf "$runtime_audit_dir"
 install -m 0644 "$openal_src/COPYING" \
     "$stage_dir/plumos/licenses/openal-soft-LGPL-2.0-or-later.txt"
 install -m 0644 "$ffmpeg_compat_src/COPYING.LGPLv2.1" \
@@ -731,6 +824,10 @@ install -m 0644 /usr/share/doc/libsdl2-gfx-1.0-0/copyright \
     "$stage_dir/plumos/licenses/libsdl2-gfx-copyright.txt"
 install -m 0644 /usr/share/doc/libsdl2-mixer-2.0-0/copyright \
     "$stage_dir/plumos/licenses/libsdl2-mixer-copyright.txt"
+install -m 0644 /usr/share/doc/libglib2.0-0/copyright \
+    "$stage_dir/plumos/licenses/libglib2.0-copyright.txt"
+install -m 0644 /usr/share/doc/libpcre2-8-0/copyright \
+    "$stage_dir/plumos/licenses/libpcre2-copyright.txt"
 mkdir -p \
     "$stage_dir/plumos/state/portmaster/config" \
     "$stage_dir/plumos/state/portmaster/libs" \
@@ -768,6 +865,8 @@ cat > "$stage_dir/plumos/components/portmaster/manifest.json" <<EOF
   "upstream_sha256": "${actual_sha256}",
   "cairo_compat_version": "${CAIRO_COMPAT_VERSION}",
   "runtime_abi": "plumos-bubble-portmaster-v1",
+  "gui_runtime_preflight": ["SDL2_image", "SDL2_mixer", "SDL2_ttf"],
+  "gui_transitive_closure": "build-time ldd plus device-time ctypes load",
   "depends_on": ["frontend", "pyxel"],
   "display": "SDL2 KMSDRM 640x480; GUI requires Bubble Mali-G52 GLES2; ports own renderer selection",
   "software_renderer_forced": false,
@@ -803,6 +902,8 @@ rsync -a "$stage_dir/plumos/" "$OUT_DIR/plumos/"
         -o -path 'licenses/libpixman-*' \
         -o -path 'licenses/libsdl2-gfx-*' \
         -o -path 'licenses/libsdl2-mixer-*' \
+        -o -path 'licenses/libglib2.0-*' \
+        -o -path 'licenses/libpcre2-*' \
         -o -path 'components/portmaster/manifest.json' \) \
         -print |
         sort |
@@ -839,6 +940,7 @@ meson_bootstrap_sha256=${actual_meson_bootstrap_sha256}
 cairo_compat_version=${CAIRO_COMPAT_VERSION}
 cairo_compat_sha256=${actual_cairo_compat_sha256}
 pixman_runtime_version=${actual_pixman_runtime_version}
+glib_runtime_version=${glib_runtime_version}
 squashfs_tools_version=${actual_squashfs_tools_version}
 zip_version=${actual_zip_version}
 unsquashfs_sha256=$(sha256sum /usr/bin/unsquashfs | awk '{print $1}')

@@ -19,11 +19,14 @@ ADAPTER_DIR="${APP_ROOT}/adapter"
 STATE_ROOT="${PLUMOS_ROOT}/state/portmaster"
 DATA_ROOT="${PLUMOS_PORTMASTER_DATA_ROOT:-${STATE_ROOT}/data}"
 PM_DIR="${DATA_ROOT}/upstream/PortMaster"
+RESTART_FILE="${PM_DIR}/.pugwash-reboot"
 LOG_FILE="${PLUMOS_ROOT}/logs/apps/portmaster.log"
 PID_FILE="${RUN_ROOT}/portmaster.pid"
 MOUNTS_FILE="${RUN_ROOT}/state.mounts"
+MOUNT_CLEANUP="${PLUMOS_ROOT}/bin/plumos-portmaster-mount-cleanup"
 child_pid=""
 restore_frontend=0
+cleanup_done=0
 [ -x "$BB" ] || BB=/bin/busybox
 
 frontend_is_ancestor() {
@@ -52,12 +55,13 @@ is_mounted() {
 }
 
 cleanup() {
-  if [ -f "$MOUNTS_FILE" ]; then
-    sed '1!G;h;$!d' "$MOUNTS_FILE" 2>/dev/null | while IFS= read -r target; do
-      [ -n "$target" ] || continue
-      is_mounted "$target" && umount "$target" 2>/dev/null || true
-    done
-    rm -f "$MOUNTS_FILE"
+  [ "$cleanup_done" -eq 0 ] || return 0
+  cleanup_done=1
+  if [ -x "$MOUNT_CLEANUP" ]; then
+    "$BB" sh "$MOUNT_CLEANUP" "$MOUNTS_FILE" \
+      "${PM_DIR}/pugwash.txt" \
+      "${PM_DIR}/config" "${PM_DIR}/libs" "${PM_DIR}/themes" \
+      >> "$LOG_FILE" 2>&1 || true
   fi
   recorded="$(cat "$PID_FILE" 2>/dev/null || true)"
   if [ -n "$child_pid" ] && [ "$recorded" = "$child_pid" ]; then
@@ -67,7 +71,8 @@ cleanup() {
   # boundary before returning control to the frontend or accepting a reboot.
   sync
   if [ "$restore_frontend" -eq 1 ] && ! frontend_running; then
-    nohup "$BB" sh "${PLUMOS_ROOT}/bin/plumos-frontend-launch" >/dev/null 2>&1 &
+    "$BB" setsid "$BB" sh "${PLUMOS_ROOT}/bin/plumos-frontend-launch" \
+      >/dev/null 2>&1 </dev/null &
   fi
 }
 
@@ -97,6 +102,16 @@ if [ -f "$PID_FILE" ]; then
   rm -f "$PID_FILE"
 fi
 
+[ -x "$MOUNT_CLEANUP" ] || {
+  printf 'plumos-portmaster-launch: mount cleanup helper is missing: %s\n' \
+    "$MOUNT_CLEANUP" >&2
+  exit 127
+}
+"$BB" sh "$MOUNT_CLEANUP" "$MOUNTS_FILE" \
+  "${PM_DIR}/pugwash.txt" \
+  "${PM_DIR}/config" "${PM_DIR}/libs" "${PM_DIR}/themes" \
+  >> "$LOG_FILE" 2>&1 || exit 1
+
 "$BB" sh "${PLUMOS_ROOT}/bin/plumos-portmaster-runtime" prepare >/dev/null || exit 1
 
 : > "$MOUNTS_FILE"
@@ -120,11 +135,6 @@ for name in config libs themes; do
   mount --bind "$source_dir" "$target_dir" || exit 1
   printf '%s\n' "$target_dir" >> "$MOUNTS_FILE"
 done
-
-if ! frontend_is_ancestor && frontend_running; then
-  "$BB" sh "${PLUMOS_ROOT}/bin/plumos-frontend-stop" stop >> "$LOG_FILE" 2>&1
-  restore_frontend=1
-fi
 
 audio_output="${PLUMOS_ROOT}/bin/plumos-audio-output"
 if [ -x "$audio_output" ]; then
@@ -180,15 +190,63 @@ unset LIBGL_ALWAYS_SOFTWARE MESA_LOADER_DRIVER_OVERRIDE \
   LIBGL_DRIVERS_PATH __EGL_VENDOR_LIBRARY_FILENAMES
 mkdir -p "$HOME" "$XDG_CACHE_HOME" "$HM_PORTS_DIR"
 
+# Do this while the frontend still owns its renderer on direct launches.  A
+# missing transitive DSO must fail back to the menu instead of producing a
+# long black screen after display handoff.
+if ! "$BB" sh "${PLUMOS_ROOT}/bin/plumos-python-bubble" -c \
+  'import ctypes; ctypes.CDLL("libSDL2_image-2.0.so.0"); ctypes.CDLL("libSDL2_mixer-2.0.so.0"); ctypes.CDLL("libSDL2_ttf-2.0.so.0")' \
+  >> "$LOG_FILE" 2>&1; then
+  printf 'plumos-portmaster-launch: GUI runtime preflight failed; see %s\n' \
+    "$LOG_FILE" >&2
+  exit 70
+fi
+
+if ! frontend_is_ancestor && frontend_running; then
+  "$BB" sh "${PLUMOS_ROOT}/bin/plumos-frontend-stop" stop >> "$LOG_FILE" 2>&1
+  restore_frontend=1
+fi
+
 printf '\n[%s] launch version=%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
   "$(cat "${PM_DIR}/version" 2>/dev/null || printf unknown)" \
   "$(printf '%s' "$audio_status" | tr '\n' ' ')" >> "$LOG_FILE"
 printf 'renderer=mali-g52-gles2 software_fallback=false\n' >>"$LOG_FILE"
 
-"$BB" sh "${PLUMOS_ROOT}/bin/plumos-python-bubble" \
-  "${ADAPTER_DIR}/plumos_portmaster_bootstrap.py" "$@" >> "$LOG_FILE" 2>&1 &
-child_pid=$!
-printf '%s\n' "$child_pid" > "$PID_FILE"
-wait "$child_pid"
-rc=$?
-exit "$rc"
+# Preserve PortMaster.sh's outer restart contract.  Language, theme and
+# release-channel changes request a GUI restart using this marker.  A stale
+# marker left by an interrupted session must not suppress every later launch.
+if [ -e "$RESTART_FILE" ]; then
+  printf '[%s] restart-marker=stale action=consume\n' \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "$LOG_FILE"
+  rm -f "$RESTART_FILE" || exit 1
+fi
+
+restart_limit="${PLUMOS_PORTMASTER_RESTART_LIMIT:-8}"
+case "$restart_limit" in
+  ''|*[!0-9]*|0)
+    printf 'plumos-portmaster-launch: invalid restart limit: %s\n' \
+      "$restart_limit" >&2
+    exit 64
+    ;;
+esac
+restart_count=0
+
+while :; do
+  "$BB" sh "${PLUMOS_ROOT}/bin/plumos-python-bubble" \
+    "${ADAPTER_DIR}/plumos_portmaster_bootstrap.py" "$@" >> "$LOG_FILE" 2>&1 &
+  child_pid=$!
+  printf '%s\n' "$child_pid" > "$PID_FILE"
+  wait "$child_pid"
+  rc=$?
+
+  [ -e "$RESTART_FILE" ] || exit "$rc"
+  rm -f "$RESTART_FILE" || exit 1
+  restart_count=$((restart_count + 1))
+  printf '[%s] restart-marker=requested count=%s rc=%s\n' \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$restart_count" "$rc" \
+    >> "$LOG_FILE"
+  if [ "$restart_count" -ge "$restart_limit" ]; then
+    printf 'plumos-portmaster-launch: restart limit reached: %s\n' \
+      "$restart_limit" >&2
+    exit 75
+  fi
+done

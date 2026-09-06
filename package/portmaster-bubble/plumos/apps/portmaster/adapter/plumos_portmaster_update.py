@@ -46,7 +46,7 @@ EXECUTABLE_FILES = (
     "PortMaster/gptokeyb",
     "PortMaster/gptokeyb2",
 )
-ADAPTER_VERSION = 12
+ADAPTER_VERSION = 20
 STALE_UPDATE_PREFIXES = (
     "portmaster-download-",
     "upstream.next.",

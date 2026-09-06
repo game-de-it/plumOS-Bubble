@@ -25,8 +25,10 @@ PID_FILE="${RUN_ROOT}/port.pid"
 START_FILE="${RUN_ROOT}/port.starttime"
 SCRIPT_FILE="${RUN_ROOT}/port.script"
 MOUNTS_FILE="${RUN_ROOT}/port.mounts"
+MOUNT_CLEANUP="${PLUMOS_ROOT}/bin/plumos-portmaster-mount-cleanup"
 child=""
 restore_frontend=0
+cleanup_done=0
 script="${1:-}"
 [ -n "$script" ] || { printf 'usage: plumOS-portmaster-port-launch SCRIPT [ARGS...]\n' >&2; exit 64; }
 shift
@@ -90,6 +92,8 @@ is_mounted() {
 }
 
 cleanup() {
+  [ "$cleanup_done" -eq 0 ] || return 0
+  cleanup_done=1
   if [ -n "$child" ]; then
     recorded="$(cat "$PID_FILE" 2>/dev/null || true)"
     if [ "$recorded" = "$child" ]; then
@@ -102,15 +106,19 @@ cleanup() {
     fi
   fi
   "$BB" sh "${PLUMOS_ROOT}/bin/plumos-portmaster-gptokeyb-stop" stop 2>/dev/null || true
-  if [ -f "$MOUNTS_FILE" ]; then
-    sed '1!G;h;$!d' "$MOUNTS_FILE" 2>/dev/null | while IFS= read -r target; do
-      [ -n "$target" ] || continue
-      is_mounted "$target" && umount "$target" 2>/dev/null || true
-    done
+  if [ -x "$MOUNT_CLEANUP" ]; then
+    "$BB" sh "$MOUNT_CLEANUP" "$MOUNTS_FILE" \
+      /usr/lib/compat \
+      "${PM_DIR}/utils/patcher.txt" \
+      "${PM_DIR}/utils/patcher/main.lua" \
+      "${PM_DIR}/utils/patcher/talkies.lua" \
+      "${PM_DIR}/config" "${PM_DIR}/libs" "${PM_DIR}/themes" \
+      >> "$LOG_FILE" 2>&1 || true
   fi
-  rm -f "$PID_FILE" "$START_FILE" "$SCRIPT_FILE" "$MOUNTS_FILE"
+  rm -f "$PID_FILE" "$START_FILE" "$SCRIPT_FILE"
   if [ "$restore_frontend" -eq 1 ] && ! frontend_running; then
-    nohup "$BB" sh "${PLUMOS_ROOT}/bin/plumos-frontend-launch" >/dev/null 2>&1 &
+    "$BB" setsid "$BB" sh "${PLUMOS_ROOT}/bin/plumos-frontend-launch" \
+      >/dev/null 2>&1 </dev/null &
   fi
 }
 
@@ -189,6 +197,18 @@ if [ -f "$PID_FILE" ]; then
   fi
   rm -f "$PID_FILE" "$START_FILE" "$SCRIPT_FILE"
 fi
+
+[ -x "$MOUNT_CLEANUP" ] || {
+  printf 'PortMaster mount cleanup helper is missing: %s\n' "$MOUNT_CLEANUP" >&2
+  exit 127
+}
+"$BB" sh "$MOUNT_CLEANUP" "$MOUNTS_FILE" \
+  /usr/lib/compat \
+  "${PM_DIR}/utils/patcher.txt" \
+  "${PM_DIR}/utils/patcher/main.lua" \
+  "${PM_DIR}/utils/patcher/talkies.lua" \
+  "${PM_DIR}/config" "${PM_DIR}/libs" "${PM_DIR}/themes" \
+  >> "$LOG_FILE" 2>&1 || exit 1
 
 "$BB" sh "${PLUMOS_ROOT}/bin/plumos-portmaster-runtime" prepare >/dev/null || exit 1
 mkdir -p "$RUN_ROOT" "$(dirname "$LOG_FILE")" "$STATE_ROOT/home"
