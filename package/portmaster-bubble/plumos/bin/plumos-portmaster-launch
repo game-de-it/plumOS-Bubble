@@ -170,7 +170,10 @@ export HM_PORTS_DIR="${PLUMOS_ROM_ROOT}/PORTS"
 export HM_SCRIPTS_DIR="${PLUMOS_ROM_ROOT}/PORTS"
 export PATH="${ADAPTER_DIR}/shims:${ADAPTER_DIR}/bin/aarch64:${PLUMOS_ROOT}/bin:${PATH}"
 export LD_LIBRARY_PATH="${RUN_ROOT}/lib:${PLUMOS_ROOT}/apps/pyxel/lib:${PLUMOS_ROOT}/apps/python/lib:${PLUMOS_ROOT}/lib:${PLUMOS_ROOT}/apps/nextcommander/lib:${PLUMOS_ROOT}/emulator/lib:${PLUMOS_ROOT}/apps/pyxel/site/pygame.libs:${LD_LIBRARY_PATH:-}"
-export PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH="${RUN_ROOT}/lib:${PLUMOS_ROOT}/lib:${PLUMOS_ROOT}/apps/nextcommander/lib:${PLUMOS_ROOT}/emulator/lib:${PLUMOS_ROOT}/apps/pyxel/site/pygame.libs"
+# Keep vendor GBM ahead of the Mesa GBM copies carried by utility apps. SDL's
+# KMSDRM backend opens libgbm independently of its EGL/GL driver hints; mixing
+# Mesa GBM with Bubble's stateful Mali EGL/GLES DSO fails window creation.
+export PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH="${PLUMOS_ROOT}/emulator/lib:${RUN_ROOT}/lib:${PLUMOS_ROOT}/lib:${PLUMOS_ROOT}/apps/nextcommander/lib:${PLUMOS_ROOT}/apps/pyxel/site/pygame.libs"
 export PYSDL2_DLL_PATH="${RUN_ROOT}/lib"
 export SDL_VIDEODRIVER="kmsdrm"
 export SDL_RENDER_DRIVER="opengles2"
