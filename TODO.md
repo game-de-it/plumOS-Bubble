@@ -352,10 +352,20 @@
     30拡張子は理由付き除外とした。実機の隔離fixtureでは52/52を認識し、ROM SD 4,745 fileは
     read-only棚卸しのみ実施した。各実形式のcore起動確認と残りcoverage項目は継続する。
 - [ ] `BUB-P6-06` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。
+  - MF/V90S/Pixel2のPortMaster履歴を再監査し、GUI restart marker、component-owned
+    Bash/patcher/LOVE、font/cairo/audio/transitive DSO、`pgrep -f`、GPTokeYB所有権付き停止、
+    session/mount回収、staged updateをBubble adapter 24へ反映した。実機GUIはcanonical
+    Mali EGL/GLES/GBMのみで22秒超生存し、Mesa software fallbackはゼロ。物理入力・通常終了と、
+    portを1件導入後の代表runtime試験を残す（現時点の実機port scriptは0件）。
+  - Pixel2で起動時の同期auditが長時間化とmount残留を起こした履歴があるため、installed-port
+    static auditはGUI起動gateにせず、明示diagnostic/update工程として実装・検証する。
 - [ ] `BUB-P6-07` app/game終了時に同一sessionだけを回収し、frontend/device ownershipを復元する。
   - SSH benchmarkがfrontendを複数回停止してPID 1の4回restart limitへ到達した。`sync`後の
     強制rebootで通常FE 1 processへ復旧。今後の繰返し性能試験は通常FE導線を各試行で使うか、
     validation hold中にfrontend restart attemptを消費しない専用supervision契約が必要。
+  - PortMasterのSSH/direct検証は所有marker付きvalidation holdで既存FEだけを停止し、解除後に
+    PID 1復帰を3秒待ってもFE不在なら正規`plumos-frontend-launch`を1回だけ起動する。
+    host契約と実機の強制停止後にhold/mountなし、FE 1 process、mutable state不変を確認した。
   - GGFE 4-core実機試験後にもrestart limitへ到達。`E81`はrecovery consoleへ`exec sh`するため、
     その後のsafe reboot requestを消費するPID 1 supervisorが残らず、network/storage停止後も
     本体がrebootしなかった。recovery consoleでもpower requestを監視・確定できるloopへ変更し、
