@@ -932,6 +932,7 @@ static void ggfe_blit_rgba(struct cart3d_target *t, const struct ggfe_image *img
 /* ------------------------------------------------------------------ */
 
 static const unsigned char ggfe_accent[3] = {255, 133, 13};
+static const unsigned char ggfe_fg[3] = {184, 208, 202};
 static const unsigned char ggfe_muted[3] = {133, 166, 166};
 static const unsigned char ggfe_sel_fg[3] = {255, 230, 122};
 static const unsigned char ggfe_rule[3] = {30, 42, 44};
@@ -1138,7 +1139,57 @@ static float ggfe_cyclic_distance(int index, float pos, int count) {
 #define GGFE_LAUNCH_END 1.44f
 #define GGFE_HANDOFF 0.35f
 
+/*
+ * SELECT opens a small menu.  B and START deliberately do nothing while
+ * browsing: leaving the frontend by a face button was too easy to do by
+ * accident, so the only way out is the menu's own exit item.
+ */
+enum ggfe_menu_row {
+  GGFE_MENU_CORE = 0,
+  GGFE_MENU_MOTION,
+  GGFE_MENU_CASES,
+  GGFE_MENU_EXIT,
+  GGFE_MENU_ROWS
+};
+
+struct ggfe_menu {
+  int open;
+  int cursor;
+};
+
+/*
+ * Two carousel motions, chosen by ggfe.json.
+ *
+ * "snap" is GGFE's own and the default: a short ease-out with a settle
+ * overshoot that re-aims from wherever the carousel currently is, so a held or
+ * rapidly tapped D-pad keeps moving instead of queueing.
+ *
+ * "gallery" matches the plumOS gallery: a longer symmetric smoothstep that
+ * always completes, with one further press queued behind it.
+ *
+ * The choice is presentation only.  Compose cost is set by how many
+ * cartridges fall inside the carousel span - 1.03 ms at either end of a
+ * library against 1.51 ms in the middle on the build machine - and does not
+ * change with the easing curve or with whether the carousel is moving at all.
+ */
+enum ggfe_motion { GGFE_MOTION_SNAP = 0, GGFE_MOTION_GALLERY };
+
+struct ggfe_scroll_state {
+  enum ggfe_motion model;
+  int duration_ms;
+  int target;
+  float from;
+  int to;
+  int active;
+  int pending_target;
+  int pending_to;
+  int pending_active;
+  long long start_ms;
+};
+
 struct ggfe_frame {
+  const struct ggfe_menu *menu; /* NULL unless the menu is open */
+  const struct ggfe_scroll_state *scroll;
   float pos;
   int has_hero;
   float hero[16];
@@ -1469,6 +1520,151 @@ static long long ggfe_profile_now_us(void) {
 #define GGFE_STAGE_END(stage) ((void)0)
 #endif
 
+/*
+ * Cycle this cartridge's core through the profiles the catalogue lists and
+ * this device actually has, plus one position for "no override" so the normal
+ * resolution chain decides again.  Written straight to GGFE's own override
+ * file; plumOS's is never touched.
+ */
+static void ggfe_menu_cycle_core(struct ggfe_app *app, int sel) {
+  const char *current;
+  const char *avail[GGFE_MAX_PROFILES];
+  int n = 0, i, at = -1;
+  char path[PATH_MAX];
+
+  if (sel < 0 || sel >= app->entry_count) {
+    return;
+  }
+  for (i = 0; i < app->catalog.profile_count; i++) {
+    if (app->catalog.profiles[i].available) {
+      avail[n++] = app->catalog.profiles[i].id;
+    }
+  }
+  if (n == 0) {
+    return;
+  }
+  current = ggfe_override_for_rom(&app->ggfe_overrides, app->entries[sel].rel);
+  if (current && current[0]) {
+    for (i = 0; i < n; i++) {
+      if (strcmp(avail[i], current) == 0) {
+        at = i;
+        break;
+      }
+    }
+  }
+  /* -1 is the "no override" slot, so the cycle is: auto, then each core. */
+  at = (at + 2 > n) ? -1 : at + 1;
+  ggfe_override_set_rom(&app->ggfe_overrides, app->entries[sel].rel,
+                        at < 0 ? NULL : avail[at]);
+  if (join_path(path, sizeof(path), app->plumos_root,
+                app->cfg.ggfe_overrides) &&
+      ggfe_overrides_save(&app->ggfe_overrides, path,
+                          app->cfg.launch_system)) {
+    ggfe_log(app, "ggfe_menu=core rom=%s profile=%s\n", app->entries[sel].rel,
+             at < 0 ? "(auto)" : avail[at]);
+  } else {
+    ggfe_log(app, "ggfe_menu=core-save-failed rom=%s\n", app->entries[sel].rel);
+  }
+}
+
+#define GGFE_MENU_X0 108
+#define GGFE_MENU_X1 532
+#define GGFE_MENU_Y0 128
+#define GGFE_MENU_ROW_H 46
+
+static const unsigned char ggfe_menu_panel[3] = {18, 24, 26};
+static const unsigned char ggfe_menu_edge[3] = {70, 92, 92};
+static const unsigned char ggfe_menu_sel[3] = {40, 60, 54};
+
+/* The profile shown for the selected cartridge, and where it came from. */
+static void ggfe_menu_core_text(struct ggfe_app *app, int sel, char *out,
+                                size_t out_size, char *src, size_t src_size) {
+  struct ggfe_launch_choice choice;
+  const char *override;
+
+  out[0] = '\0';
+  src[0] = '\0';
+  if (sel < 0 || sel >= app->entry_count) {
+    copy_string(out, out_size, "-");
+    return;
+  }
+  override = ggfe_override_for_rom(&app->ggfe_overrides, app->entries[sel].rel);
+  if (ggfe_choose_profile(&app->catalog, &app->cfg, &app->ggfe_overrides,
+                          &app->plumos_overrides, app->entries[sel].rel,
+                          &choice)) {
+    copy_string(out, out_size, choice.profile->id);
+    copy_string(src, src_size, choice.source);
+  } else {
+    copy_string(out, out_size, "unavailable");
+    copy_string(src, src_size, choice.source);
+  }
+  if ((!override || !override[0]) && !src[0]) {
+    /* nothing chosen here and no rule reported, so say so plainly */
+    copy_string(src, src_size, "automatic");
+  }
+}
+
+static void ggfe_draw_menu(struct ggfe_app *app, const struct ggfe_menu *menu,
+                           const struct ggfe_scroll_state *scroll,
+                           int show_cases, int sel) {
+  static const char *labels[GGFE_MENU_ROWS] = {"コア", "アニメーション",
+                                               "ケース表示", "GGFE を終了"};
+  char core[160], src[64], value[160];
+  int y0 = GGFE_MENU_Y0;
+  int y1 = y0 + GGFE_MENU_ROW_H * GGFE_MENU_ROWS + 56;
+  int i, w;
+
+  ggfe_rect(&app->target, 0, 0, GGFE_W - 1, GGFE_H - 1, ggfe_menu_panel, 0.55f);
+  ggfe_rounded_rect(&app->target, GGFE_MENU_X0, y0 - 40, GGFE_MENU_X1, y1, 10,
+                    ggfe_menu_panel, 0.96f);
+  ggfe_rect(&app->target, GGFE_MENU_X0, y0 - 40, GGFE_MENU_X1, y0 - 40,
+            ggfe_menu_edge, 1.0f);
+  ggfe_rect(&app->target, GGFE_MENU_X0, y1, GGFE_MENU_X1, y1, ggfe_menu_edge,
+            1.0f);
+  ggfe_draw_text(&app->target, &app->text, GGFE_MENU_X0 + 20, y0 - 32, 18,
+                 "MENU", ggfe_accent, 1.0f);
+
+  ggfe_menu_core_text(app, sel, core, sizeof(core), src, sizeof(src));
+  for (i = 0; i < GGFE_MENU_ROWS; i++) {
+    int ry = y0 + i * GGFE_MENU_ROW_H;
+    const unsigned char *fg = (i == menu->cursor) ? ggfe_sel_fg : ggfe_fg;
+    if (i == menu->cursor) {
+      ggfe_rounded_rect(&app->target, GGFE_MENU_X0 + 10, ry - 4,
+                        GGFE_MENU_X1 - 10, ry + GGFE_MENU_ROW_H - 12, 6,
+                        ggfe_menu_sel, 1.0f);
+    }
+    ggfe_draw_text(&app->target, &app->text, GGFE_MENU_X0 + 22, ry, 20,
+                   labels[i], fg, 1.0f);
+    value[0] = '\0';
+    switch (i) {
+      case GGFE_MENU_CORE:
+        copy_string(value, sizeof(value), core);
+        break;
+      case GGFE_MENU_MOTION:
+        copy_string(value, sizeof(value),
+                    scroll->model == GGFE_MOTION_GALLERY ? "gallery" : "snap");
+        break;
+      case GGFE_MENU_CASES:
+        copy_string(value, sizeof(value), show_cases ? "ON" : "OFF");
+        break;
+      default:
+        break;
+    }
+    if (value[0]) {
+      w = ggfe_text_width(&app->text, 17, value);
+      ggfe_draw_text(&app->target, &app->text, GGFE_MENU_X1 - 22 - w, ry + 2,
+                     17, value, ggfe_muted, 1.0f);
+    }
+  }
+  if (src[0]) {
+    char line[128];
+    snprintf(line, sizeof(line), "(%s)", src);
+    ggfe_draw_text(&app->target, &app->text, GGFE_MENU_X0 + 22,
+                   y0 + GGFE_MENU_ROW_H * GGFE_MENU_ROWS - 2, 13, line,
+                   ggfe_muted, 1.0f);
+  }
+}
+
 static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
                          const unsigned char *background) {
   const float deg = 3.14159265358979f / 180.0f;
@@ -1572,6 +1768,9 @@ static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
   }
   GGFE_STAGE_END(GGFE_STAGE_FRONT);
   ggfe_draw_hud(app, f, sel);
+  if (f->menu) {
+    ggfe_draw_menu(app, f->menu, f->scroll, f->cased, sel);
+  }
   GGFE_STAGE_END(GGFE_STAGE_HUD);
 
   if (f->flash > 0.0f) {
@@ -1598,23 +1797,34 @@ static int ggfe_state_path(const struct ggfe_app *app, char *out,
   return join_path(out, out_size, app->plumos_root, app->cfg.ui_state);
 }
 
-static int ggfe_state_load(struct ggfe_app *app, int default_cases) {
+static void ggfe_state_load(struct ggfe_app *app, int *show_cases, char *motion,
+                            size_t motion_size) {
   char path[PATH_MAX];
   char *text = NULL;
   size_t len = 0;
-  int value = default_cases;
 
-  if (ggfe_state_path(app, path, sizeof(path)) &&
-      ggfe_read_file(path, &text, &len)) {
-    value = json_get_bool(text, text + len, "show_cases", default_cases);
-    free(text);
+  if (!ggfe_state_path(app, path, sizeof(path)) ||
+      !ggfe_read_file(path, &text, &len)) {
+    return;
   }
-  return value ? 1 : 0;
+  *show_cases =
+      json_get_bool(text, text + len, "show_cases", *show_cases) ? 1 : 0;
+  {
+    /* json_get_string clears its output when the key is absent, which would
+     * silently discard the caller's default. */
+    char found[16];
+    if (json_get_string(text, text + len, "motion", found, sizeof(found)) &&
+        found[0]) {
+      copy_string(motion, motion_size, found);
+    }
+  }
+  free(text);
 }
 
 /* Written through a temporary and renamed, so a power cut during the write
  * leaves the previous file rather than a truncated one. */
-static void ggfe_state_save(struct ggfe_app *app, int show_cases) {
+static void ggfe_state_save(struct ggfe_app *app, int show_cases,
+                            const char *motion) {
   char path[PATH_MAX];
   char tmp[PATH_MAX];
   char dir[PATH_MAX];
@@ -1637,8 +1847,12 @@ static void ggfe_state_save(struct ggfe_app *app, int show_cases) {
     ggfe_log(app, "ggfe_state=write-failed path=%s errno=%d\n", tmp, errno);
     return;
   }
-  if (fprintf(f, "{\n  \"version\": 1,\n  \"show_cases\": %s\n}\n",
-              show_cases ? "true" : "false") < 0 ||
+  if (fprintf(f,
+              "{\n  \"version\": 1,\n  \"show_cases\": %s,\n"
+              "  \"motion\": \"%s\"\n}\n",
+              show_cases ? "true" : "false",
+              (motion && strcmp(motion, "gallery") == 0) ? "gallery"
+                                                         : "snap") < 0 ||
       fflush(f) != 0 || fsync(fileno(f)) != 0) {
     save_errno = errno ? errno : EIO;
   }
@@ -1670,7 +1884,8 @@ static void ggfe_state_save(struct ggfe_app *app, int show_cases) {
     ggfe_log(app, "ggfe_state=dir-open-failed path=%s errno=%d\n", dir,
              errno);
   }
-  ggfe_log(app, "ggfe_state=saved show_cases=%d\n", show_cases);
+  ggfe_log(app, "ggfe_state=saved show_cases=%d motion=%s\n", show_cases,
+           (motion && strcmp(motion, "gallery") == 0) ? "gallery" : "snap");
 }
 
 /* ------------------------------------------------------------------ */
@@ -1802,36 +2017,6 @@ static long long ggfe_now_ms(void) {
   }
   return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
 }
-
-/*
- * Two carousel motions, chosen by ggfe.json.
- *
- * "snap" is GGFE's own and the default: a short ease-out with a settle
- * overshoot that re-aims from wherever the carousel currently is, so a held or
- * rapidly tapped D-pad keeps moving instead of queueing.
- *
- * "gallery" matches the plumOS gallery: a longer symmetric smoothstep that
- * always completes, with one further press queued behind it.
- *
- * The choice is presentation only.  Compose cost is set by how many
- * cartridges fall inside the carousel span - 1.03 ms at either end of a
- * library against 1.51 ms in the middle on the build machine - and does not
- * change with the easing curve or with whether the carousel is moving at all.
- */
-enum ggfe_motion { GGFE_MOTION_SNAP = 0, GGFE_MOTION_GALLERY };
-
-struct ggfe_scroll_state {
-  enum ggfe_motion model;
-  int duration_ms;
-  int target;
-  float from;
-  int to;
-  int active;
-  int pending_target;
-  int pending_to;
-  int pending_active;
-  long long start_ms;
-};
 
 struct ggfe_repeat_state {
   unsigned int key_code;
@@ -2206,6 +2391,8 @@ int main(int argc, char **argv) {
   char log_path[PATH_MAX];
   int input_fd;
   struct ggfe_scroll_state scroll;
+  struct ggfe_menu menu;
+  char motion_pref[16];
   struct ggfe_repeat_state repeat;
   float launch_t = -1.0f;
   int show_cases;
@@ -2238,7 +2425,9 @@ int main(int argc, char **argv) {
   if (join_path(log_path, sizeof(log_path), plumos_root, "logs/ggfe.log")) {
     app.log_fd = open(log_path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
   }
-  show_cases = ggfe_state_load(&app, 1);
+  show_cases = 1;
+  copy_string(motion_pref, sizeof(motion_pref), app.cfg.motion_model);
+  ggfe_state_load(&app, &show_cases, motion_pref, sizeof(motion_pref));
   ggfe_log(&app, "ggfe_start=ok roms=%d show_cases=%d\n", app.entry_count,
            show_cases);
   if (app.entry_count == 0) {
@@ -2280,9 +2469,9 @@ int main(int argc, char **argv) {
   stats_start_ms = last_ms;
   memset(&scroll, 0, sizeof(scroll));
   memset(&repeat, 0, sizeof(repeat));
-  scroll.model = (strcmp(app.cfg.motion_model, "gallery") == 0)
-                     ? GGFE_MOTION_GALLERY
-                     : GGFE_MOTION_SNAP;
+  memset(&menu, 0, sizeof(menu));
+  scroll.model = (strcmp(motion_pref, "gallery") == 0) ? GGFE_MOTION_GALLERY
+                                                       : GGFE_MOTION_SNAP;
   scroll.duration_ms = app.cfg.scroll_ms;
   ggfe_log(&app, "ggfe_motion=model=%s scroll_ms=%d\n",
            scroll.model == GGFE_MOTION_GALLERY ? "gallery" : "snap",
@@ -2330,7 +2519,63 @@ int main(int argc, char **argv) {
         if (launch_t >= 0.0f) {
           continue; /* the launch sequence owns input until it completes */
         }
+        if (menu.open) {
+          switch (ev.code) {
+            case BTN_DPAD_UP:
+            case BTN_DPAD_LEFT:
+              menu.cursor = (menu.cursor + GGFE_MENU_ROWS - 1) % GGFE_MENU_ROWS;
+              break;
+            case BTN_DPAD_DOWN:
+            case BTN_DPAD_RIGHT:
+              menu.cursor = (menu.cursor + 1) % GGFE_MENU_ROWS;
+              break;
+            case BTN_EAST: /* physical A on Bubble */
+              switch (menu.cursor) {
+                case GGFE_MENU_CORE:
+                  ggfe_menu_cycle_core(&app, scroll.target);
+                  break;
+                case GGFE_MENU_MOTION:
+                  scroll.model = (scroll.model == GGFE_MOTION_SNAP)
+                                     ? GGFE_MOTION_GALLERY
+                                     : GGFE_MOTION_SNAP;
+                  copy_string(motion_pref, sizeof(motion_pref),
+                              scroll.model == GGFE_MOTION_GALLERY ? "gallery"
+                                                                  : "snap");
+                  scroll.duration_ms =
+                      (scroll.model == GGFE_MOTION_GALLERY) ? 360 : 240;
+                  ggfe_state_save(&app, show_cases, motion_pref);
+                  ggfe_log(&app, "ggfe_menu=motion value=%s\n", motion_pref);
+                  break;
+                case GGFE_MENU_CASES:
+                  show_cases = !show_cases;
+                  ggfe_state_save(&app, show_cases, motion_pref);
+                  ggfe_log(&app, "ggfe_menu=cases value=%d\n", show_cases);
+                  break;
+                case GGFE_MENU_EXIT:
+                  ggfe_log(&app, "ggfe_input=exit source=menu\n");
+                  running = 0;
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case BTN_SOUTH: /* physical B on Bubble: closes the menu only */
+            case BTN_SELECT:
+              menu.open = 0;
+              ggfe_log(&app, "ggfe_menu=close\n");
+              break;
+            default:
+              break;
+          }
+          continue;
+        }
         switch (ev.code) {
+          case BTN_SELECT:
+            ggfe_repeat_cancel(&repeat);
+            menu.open = 1;
+            menu.cursor = 0;
+            ggfe_log(&app, "ggfe_menu=open target=%d\n", scroll.target);
+            break;
           case BTN_DPAD_LEFT:
             ggfe_repeat_press(&repeat, (unsigned int)ev.code, -1,
                               ggfe_now_ms());
@@ -2368,15 +2613,14 @@ int main(int argc, char **argv) {
             show_cases = !show_cases;
             ggfe_log(&app, "ggfe_input=case-toggle code=%u visible=%d\n",
                      (unsigned int)ev.code, show_cases);
-            ggfe_state_save(&app, show_cases);
+            ggfe_state_save(&app, show_cases, motion_pref);
             break;
           case BTN_SOUTH: /* physical B on Bubble */
           case BTN_START:
+            /* Deliberately inert.  Leaving by a face button was too easy to
+             * do by accident; SELECT opens the menu and its exit item is the
+             * way out. */
             ggfe_repeat_cancel(&repeat);
-            ggfe_log(&app, "ggfe_input=exit code=%u physical=%s\n",
-                     (unsigned int)ev.code,
-                     ev.code == BTN_SOUTH ? "B" : "START");
-            running = 0;
             break;
           default:
             break;
@@ -2398,6 +2642,8 @@ int main(int argc, char **argv) {
       launch_t += dt;
     } else {
       ggfe_browse_frame(pos, show_cases, &frame);
+      frame.menu = menu.open ? &menu : NULL;
+      frame.scroll = &scroll;
     }
 
     compose_start_us = ggfe_now_us();
@@ -2595,10 +2841,38 @@ int main(int argc, char **argv) {
    * GGFE_SET_CASES writes the file, and every run reports what it read. */
   {
     const char *set = getenv("GGFE_SET_CASES");
+    const char *set_motion = getenv("GGFE_SET_MOTION");
+    const char *cycle = getenv("GGFE_CYCLE_CORE");
+    int cases = 1;
+    char motion[16];
+
+    copy_string(motion, sizeof(motion), app.cfg.motion_model);
+    ggfe_state_load(&app, &cases, motion, sizeof(motion));
     if (set && set[0]) {
-      ggfe_state_save(&app, set[0] != '0');
+      cases = (set[0] != '0');
     }
-    printf("show_cases=%d\n", ggfe_state_load(&app, 1));
+    if (set_motion && set_motion[0]) {
+      copy_string(motion, sizeof(motion), set_motion);
+    }
+    if ((set && set[0]) || (set_motion && set_motion[0])) {
+      ggfe_state_save(&app, cases, motion);
+    }
+    cases = 1;
+    copy_string(motion, sizeof(motion), app.cfg.motion_model);
+    ggfe_state_load(&app, &cases, motion, sizeof(motion));
+    printf("show_cases=%d\n", cases);
+    printf("state_motion=%s\n", motion);
+    if (cycle && cycle[0]) {
+      int times = atoi(cycle), k;
+      for (k = 0; k < times; k++) {
+        ggfe_menu_cycle_core(&app, 2);
+      }
+    }
+    if (app.entry_count > 2) {
+      const char *ov =
+          ggfe_override_for_rom(&app.ggfe_overrides, app.entries[2].rel);
+      printf("core_override=%s\n", (ov && ov[0]) ? ov : "(auto)");
+    }
   }
   printf("motion=%s scroll_ms=%d\n", app.cfg.motion_model, app.cfg.scroll_ms);
   {
@@ -2707,6 +2981,27 @@ int main(int argc, char **argv) {
   background = (unsigned char *)malloc((size_t)GGFE_W * GGFE_H * 3);
   ggfe_background_build(background);
 
+  {
+    /* One shot with the menu open, so its layout can be reviewed on a host. */
+    struct ggfe_menu menu;
+    struct ggfe_scroll_state scroll;
+    char path2[PATH_MAX];
+    memset(&menu, 0, sizeof(menu));
+    memset(&scroll, 0, sizeof(scroll));
+    scroll.model = (strcmp(app.cfg.motion_model, "gallery") == 0)
+                       ? GGFE_MOTION_GALLERY
+                       : GGFE_MOTION_SNAP;
+    scroll.duration_ms = app.cfg.scroll_ms;
+    scroll.target = 2;
+    menu.open = 1;
+    ggfe_browse_frame(2.0f, 1, &frame);
+    frame.menu = &menu;
+    frame.scroll = &scroll;
+    ggfe_compose(&app, &frame, background);
+    snprintf(path2, sizeof(path2), "%s/g-menu.png", out_dir);
+    ggfe_write_png(path2, app.target.rgb, GGFE_W, GGFE_H);
+    printf("wrote %s\n", path2);
+  }
   for (s = 0; s < sizeof(shots) / sizeof(shots[0]); s++) {
     float pos = shots[s].pos;
     if (shots[s].t < 0.0f) {

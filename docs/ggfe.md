@@ -40,33 +40,41 @@ There is no on-screen button legend; the controls are documented here instead.
 
 | Button | Action |
 |---|---|
-| D-pad Left | previous cartridge; hold to repeat |
-| D-pad Right | next cartridge; hold to repeat |
-| D-pad Up | five cartridges back |
-| D-pad Down | five cartridges forward |
+| D-pad Left / Right | previous / next cartridge, wrapping at the ends |
+| D-pad Up / Down | jump five cartridges |
 | **A** | launch the selected game |
-| **X** | toggle cartridge cases while browsing |
-| **B** | return to the stock frontend |
-| **START** | return to the stock frontend |
+| **X** | show or hide the cases |
+| **SELECT** | open the menu |
+| **B**, **START** | nothing |
+
+B and START are deliberately inert. Leaving the frontend by a face button was
+too easy to do by accident, so the only way out is the menu's exit item.
+
+### Menu
+
+SELECT opens it; SELECT or B closes it. D-pad moves, A acts on the row.
+
+| Row | Action |
+|---|---|
+| コア | cycle this cartridge's core through the profiles the device actually has, then back to no override |
+| アニメーション | switch between `snap` and `gallery` |
+| ケース表示 | show or hide the cases, the same as X |
+| GGFE を終了 | leave GGFE and return to the stock frontend |
+
+The core row shows the profile that will be used and, beneath the list, which
+rule chose it - `ggfe rom override`, `plumos system override`, `systems.json
+default` and so on. Selecting a core writes a ROM-scope entry to
+`state/frontend/ggfe-overrides.json`; one more press past the last core clears
+it again so the normal chain decides. Only profiles this device has are
+offered.
+
+The core and animation choices are remembered across launches.
 
 Notes:
 
 * Physical A is `BTN_EAST` and physical B is `BTN_SOUTH` on this device, per
   `configs/input/bubble-controller-map.json`. GGFE uses those codes, not
   positions.
-* Physical X is `BTN_NORTH`. GGFE persists the case setting in its own state
-  file, and the launch animation respects the remembered ON/OFF choice.
-* Left/right wraps between the final and first cartridge in either direction.
-  GGFE supplies the same 350 ms initial delay and 95 ms repeat interval as the
-  plumOS frontend even when the input bridge emits no kernel repeat events.
-  Up/down is a single cyclic five-cartridge jump and does not repeat.
-* Artwork for the visible destination range is decoded before a transition
-  starts, so first-use PNG work cannot skip the motion. `logs/ggfe.log` reports
-  measured FPS, maximum frame time and slow frame count once per second.
-* B/START returns to the stock frontend when GGFE was opened from Apps. During
-  the standalone validation procedure, `frontend-hold` deliberately prevents
-  that frontend from restarting, so B/START leaves a black screen until the
-  marker is removed. That black screen is an exited GGFE, not a game launch.
 * Input is ignored while the launch sequence is playing, so a second A press
   cannot start a second game.
 * **A does nothing on a cartridge with no runnable core.** Rather than play an
@@ -164,8 +172,8 @@ spends in the busier state, not what a frame there costs.
 
 ## Remembered view options
 
-`state/frontend/ggfe-state.json` holds GGFE's own view state - currently just
-whether the cases are shown. It is written when the toggle is pressed, through
+`state/frontend/ggfe-state.json` holds GGFE's own view state: whether the
+cases are shown, and which carousel motion is in use. It is written when the toggle is pressed, through
 a temporary and a rename so a power cut leaves the previous file rather than a
 truncated one. The temporary file is flushed and synced before the rename, the
 directory entry is synced afterwards, and write/sync failures are logged rather

@@ -29,7 +29,14 @@ grep -Fq '{ BTN_EAST,   IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_A }' "$pico
 grep -Fq '{ BTN_SOUTH,  IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_B }' "$pico_patch"
 grep -Fq 'case BTN_EAST: /* physical A on Bubble */' src/frontend/plumos_ggfe.c
 grep -Fq 'case BTN_NORTH: /* physical X on Bubble */' src/frontend/plumos_ggfe.c
-grep -Fq 'case BTN_SOUTH: /* physical B on Bubble */' src/frontend/plumos_ggfe.c
+# B and START no longer leave GGFE; SELECT opens a menu whose exit item does.
+grep -Fq 'case BTN_SELECT:' src/frontend/plumos_ggfe.c
+grep -Fq 'GGFE_MENU_EXIT' src/frontend/plumos_ggfe.c
+if awk '/^        switch \(ev.code\) \{/,/^        \}/' src/frontend/plumos_ggfe.c |
+        grep -A2 -E 'case (BTN_SOUTH|BTN_START):' | grep -q 'running = 0'; then
+    echo 'B or START still exits GGFE' >&2
+    exit 1
+fi
 grep -Fq 'ggfe_input=case-toggle code=%u visible=%d' src/frontend/plumos_ggfe.c
 grep -Fq 'ggfe_browse_frame(pos, show_cases, &frame);' src/frontend/plumos_ggfe.c
 grep -Fq 'ggfe_input=reopened-after-launch' src/frontend/plumos_ggfe.c

@@ -160,6 +160,32 @@ if snap[3] <= gallery[3]:
     raise SystemExit(1)
 PY
 
+# The menu's core cycle walks the profiles this device actually has and comes
+# back round to no override, writing GGFE's own file each time.
+rm -f "$root/state/frontend/ggfe-overrides.json"
+cycle_at() {
+    GGFE_CYCLE_CORE=$1 "$tmp/ggfe-host" "$root" "$card" "$tmp" 2>/dev/null |
+        grep '^core_override=' | sed 's/^core_override=//'
+    rm -f "$root/state/frontend/ggfe-overrides.json"
+}
+[ "$(cycle_at 0)" = "(auto)" ] || fail "a fresh cartridge should have no override"
+first=$(cycle_at 1)
+case "$first" in
+    retroarch:*|picoarch:*) ;;
+    *) fail "the first cycle step did not choose a profile: $first" ;;
+esac
+[ "$(cycle_at 5)" = "(auto)" ] ||
+    fail "the cycle did not return to no override after every available core"
+
+# The motion choice survives a restart.
+rm -f "$root/state/frontend/ggfe-state.json"
+GGFE_SET_MOTION=gallery "$tmp/ggfe-host" "$root" "$card" "$tmp" >/dev/null 2>&1
+"$tmp/ggfe-host" "$root" "$card" "$tmp" >"$tmp/motion1.txt" 2>&1 || true
+expect_line "state_motion=gallery" "$tmp/motion1.txt"
+GGFE_SET_MOTION=snap "$tmp/ggfe-host" "$root" "$card" "$tmp" >/dev/null 2>&1
+"$tmp/ggfe-host" "$root" "$card" "$tmp" >"$tmp/motion2.txt" 2>&1 || true
+expect_line "state_motion=snap" "$tmp/motion2.txt"
+
 # GGFE must never write plumOS's override file.
 before=$(cksum <"$root/state/frontend/core-overrides.json")
 "$tmp/ggfe-host" "$root" "$card" "$tmp" >/dev/null 2>&1 || true
@@ -168,4 +194,4 @@ if [ "$before" != "$after" ]; then
     fail "GGFE modified the plumOS core-overrides file"
 fi
 
-printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 case_state=persisted motion=snap,gallery navigation=wrap,page5 repeat=350/95 threads=1,4 identical=9\n'
+printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 case_state=persisted motion=snap,gallery core_cycle=ok navigation=wrap,page5 repeat=350/95 threads=1,4 identical=9\n'

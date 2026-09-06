@@ -33,6 +33,8 @@
  * the stock frontend.
  */
 
+#include <unistd.h>
+
 #include "plumos_ggfe_art.h"
 
 #define GGFE_MAX_PROFILES 12
@@ -292,6 +294,117 @@ static int ggfe_overrides_load(struct ggfe_override_set *set, const char *path,
 static void ggfe_overrides_free(struct ggfe_override_set *set) {
   free(set->rom);
   memset(set, 0, sizeof(*set));
+}
+
+/* Set or clear this ROM's profile.  A NULL profile removes the entry, which is
+ * how the menu expresses "no override, follow the normal chain". */
+static int ggfe_override_set_rom(struct ggfe_override_set *set,
+                                 const char *rom_rel, const char *profile) {
+  int i;
+
+  for (i = 0; i < set->rom_count; i++) {
+    if (strcmp(set->rom[i].relative_path, rom_rel) != 0) {
+      continue;
+    }
+    if (profile && profile[0]) {
+      return copy_string(set->rom[i].launch_profile,
+                         sizeof(set->rom[i].launch_profile), profile);
+    }
+    set->rom[i] = set->rom[set->rom_count - 1];
+    set->rom_count--;
+    return 1;
+  }
+  if (!profile || !profile[0]) {
+    return 1;
+  }
+  if (!set->rom) {
+    set->rom = (struct ggfe_profile_override *)calloc(
+        GGFE_MAX_ROM_OVERRIDES, sizeof(struct ggfe_profile_override));
+    if (!set->rom) {
+      return 0;
+    }
+  }
+  if (set->rom_count >= GGFE_MAX_ROM_OVERRIDES) {
+    return 0;
+  }
+  memset(&set->rom[set->rom_count], 0, sizeof(set->rom[set->rom_count]));
+  if (!copy_string(set->rom[set->rom_count].relative_path,
+                   sizeof(set->rom[set->rom_count].relative_path), rom_rel) ||
+      !copy_string(set->rom[set->rom_count].launch_profile,
+                   sizeof(set->rom[set->rom_count].launch_profile), profile)) {
+    return 0;
+  }
+  set->rom_count++;
+  return 1;
+}
+
+static void ggfe_json_escape(FILE *f, const char *s) {
+  for (; *s; s++) {
+    if (*s == '"' || *s == '\\') {
+      fputc('\\', f);
+      fputc(*s, f);
+    } else if ((unsigned char)*s < 0x20) {
+      fprintf(f, "\\u%04x", (unsigned char)*s);
+    } else {
+      fputc(*s, f);
+    }
+  }
+}
+
+/*
+ * Rewrite GGFE's own override file.  The whole file is regenerated from the
+ * in-memory set, which is safe because GGFE owns this file outright - it never
+ * writes plumOS's - and it is written through a temporary and renamed so an
+ * interrupted write leaves the previous file rather than a truncated one.
+ */
+static int ggfe_overrides_save(const struct ggfe_override_set *set,
+                               const char *path, const char *system_id) {
+  char tmp[PATH_MAX];
+  char dir[PATH_MAX];
+  FILE *f;
+  int i, first = 1;
+
+  if (path_parent(dir, sizeof(dir), path)) {
+    (void)mkdir(dir, 0755);
+  }
+  if ((size_t)snprintf(tmp, sizeof(tmp), "%s.next", path) >= sizeof(tmp)) {
+    return 0;
+  }
+  f = fopen(tmp, "wb");
+  if (!f) {
+    return 0;
+  }
+  fprintf(f, "{\n  \"version\": 1,\n  \"system_overrides\": [");
+  if (set->has_system && set->system.launch_profile[0]) {
+    fprintf(f, "\n    { \"system_id\": \"");
+    ggfe_json_escape(f, system_id);
+    fprintf(f, "\", \"launch_profile\": \"");
+    ggfe_json_escape(f, set->system.launch_profile);
+    fprintf(f, "\" }\n  ");
+  }
+  fprintf(f, "],\n  \"rom_overrides\": [");
+  for (i = 0; i < set->rom_count; i++) {
+    if (!set->rom[i].launch_profile[0]) {
+      continue;
+    }
+    fprintf(f, "%s\n    { \"system_id\": \"", first ? "" : ",");
+    ggfe_json_escape(f, system_id);
+    fprintf(f, "\", \"relative_path\": \"");
+    ggfe_json_escape(f, set->rom[i].relative_path);
+    fprintf(f, "\", \"launch_profile\": \"");
+    ggfe_json_escape(f, set->rom[i].launch_profile);
+    fprintf(f, "\" }");
+    first = 0;
+  }
+  fprintf(f, "%s]\n}\n", first ? "" : "\n  ");
+  fflush(f);
+  fsync(fileno(f));
+  fclose(f);
+  if (rename(tmp, path) != 0) {
+    (void)unlink(tmp);
+    return 0;
+  }
+  return 1;
 }
 
 static const char *ggfe_override_for_rom(const struct ggfe_override_set *set,
