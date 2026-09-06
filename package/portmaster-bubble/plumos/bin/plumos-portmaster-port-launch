@@ -29,6 +29,8 @@ MOUNT_CLEANUP="${PLUMOS_ROOT}/bin/plumos-portmaster-mount-cleanup"
 FRONTEND_CONTROL="${PLUMOS_ROOT}/bin/plumos-portmaster-frontend-control"
 PORT_BASH="${APP_ROOT}/adapter/bin/aarch64/bash"
 EXEC_GUARD_LIB="${APP_ROOT}/adapter/lib/aarch64/libplumos-portmaster-exec-guard.so"
+MALI_LIBRARY="${PLUMOS_ROOT}/emulator/lib/libmali.so.1"
+DRM_SHARE_LIBRARY="${PLUMOS_DRM_SHARE_LIBRARY:-}"
 SESSION_CLEANUP="${PLUMOS_ROOT}/bin/plumos-portmaster-session-cleanup"
 child=""
 restore_frontend=0
@@ -312,11 +314,28 @@ unset LIBGL_ALWAYS_SOFTWARE MESA_LOADER_DRIVER_OVERRIDE \
   printf 'PortMaster Bubble execution guard is missing: %s\n' "$EXEC_GUARD_LIB" >&2
   exit 127
 }
-export PLUMOS_PORTMASTER_SESSION_ID="${PLUMOS_PORTMASTER_SESSION_ID:-bubble-$(date +%s)-$$}"
-export PLUMOS_PORTMASTER_REQUIRED_SESSION_ID="$PLUMOS_PORTMASTER_SESSION_ID"
-export PLUMOS_PORTMASTER_REQUIRED_LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
-export PLUMOS_PORTMASTER_REQUIRED_LD_PRELOAD="$EXEC_GUARD_LIB"
-export LD_PRELOAD="${EXEC_GUARD_LIB}${LD_PRELOAD:+:${LD_PRELOAD}}"
+[ -r "$MALI_LIBRARY" ] || {
+  printf 'PortMaster Bubble Mali runtime is missing: %s\n' "$MALI_LIBRARY" >&2
+  exit 127
+}
+drm_share_status=disabled
+case "$DRM_SHARE_LIBRARY" in
+  '') ;;
+  "${PLUMOS_ROOT}"/frontend/lib/libplumos-drm-share.so)
+    [ -r "$DRM_SHARE_LIBRARY" ] || {
+      printf 'PortMaster Bubble DRM share library is missing: %s\n' \
+        "$DRM_SHARE_LIBRARY" >&2
+      exit 127
+    }
+    drm_share_status=enabled
+    ;;
+  *)
+    printf 'PortMaster Bubble rejected unmanaged DRM share library: %s\n' \
+      "$DRM_SHARE_LIBRARY" >&2
+    exit 64
+    ;;
+esac
+required_preload="${DRM_SHARE_LIBRARY:+${DRM_SHARE_LIBRARY}:}${EXEC_GUARD_LIB}:${MALI_LIBRARY}"
 mkdir -p "$XDG_CACHE_HOME" "$HM_PORTS_DIR"
 
 if ! frontend_is_ancestor && frontend_running; then
@@ -324,9 +343,18 @@ if ! frontend_is_ancestor && frontend_running; then
   restore_frontend=1
 fi
 
+export PLUMOS_PORTMASTER_SESSION_ID="${PLUMOS_PORTMASTER_SESSION_ID:-bubble-$(date +%s)-$$}"
+export PLUMOS_PORTMASTER_REQUIRED_SESSION_ID="$PLUMOS_PORTMASTER_SESSION_ID"
+export PLUMOS_PORTMASTER_REQUIRED_LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
+export PLUMOS_PORTMASTER_REQUIRED_LD_PRELOAD="$required_preload"
+export LD_PRELOAD="${required_preload}${LD_PRELOAD:+:${LD_PRELOAD}}"
+export SDL_VIDEO_EGL_DRIVER="$MALI_LIBRARY"
+export SDL_VIDEO_GL_DRIVER="$MALI_LIBRARY"
 printf '\n[%s] script=%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$script" \
   "$(printf '%s' "$audio_status" | tr '\n' ' ')" >> "$LOG_FILE"
 printf 'renderer_policy=port-owned-hardware-preferred software_forced=false\n' >>"$LOG_FILE"
+printf 'renderer_runtime=mali-canonical drm_share=%s\n' \
+  "$drm_share_status" >>"$LOG_FILE"
 setsid "$PORT_BASH" "$script" "$@" >> "$LOG_FILE" 2>&1 &
 child=$!
 printf '%s\n' "$child" > "$PID_FILE"
