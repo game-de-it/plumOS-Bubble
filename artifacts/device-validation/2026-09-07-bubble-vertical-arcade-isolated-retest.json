@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "device": "GKD Bubble",
+  "run_id": "20260906T150735Z",
+  "catalog_systems": 98,
+  "catalog_profile_occurrences": 196,
+  "profile_filter": [],
+  "bios_root": "/storage/plumos/state/device-matrix/bios",
+  "retroarch_video_contract": {
+    "source": "factory_fallback",
+    "menu_driver": "rgui",
+    "video_driver": "drm",
+    "video_aspect_ratio_auto": "true",
+    "video_force_aspect": "true",
+    "video_scale_integer": "false",
+    "video_rotation": "0"
+  },
+  "volume_requirement": {
+    "persisted": "preserved",
+    "runtime": 0,
+    "softvol_raw": 0
+  },
+  "records": [
+    {
+      "system": "fbneo",
+      "profile": "retroarch:fbneo",
+      "content": "/run/media/sd2/roms/fbneo/imgfight.zip",
+      "content_source": "explicit_content_map",
+      "command": "PLUMOS_ROOT=/storage/plumos PLUMOS_ROM_ROOT=/run/media/sd2 PLUMOS_BIOS_ROOT=/storage/plumos/state/device-matrix/bios /bin/busybox sh /storage/plumos/bin/plumos-retroarch-launch --system fbneo --core /storage/plumos/cores/fbneo_libretro.so --rom /run/media/sd2/roms/fbneo/imgfight.zip --cpu ondemand --safe-exit false",
+      "runtime_log": "/storage/plumos/logs/retroarch-fbneo-fbneo.log",
+      "seconds": 5,
+      "renderer_expectation": "cpu_framebuffer_no_software_gl",
+      "status": "started",
+      "reason": null,
+      "ssh_rc": 0,
+      "probe": {
+        "alive": "yes",
+        "drm": "797,",
+        "audio": "797,",
+        "mali": "none",
+        "software_gl": "none",
+        "pcm": "RUNNING",
+        "pcm_states": "RUNNING,RUNNING,RUNNING,RUNNING,RUNNING,RUNNING,RUNNING,RUNNING,RUNNING",
+        "pcm_progress": "yes",
+        "rc": "143",
+        "leftovers": "none",
+        "preexisting": "none"
+      },
+      "runtime_log_delta": "[INFO] [Environ] SET_AUDIO_BUFFER_STATUS_CALLBACK.\n[INFO] [Content] Content loading skipped. Implementation will load it on its own.\n[INFO] [Environ] GET_SAVE_DIRECTORY: \"/storage/plumos/saves/fbneo/FinalBurn Neo\".\n[libretro INFO] Setting save dir to /storage/plumos/saves/fbneo/FinalBurn Neo\n[INFO] [Environ] GET_SYSTEM_DIRECTORY: \"/storage/plumos/state/device-matrix/bios\".\n[libretro INFO] Setting system dir to /storage/plumos/state/device-matrix/bios\n[libretro DEBUG] [FBNeo] nSwitchCode 0x00 : P1 Coin\n[libretro DEBUG] [FBNeo] nSwitchCode 0x01 : P1 Start\n[libretro DEBUG] [FBNeo] nSwitchCode 0x02 : P1 Up\n[libretro DEBUG] [FBNeo] nSwitchCode 0x03 : P1 Down\n[libretro DEBUG] [FBNeo] nSwitchCode 0x04 : P1 Left\n[libretro DEBUG] [FBNeo] nSwitchCode 0x05 : P1 Right\n[libretro DEBUG] [FBNeo] nSwitchCode 0x06 : P1 Button 1\n[libretro DEBUG] [FBNeo] nSwitchCode 0x07 : P1 Button 2\n[libretro DEBUG] [FBNeo] nSwitchCode 0x08 : P1 Button 3\n[libretro DEBUG] [FBNeo] nSwitchCode 0x09 : P1 Button 4\n[libretro DEBUG] [FBNeo] nSwitchCode 0x0A : P2 Coin\n[libretro DEBUG] [FBNeo] nSwitchCode 0x0B : P2 Start\n[libretro DEBUG] [FBNeo] nSwitchCode 0x0C : P2 Up\n[libretro DEBUG] [FBNeo] nSwitchCode 0x0D : P2 Down\n[libretro DEBUG] [FBNeo] nSwitchCode 0x0E : P2 Left\n[libretro DEBUG] [FBNeo] nSwitchCode 0x0F : P2 Right\n[libretro DEBUG] [FBNeo] nSwitchCode 0x10 : P2 Button 1\n[libretro DEBUG] [FBNeo] nSwitchCode 0x11 : P2 Button 2\n[libretro DEBUG] [FBNeo] nSwitchCode 0x12 : P2 Button 3\n[libretro DEBUG] [FBNeo] nSwitchCode 0x13 : P2 Button 4\n[INFO] [Environ] SET_CONTROLLER_INFO.\n[libretro INFO] Initialize DIP switches.\n[INFO] [Environ] GET_CORE_OPTIONS_VERSION.\n[INFO] [Environ] SET_CORE_OPTIONS_V2.\n[libretro INFO] [FBNeo] Searching all possible locations for romset imgfight\n[libretro INFO] [FBNeo] No patched romset found at /storage/plumos/state/device-matrix/bios/fbneo/patched/imgfight\n[libretro INFO] [FBNeo] Romset found at /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] No romset found at /storage/plumos/state/device-matrix/bios/fbneo/imgfight\n[libretro INFO] [FBNeo] No romset found at /storage/plumos/state/device-matrix/bios/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0xf5c94464 and name if-c-h0-a.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0x87c534fe and name if-c-l0-a.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0xea030541 and name if-c-h3.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0xc66ae348 and name if-c-l3.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0x745e6638 and name if-c-00.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0xb7108449 and name if-c-10.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0xaef33cba and name if-c-20.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0x1f98e695 and name if-c-30.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0x34ee2d77 and name if-a-a0.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0x6bd2845b and name if-a-a1.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0x090d50e5 and name if-a-a2.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0x3a8e3083 and name if-a-a3.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0xb425c829 and name if-a-b0.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0xe9bfe23e and name if-a-b1.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0x256e50f2 and name if-a-b2.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0x4c682785 and name if-a-b3.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0xcb64a194 and name if-c-v0.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] Using ROM with known crc 0x45b68bf5 and name if-c-v1.bin from archive /run/media/sd2/roms/fbneo/imgfight\n[libretro INFO] [FBNeo] No missing files, proceeding\n[libretro INFO] [FBNeo] Samplerate set to 48000\n[libretro INFO] [FBNeo] Applied dipswitches from core options\n[libretro DEBUG] Cheat cpu-register INIT.\n[libretro DEBUG] CPU-registry: nec v20-v35 cpu #0 ...\n[libretro DEBUG] CPU-registry: Z80 cpu #0 ...\n[libretro DEBUG] YM2151: Using FM-Timer.\n[libretro DEBUG] YM2151: Using Buffered-mode.\n[libretro INFO] [FBNeo] Initialized driver for imgfight\n[libretro INFO] [FBNeo] Adjusted audio buffer to match driver's refresh rate (55.000000 Hz)\n[libretro INFO] [Cheevos] System RAM set to 0x7f96e21012, size is 188432\n[INFO] [Environ] SET_ROTATION: \"1\" (90 deg).\n[INFO] [Environ] SET_PIXEL_FORMAT: XRGB8888.\n[libretro INFO] [FBNeo] Driver imgfight was successfully started : game's full name is Image Fight (World)\n[INFO] [State] found_last_state_slot: #20.\n[INFO] [SRAM] Skipping SRAM load.\n[INFO] [Core] Version of libretro API: 1, Compiled against API: 1\n[libretro INFO] [FBNeo] Timing set to 55.000000 Hz\n[INFO] [Core] Geometry: 384x256, Aspect: 0.750, FPS: 55.00, Sample rate: 48015.00 Hz.\n[INFO] [Video] Set video size to: fullscreen.\n[INFO] [Video] Starting threaded video driver...\n[INFO] [DRM] OSD font renderer initialized.\n[DRM] Bubble rotations panel=0 core=1 content=3.\n[INFO] [DRM] UNIVERSAL PLANES cap set.\n[INFO] [DRM] ATOMIC caps set.\n[INFO] [DRM] Init successful.\n[INFO] [Video] Graphics driver did not initialize an input driver. Attempting to pick a suitable driver.\nxkbcommon: ERROR: failed to add default include path /usr/share/X11/xkb\n[WARN] [udev] Couldn't open any keyboard, mouse or touchpad. Are permissions set correctly for /dev/input/event* and /run/udev/?\n[WARN] [udev] Fullscreen pointer won't be available.\n[INFO] [udev] Adding Bubble retrogame_joypad without udev database: /dev/input/event2.\n[INFO] [udev] Pad #0 (/dev/input/event2) supports force feedback.\n[INFO] [udev] Pad #0 (/dev/input/event2) supports 16 force feedback effects.\n[INFO] [Input] Found joypad driver: \"udev\".\n[INFO] [Video] Found display server: \"null\".\n[INFO] [Audio] Set audio input rate to: 48015.00 Hz.\n[INFO] [Video] Timings deviate too much. Will not adjust. (Target = 60.00 Hz, Game = 55.00 Hz)\n[INFO] [ALSA] Using ALSA version 1.2.8.\n[INFO] [ALSA] Using FLOAT_LE sample format for PLAYBACK device \"plumos_output\".\n[INFO] [ALSA] Period: 4 periods per buffer (768 frames, 6144 bytes).\n[INFO] [ALSA] Buffer size: 3072 frames (24576 bytes).\n[INFO] [ALSA] Can pause: yes.\n[INFO] [ALSA] Initialized PLAYBACK device \"plumos_output\".\n[INFO] [Audio] Started synchronous audio driver.\n[INFO] [ALSA] Using ALSA version 1.2.8\n[INFO] [Microphone] Initialized microphone driver.\n[INFO] [Environ] SET_SUBSYSTEM_INFO.\nALSA lib seq.c:935:(snd_seq_open_noupdate) Unknown SEQ default\n[ERROR] [MIDI] snd_seq_open failed with error -2.\n[ERROR] [MIDI] Initialization failed.\n[libretro INFO] [FBNeo] Unknown device type for port 0, forcing \"Classic\" instead\n[libretro INFO] [FBNeo] Unknown device type for port 1, forcing \"Classic\" instead\n[INFO] [Playlist] Loading favorites file: \"/storage/plumos/config/retroarch/playlists/builtin/content_favorites.lpl\".\n[INFO] [Playlist] Loading history file: \"/storage/plumos/config/retroarch/playlists/builtin/content_history.lpl\".\n[INFO] [Playlist] Loading history file: \"/storage/plumos/config/retroarch/playlists/builtin/content_image_history.lpl\".\n[INFO] [Playlist] Loading history file: \"/storage/plumos/config/retroarch/playlists/builtin/content_music_history.lpl\".\n[INFO] [Playlist] Written to file: \"/storage/plumos/config/retroarch/playlists/builtin/content_history.lpl\".\n[INFO] [Environ] SET_INPUT_DESCRIPTORS.\n[DRM] Bubble display-contract layer=0 frame=384x256 aspect=1.333333 rotation=3 viewport=640x480+0+0 scanout=640x480.\n[INFO] [DRM] Number of planes on FD 3 is 6.\n[INFO] [DRM] CRTC index found 0 with ID 71.\n[INFO] [DRM] Plane with ID 57 is not an overlay. May be primary or cursor. Not usable.\n[INFO] [DRM] Plane with ID 73 is not an overlay. May be primary or cursor. Not usable.\n[INFO] [DRM] Plane with ID 89 is not an overlay. May be primary or cursor. Not usable.\n[INFO] [DRM] Using plane/overlay ID 105.\n[INFO] [DRM] Using plane with ID 105 on CRTC ID 71 format XR24.\n[INFO] [DRM] Completed synchronous plane-switch barrier: layer=0 target_fb=161.\n",
+      "wrapper_log_delta": "\nWarning: Permanently added '192.168.10.101' (ED25519) to the list of known hosts.\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n",
+      "display_contract_lines": [
+        "[DRM] Bubble rotations panel=0 core=1 content=3.",
+        "[DRM] Bubble display-contract layer=0 frame=384x256 aspect=1.333333 rotation=3 viewport=640x480+0+0 scanout=640x480."
+      ],
+      "elapsed_seconds": 8.01,
+      "geometry_contract": {
+        "frame": "384x256",
+        "reported_aspect": 0.75,
+        "effective_aspect": 0.75,
+        "aspect_source": "core_reported",
+        "rotation_quadrants": 1,
+        "orientation": "vertical",
+        "expected_viewport": {
+          "width": 360,
+          "height": 480,
+          "x": 140,
+          "y": 0
+        }
+      },
+      "renderer_contract": "no_software_gl_loaded",
+      "renderer_warnings": [],
+      "display_contract": "retroarch_drm",
+      "audio_contract": "pcm_running_progress"
+    },
+    {
+      "system": "mame2003plus",
+      "profile": "retroarch:mame2003_plus",
+      "content": "/run/media/sd2/roms/mame/varthj.zip",
+      "content_source": "explicit_content_map",
+      "command": "PLUMOS_ROOT=/storage/plumos PLUMOS_ROM_ROOT=/run/media/sd2 PLUMOS_BIOS_ROOT=/storage/plumos/state/device-matrix/bios /bin/busybox sh /storage/plumos/bin/plumos-retroarch-launch --system mame2003plus --core /storage/plumos/cores/mame2003_plus_libretro.so --rom /run/media/sd2/roms/mame/varthj.zip --cpu ondemand --safe-exit false",
+      "runtime_log": "/storage/plumos/logs/retroarch-mame2003plus-mame2003_plus.log",
+      "seconds": 5,
+      "renderer_expectation": "cpu_framebuffer_no_software_gl",
+      "status": "started",
+      "reason": null,
+      "ssh_rc": 0,
+      "probe": {
+        "alive": "yes",
+        "drm": "1541,",
+        "audio": "1541,",
+        "mali": "none",
+        "software_gl": "none",
+        "pcm": "RUNNING",
+        "pcm_states": "RUNNING,RUNNING,RUNNING,RUNNING,RUNNING,RUNNING,RUNNING,RUNNING,RUNNING",
+        "pcm_progress": "yes",
+        "rc": "143",
+        "leftovers": "none",
+        "preexisting": "none"
+      },
+      "runtime_log_delta": "[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+]          40048 ran, 55781002 total, time = 0.004006381\n[libretro DEBUG] [MAME 2003+]   cpu 1: 16020 cycles\n[libretro DEBUG] [MAME 2003+] timer_adjust 6B146700 to expire @ 0.000112181\n[libretro DEBUG] [MAME 2003+] activecpu_abort_timeslice (CPU=1, cycles_left=15572)\n[libretro DEBUG] [MAME 2003+]          449 ran, 22296824 total, time = 0.000112181\n[libretro DEBUG] [MAME 2003+]          (new target)\n[libretro DEBUG] [MAME 2003+] timer_adjust_global_time: delta=0.000112181 head->expire=0.000000000\n[libretro DEBUG] [MAME 2003+] Timer 6B146700 fired (expire=0.000000000)\n[libretro DEBUG] [MAME 2003+] timer_adjust 6B1466C0 to expire @ 0.000000000\n[libretro DEBUG] [MAME 2003+] Timer 6B1466C0 fired (expire=0.000000000)\n[libretro DEBUG] [MAME 2003+] Z80 #1 set_irq_line 0\n[libretro DEBUG] [MAME 2003+] ------------------\n[libretro DEBUG] [MAME 2003+] cpu_timeslice: target = 0.003892758\n[libretro DEBUG] [MAME 2003+]   cpu 0: -14 cycles\n[libretro DEBUG] [MAME 2003+]   cpu 1: 15571 cycles\n[libretro DEBUG] [MAME 2003+]          15571 ran, 22312395 total, time = 0.003892750\n[libretro DEBUG] [MAME 2003+]          (new target)\n[libretro DEBUG] [MAME 2003+] timer_adjust_global_time: delta=0.003892750 head->expire=0.000000008\n[libretro DEBUG] [MAME 2003+] ------------------\n[libretro DEBUG] [MAME 2003+] cpu_timeslice: target = 0.000000008\n[libretro DEBUG] [MAME 2003+]   cpu 0: -14 cycles\n[libretro DEBUG] [MAME 2003+]   cpu 1: 0 cycles\n[libretro DEBUG] [MAME 2003+] timer_adjust_global_time: delta=0.000000008 head->expire=0.000000000\n[libretro DEBUG] [MAME 2003+] Timer 6B145380 fired (expire=0.000000000)\n[libretro DEBUG] [MAME 2003+] timer_adjust 6B145380 to expire @ 0.004004939\n[libretro DEBUG] [MAME 2003+] timer_adjust 6B146740 to expire @ 0.000000000\n[libretro DEBUG] [MAME 2003+] Timer 6B146740 fired (expire=0.000000000)\n[libretro DEBUG] [MAME 2003+] timer_adjust 6B146780 to expire @ 0.000000000\n[libretro DEBUG] [MAME 2003+] Timer 6B146780 fired (expire=0.000000000)\n[libretro DEBUG] [MAME 2003+] Z80 #1 set_irq_line 1\n[libretro DEBUG] [MAME 2003+] Z80 #1 single int. irq_vector $ff\n[libretro DEBUG] [MAME 2003+] Z80 #1 IM1 $0038\n[libretro DEBUG] [MAME 2003+] ------------------\n[libretro DEBUG] [MAME 2003+] cpu_timeslice: target = 0.004004939\n[libretro DEBUG] [MAME 2003+]   cpu 0: 40034 cycles\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=00000BF4): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+] cpu #0 (PC=0000090A): word write to 00000000 = 000F & FFFF\n[libretro DEBUG] [MAME 2003+]          40048 ran, 55821050 total, time = 0.004006242\n[libretro DEBUG] [MAME 2003+]   cpu 1: 16019 cycles\n[libretro DEBUG] [MAME 2003+] timer_adjust 6B146800 to expire @ 0.000112242\n[libretro DEBUG] [MAME 2003+] activecpu_abort_timeslice (CPU=1, cycles_left=15571)\n[libretro DEBUG] [MAME 2003+]          449 ran, 22312844 total, time = 0.000112242\n[libretro DEBUG] [MAME 2003+]          (new target)\n[libretro DEBUG] [MAME 2003+] timer_adjust_global_time: delta=0.000112242 head->expire=0.000000000\n[libretro DEBUG] [MAME 2003+] Timer 6B146800 fired (expire=0.000000000)\n[libretro DEBUG] [MAME 2003+] timer_adjust 6B1467C0 to expire @ 0.000000000\n[libretro DEBUG] [MAME 2003+] Timer 6B1467C0 fired (expire=0.000000000)\n[libretro DEBUG] [MAME 2003+] Z80 #1 set_irq_line 0\n[libretro DEBUG] [MAME 2003+] ------------------\n[libretro DEBUG] [MAME 2003+] cpu_timeslice: target = 0.003892697\n[libretro DEBUG] [MAME 2003+]   cpu 0: -13 cycles\n[libretro DEBUG] [MAME 2003+]   cpu 1: 15570 cycles\n[libretro DEBUG] [MAME 2003+]          15580 ran, 22328424 total, time = 0.003895000\n[libretro DEBUG] [MAME 2003+] timer_adjust_global_time: delta=0.003892697 head->expire=0.000000000\n[libretro DEBUG] [MAME 2003+] Timer 6B145380 fired (expire=0.000000000)\n[libretro DEBUG] [MAME 2003+] timer_adjust 6B145380 to expire @ 0.004004939\n[libretro DEBUG] [MAME 2003+] timer_adjust 6B146840 to expire @ 0.000000000\n[libretro DEBUG] [MAME 2003+] Timer 6B146840 fired (expire=0.000000000)\n[libretro DEBUG] [MAME 2003+] timer_adjust 6B146880 to expire @ 0.000000000\n[libretro DEBUG] [MAME 2003+] Timer 6B146880 fired (expire=0.000000000)\n[libretro DEBUG] [MAME 2003+] Z80 #1 set_irq_line 1\n[libretro DEBUG] [MAME 2003+] Z80 #1 single int. irq_vector $ff\n[libretro DEBUG] ",
+      "wrapper_log_delta": "\nWarning: Permanently added '192.168.10.101' (ED25519) to the list of known hosts.\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n",
+      "display_contract_lines": [],
+      "elapsed_seconds": 8.13,
+      "geometry_contract": null,
+      "renderer_contract": "no_software_gl_loaded",
+      "renderer_warnings": [],
+      "display_contract": "runtime_only",
+      "audio_contract": "pcm_running_progress"
+    }
+  ],
+  "completed_at": "2026-09-06T15:08:02.520723+00:00",
+  "summary": {
+    "started": 2,
+    "failed": 0,
+    "unsupported": 0,
+    "not_run": 0
+  }
+}

@@ -357,6 +357,9 @@
     全てをpolicyへ収録し、18 systemへ52拡張子を追加、共有directory衝突やlauncher非対応の
     30拡張子は理由付き除外とした。実機の隔離fixtureでは52/52を認識し、ROM SD 4,745 fileは
     read-only棚卸しのみ実施した。各実形式のcore起動確認と残りcoverage項目は継続する。
+  - clean imageで明示scanした結果、Mega Driveの正当な`.bin`対応が
+    `megadrive/EDMD/SAVE/*.BIN`までgameとして再帰収録することを確認。拡張子を削らず、
+    save/cache directoryを機械可読な除外規則へ追加する。
 - [ ] `BUB-P6-06` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。
   - MF/V90S/Pixel2のPortMaster履歴を再監査し、GUI restart marker、component-owned
     Bash/patcher/LOVE、font/cairo/audio/transitive DSO、`pgrep -f`、GPTokeYB所有権付き停止、
@@ -387,6 +390,9 @@
     その後のsafe reboot requestを消費するPID 1 supervisorが残らず、network/storage停止後も
     本体がrebootしなかった。recovery consoleでもpower requestを監視・確定できるloopへ変更し、
     意図的なrestart-limit到達からReboot/Shutdown双方を実機確認する。
+  - clean imageのPortMaster GUIはMali/DRMで25秒生存したが、launcherへの強制`TERM`後に
+    GUI childが一時DRM ownerとして残ったままFEが復帰した。即時に単一ownerへ復旧済み。
+    power/rebootが利用する強制終了境界では、子のDRM解放確認後にだけFEを再開する契約を追加する。
 - [ ] `BUB-P6-08` 全system表示、全profile選択、全core load smoke、代表content起動をhostで通してから、
   ROMセットを変更せず一括実機acceptanceを開始する。
   - hostでは全system/profile解決と114/114 core load smokeまで合格。
@@ -438,6 +444,10 @@
   - 同試験後、active `config/standalone/*`がglobal checksumへ誤収録され、DraSticによる正当な
     `drastic.cf2`更新でapp-layer検証が失敗することを検出。active standalone設定をmanaged
     inventoryから除外し、factory defaultはstandalone component checksumで引き続き管理する。
+  - source `0dc027a`のclean imageで過去問題経路29 profileをROM2/SD2 contentにより再走査。
+    SSH欠測と検証BIOS pathを修正した後は29/29がDRM取得、29/29がPCM pointer進行、
+    必須経路はMali、software GL mappingは0。PFS、Apotris、PortMaster GUI、GGFEも別途起動した。
+    詳細は`docs/validation/2026-09-07-bubble-fresh-image-emulator-regression.md`。
 - [ ] `BUB-P6-09` Bubble全物理入力を実機captureから固定し、全runtimeへ割り当てて物理確認する。
   - event0/1/2、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`から、D-pad、ABXY、
     Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。
@@ -544,6 +554,10 @@
     代表contentのruntime結果は
     `docs/validation/2026-09-02-bubble-emulator-device-acceptance.md`へ記録した。
     次は物理LCD/aspect/speaker確認、N64 audio修正、visible first-boot progressを行う。
+  - clean imageのfresh RetroArch configで縦画面回帰を検出。FBNeo Image Fightと
+    MAME2003+ Varthはcoreが3:4/quarter-turnを返すが、DRMはrotation 3のまま
+    `640x480` full viewportを確保し4:3へ伸長する。以前の`360x480+140+0`契約へ戻し、
+    fresh factory configを含むruntime testで固定する。
 - [ ] GGFE（Game Gear専用フロントエンド）を実装する。カートリッジをCPU software 3Dで描画し、
   GLもEGLも`/dev/mali0`も使わず、RetroArchとGPU/DRM masterを奪い合わない構成とする。
   - `plumos_cart3d.h`（3Dラスタライザ）、`plumos_ggfe_model.h`（実物採寸のカート/ケース形状）、

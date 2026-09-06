@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "device": "GKD Bubble",
+  "run_id": "20260906T150452Z",
+  "catalog_systems": 98,
+  "catalog_profile_occurrences": 196,
+  "profile_filter": [],
+  "bios_root": "/storage/plumos/state/device-matrix/bios",
+  "retroarch_video_contract": {
+    "source": "factory_fallback",
+    "menu_driver": "rgui",
+    "video_driver": "drm",
+    "video_aspect_ratio_auto": "true",
+    "video_force_aspect": "true",
+    "video_scale_integer": "false",
+    "video_rotation": "0"
+  },
+  "volume_requirement": {
+    "persisted": "preserved",
+    "runtime": 0,
+    "softvol_raw": 0
+  },
+  "records": [
+    {
+      "system": "pyxel",
+      "profile": "pyxel:bubble",
+      "content": "/run/media/sd2/roms/pyxel/pfs.pyxapp",
+      "content_source": "explicit_content_map",
+      "command": "PLUMOS_ROOT=/storage/plumos PLUMOS_PYXEL_CPU_POLICY=performance /bin/busybox sh /storage/plumos/bin/plumos-pyxel-bubble-launch -m pyxel play /run/media/sd2/roms/pyxel/pfs.pyxapp",
+      "runtime_log": "/storage/plumos/logs/pyxel/runtime.log",
+      "seconds": 8,
+      "renderer_expectation": "mali_required",
+      "status": "started",
+      "reason": null,
+      "ssh_rc": 0,
+      "probe": {
+        "alive": "yes",
+        "drm": "31246,",
+        "audio": "31246,",
+        "mali": "31246,",
+        "software_gl": "none",
+        "pcm": "RUNNING",
+        "pcm_states": "RUNNING,RUNNING,RUNNING,RUNNING,RUNNING,RUNNING,RUNNING,RUNNING,RUNNING",
+        "pcm_progress": "yes",
+        "rc": "143",
+        "leftovers": "none",
+        "preexisting": "none"
+      },
+      "runtime_log_delta": "stage=P63_CPU result=ok requested=performance active=performance\nplumos-pyxel-display: backend=kmsdrm api=gles2 source=256x192\nplumos-pyxel-display: context=created make-current=0\nplumos-pyxel-fit: upstream=0.0,0.0 640x480 output=640x480 factor=1.000000 offset=0.0,0.0\nERROR: Could not restore CRTC\narm_release_ver: g13p0-01eac0, rk_so_ver: 3\n",
+      "wrapper_log_delta": "\nWarning: Permanently added '192.168.10.101' (ED25519) to the list of known hosts.\n** WARNING: connection is not using a post-quantum key exchange algorithm.\n** This session may be vulnerable to \"store now, decrypt later\" attacks.\n** The server may need to be upgraded. See https://openssh.com/pq.html\n",
+      "display_contract_lines": [
+        "plumos-pyxel-display: backend=kmsdrm api=gles2 source=256x192",
+        "plumos-pyxel-display: context=created make-current=0",
+        "plumos-pyxel-fit: upstream=0.0,0.0 640x480 output=640x480 factor=1.000000 offset=0.0,0.0"
+      ],
+      "elapsed_seconds": 10.26,
+      "geometry_contract": null,
+      "renderer_contract": "mali_loaded",
+      "renderer_warnings": [],
+      "display_contract": "pyxel_fit",
+      "audio_contract": "pcm_running_progress"
+    }
+  ],
+  "completed_at": "2026-09-06T15:05:13.811240+00:00",
+  "summary": {
+    "started": 1,
+    "failed": 0,
+    "unsupported": 0,
+    "not_run": 0
+  }
+}

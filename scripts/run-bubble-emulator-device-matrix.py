@@ -177,12 +177,19 @@ def load_library(device: Device, path: str | None) -> dict:
 
 
 def retroarch_config_contract(device: Device) -> dict:
-    config = device.file(f"{ROOT}/config/retroarch/retroarch-bubble.cfg")
+    active = f"{ROOT}/config/retroarch/retroarch-bubble.cfg"
+    factory = f"{ROOT}/factory-defaults/retroarch/retroarch-bubble.cfg"
+    # A clean image intentionally seeds the mutable RetroArch config on the
+    # first launch.  Planning a device matrix must therefore use the same
+    # factory fallback as plumos-retroarch-launch instead of requiring a stale
+    # config from an earlier image.
+    config_path = active if remote_exists(device, active) else factory
+    config = device.file(config_path)
     keys = (
         "menu_driver", "video_driver", "video_aspect_ratio_auto",
         "video_force_aspect", "video_scale_integer", "video_rotation",
     )
-    result = {}
+    result = {"source": "active" if config_path == active else "factory_fallback"}
     for key in keys:
         matches = re.findall(
             rf'^{re.escape(key)}\s*=\s*"([^"]*)"\s*$', config, re.MULTILINE
@@ -325,6 +332,14 @@ for dst in "$R/states" "$R/saves" "$R/state/pyxel-home" "$R/state/standalone" "$
 done
 rm -f /run/plumos/validation/frontend-hold /run/plumos/validation/matrix-mounts
 /bin/busybox sh "$R/bin/plumos-volume-control" apply 0 >/dev/null 2>&1 || true
+# PID 1 observes the hold removal and normally restores the frontend itself.
+# Give that supervisor one polling interval before using the standalone recovery
+# fallback, otherwise both paths can acquire the display a few seconds apart.
+n=0
+while ! /bin/busybox pidof plumos-controller-ui-fbdev >/dev/null 2>&1 && test "$n" -lt 50; do
+    /bin/busybox usleep 100000
+    n=$((n + 1))
+done
 if ! /bin/busybox pidof plumos-controller-ui-fbdev >/dev/null 2>&1; then
     /bin/busybox setsid /bin/busybox sh "$R/bin/plumos-frontend-launch" \
         </dev/null >>"$R/logs/frontend-recovery.log" 2>&1 &
@@ -519,7 +534,11 @@ def main() -> int:
         "profile_filter": args.only_kind,
         "bios_root": bios_root,
         "retroarch_video_contract": retroarch_config_contract(device),
-        "volume_requirement": {"persisted": 0, "runtime": 0, "softvol_raw": 0},
+        "volume_requirement": {
+            "persisted": "preserved",
+            "runtime": 0,
+            "softvol_raw": 0,
+        },
         "records": records,
     }
     out = Path(args.report)
