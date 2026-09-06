@@ -16,12 +16,14 @@ rom_root=$tmp/roms
 runtime=$tmp/run
 mkdir -p "$root/bin" "$root/picoarch/bin" "$root/picoarch/lib" \
     "$root/emulator/lib" "$root/cores" "$root/share/alsa" \
-    "$rom_root/nes" "$runtime"
+    "$rom_root/nes" "$rom_root/gamegear" "$runtime"
 cp package/picoarch-bubble/plumos/bin/plumos-picoarch-launch \
     "$root/bin/plumos-picoarch-launch"
 : >"$root/cores/quicknes_libretro.so"
+: >"$root/cores/gearsystem_libretro.so"
 : >"$root/share/alsa/alsa.conf"
 : >"$rom_root/nes/test.nes"
+: >"$rom_root/gamegear/test.gg"
 cat >"$root/bin/plumos-cpu-control" <<'EOF'
 #!/bin/sh
 case $1 in
@@ -37,6 +39,7 @@ cat >"$root/picoarch/bin/picoarch" <<'EOF'
 set -eu
 : "${TEST_TRACE:?}"
 printf '%s\n' "$$" >"$TEST_TRACE.pid"
+printf '%s\n' "${PLUMOS_PICOARCH_RGB565_BYTESWAP:-unset}" >"$TEST_TRACE.rgb565"
 if [ "${TEST_HOLD:-0}" = 1 ]; then
     trap '' TERM
     while :; do sleep 1; done
@@ -52,6 +55,18 @@ PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=nes \
     "$root/bin/plumos-picoarch-launch" quicknes "$rom_root/nes/test.nes"
 grep -Fqx 'picoarch=stage-P19 system=nes core=quicknes rc=0' \
     "$root/logs/session.log"
+test "$(cat "$tmp/normal.rgb565")" = 0
+
+# Gearsystem's RGB565 output needs byte-order correction before PicoArch's
+# 16-bit scaler. A device screenshot otherwise turns the blue SEGA screen
+# green. Keep this per-core so correctly ordered cores remain untouched.
+TEST_TRACE=$tmp/gearsystem PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
+PLUMOS_BIOS_ROOT=$tmp/bios PLUMOS_RUNTIME_ROOT=$runtime \
+PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=gamegear \
+    "$root/bin/plumos-picoarch-launch" gearsystem "$rom_root/gamegear/test.gg"
+test "$(cat "$tmp/gearsystem.rgb565")" = 1
+grep -Fqx 'picoarch=video-format core=gearsystem rgb565_byteswap=1' \
+    "$root/logs/picoarch-gamegear-gearsystem.log"
 
 # The normal FE exposes content through /storage/user/Roms while the legacy
 # compatibility root is /storage/Roms -> user/Roms.  Both names must resolve to

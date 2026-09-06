@@ -68,8 +68,10 @@ else
 fi
 RGB565_BYTESWAP=0
 case "$CORE_ID" in
-    mednafen_ngp|mednafen_supergrafx|mednafen_supafaust) RGB565_BYTESWAP=1 ;;
+    gearsystem|mednafen_ngp|mednafen_supergrafx|mednafen_supafaust) RGB565_BYTESWAP=1 ;;
 esac
+printf 'picoarch=video-format core=%s rgb565_byteswap=%s\n' \
+    "$CORE_ID" "$RGB565_BYTESWAP" >>"$LOG"
 SYSTEM_DIR=$PLUMOS_BIOS_ROOT
 if [ "$CORE_ID" = scummvm ] && [ -f "$PLUMOS_ROOT/share/libretro-system/scummvm/extra/sky.cpt" ]; then
     SYSTEM_DIR=$PLUMOS_ROOT/share/libretro-system

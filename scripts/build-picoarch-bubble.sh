@@ -28,6 +28,7 @@ BUBBLE_PHYSICAL_INPUT_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-
 BUBBLE_EVDEV_HOTPLUG_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bubble-evdev-hotplug.patch"
 BUBBLE_FBDEV_STAGED_COPY_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bubble-fbdev-staged-copy.patch"
 BUBBLE_FBDEV_RENDERER_HEADER="$ROOT_DIR/src/frontend/plumos_fbdev_renderer.h"
+BUBBLE_PICOARCH_LAUNCHER="$ROOT_DIR/package/picoarch-bubble/plumos/bin/plumos-picoarch-launch"
 SDL_VERSION="2.32.0"
 SDL_SHA256="f5c2b52498785858f3de1e2996eba3c1b805d08fe168a47ea527c7fc339072d0"
 SDL_ARCHIVE="$ROOT_DIR/build/downloads/SDL2-$SDL_VERSION.tar.gz"
@@ -62,6 +63,10 @@ export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-0}"
     printf 'error: missing Bubble DRM page-flip renderer: %s\n' "$BUBBLE_FBDEV_RENDERER_HEADER" >&2
     exit 1
 }
+[ -x "$BUBBLE_PICOARCH_LAUNCHER" ] || {
+    printf 'error: missing Bubble PicoArch launcher: %s\n' "$BUBBLE_PICOARCH_LAUNCHER" >&2
+    exit 1
+}
 export PLUMOS_BUBBLE_PICOARCH_AUDIO_STATUS_PATCH="$BUBBLE_AUDIO_STATUS_PATCH"
 export PLUMOS_BUBBLE_PICOARCH_RGB565_BYTESWAP_PATCH="$BUBBLE_RGB565_BYTESWAP_PATCH"
 export PLUMOS_BUBBLE_PICOARCH_VFS_SEEK_PATCH="$BUBBLE_VFS_SEEK_PATCH"
@@ -75,6 +80,7 @@ BUBBLE_VFS_SEEK_PATCH_SHA256="$(sha256sum "$BUBBLE_VFS_SEEK_PATCH" | awk '{print
 BUBBLE_PHYSICAL_INPUT_PATCH_SHA256="$(sha256sum "$BUBBLE_PHYSICAL_INPUT_PATCH" | awk '{print $1}')"
 BUBBLE_EVDEV_HOTPLUG_PATCH_SHA256="$(sha256sum "$BUBBLE_EVDEV_HOTPLUG_PATCH" | awk '{print $1}')"
 BUBBLE_FBDEV_STAGED_COPY_PATCH_SHA256="$(sha256sum "$BUBBLE_FBDEV_STAGED_COPY_PATCH" | awk '{print $1}')"
+BUBBLE_PICOARCH_LAUNCHER_SHA256="$(sha256sum "$BUBBLE_PICOARCH_LAUNCHER" | awk '{print $1}')"
 
 if [ ! -d "$VENDOR_ROOT/.git" ]; then
     rm -rf "$VENDOR_ROOT"
@@ -216,7 +222,7 @@ install -m 0644 "$SDL_LIBRARY" \
     "$PLUMOS_DIR/picoarch/lib/libSDL2-2.0.so.0"
 strip --strip-unneeded "$PLUMOS_DIR/picoarch/lib/libSDL2-2.0.so.0"
 install -m 0755 \
-    "$ROOT_DIR/package/picoarch-bubble/plumos/bin/plumos-picoarch-launch" \
+    "$BUBBLE_PICOARCH_LAUNCHER" \
     "$PLUMOS_DIR/bin/plumos-picoarch-launch"
 install -m 0644 \
     "$ROOT_DIR/package/picoarch-bubble/plumos/factory-defaults/picoarch/config/standalone/picoarch.env" \
@@ -232,8 +238,8 @@ cat >"$PLUMOS_DIR/components/picoarch/manifest.json" <<EOF
 {
   "name": "plumOS Bubble PicoArch",
   "device": "bubble",
-  "source_ref": "picoarch:802047c276a5a931b0bf837c4ea4b8e238bdeabe v90s-build:$V90S_REF sdl2:$SDL_VERSION:$SDL_SHA256 bubble-audio-status:$BUBBLE_AUDIO_STATUS_PATCH_SHA256 bubble-rgb565-byteswap:$BUBBLE_RGB565_BYTESWAP_PATCH_SHA256 bubble-vfs-seek:$BUBBLE_VFS_SEEK_PATCH_SHA256 bubble-physical-input:$BUBBLE_PHYSICAL_INPUT_PATCH_SHA256 bubble-evdev-hotplug:$BUBBLE_EVDEV_HOTPLUG_PATCH_SHA256 bubble-fbdev-staged-copy:$BUBBLE_FBDEV_STAGED_COPY_PATCH_SHA256",
-  "render_contract": "cpu-drm-pageflip-rgb565-to-bgra8888 with staged-fbdev fallback",
+  "source_ref": "picoarch:802047c276a5a931b0bf837c4ea4b8e238bdeabe v90s-build:$V90S_REF sdl2:$SDL_VERSION:$SDL_SHA256 bubble-audio-status:$BUBBLE_AUDIO_STATUS_PATCH_SHA256 bubble-rgb565-byteswap:$BUBBLE_RGB565_BYTESWAP_PATCH_SHA256 bubble-vfs-seek:$BUBBLE_VFS_SEEK_PATCH_SHA256 bubble-physical-input:$BUBBLE_PHYSICAL_INPUT_PATCH_SHA256 bubble-evdev-hotplug:$BUBBLE_EVDEV_HOTPLUG_PATCH_SHA256 bubble-fbdev-staged-copy:$BUBBLE_FBDEV_STAGED_COPY_PATCH_SHA256 bubble-launcher:$BUBBLE_PICOARCH_LAUNCHER_SHA256",
+  "render_contract": "cpu-drm-pageflip-rgb565-to-bgra8888 with per-core RGB565 byte-order correction and staged-fbdev fallback",
   "input_contract": "plumOS Bubble Controller physical labels, digital L2/R2, dual analog, L3/R3 and F1/F2 menu",
   "core_route": "cores/*_libretro.so"
 }
