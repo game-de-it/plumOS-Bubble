@@ -359,6 +359,12 @@
     portを1件導入後の代表runtime試験を残す（現時点の実機port scriptは0件）。
   - Pixel2で起動時の同期auditが長時間化とmount残留を起こした履歴があるため、installed-port
     static auditはGUI起動gateにせず、明示diagnostic/update工程として実装・検証する。
+  - adapter 28でBusyBox全appletを外部commandとして公開し、`.tar.xz`展開shim、Bubbleの
+    trusted DSO chain、`execve`/`execveat`/`posix_spawn`環境guard、session ID継承と終了時の
+    tagged-process回収を実装。実機Apotris/GPTokeYBのloader closureと起動を確認し、停止後は
+    tagged process/mount/holdが0、FE 1 processへ復帰、mutable `installed.json` hash不変。
+    実機にあるport scriptはApotris 1件のみのため、物理LCD/input/audioのFE導線確認と、
+    将来追加される異なるruntime種別の代表試験を残す。
 - [ ] `BUB-P6-07` app/game終了時に同一sessionだけを回収し、frontend/device ownershipを復元する。
   - SSH benchmarkがfrontendを複数回停止してPID 1の4回restart limitへ到達した。`sync`後の
     強制rebootで通常FE 1 processへ復旧。今後の繰返し性能試験は通常FE導線を各試行で使うか、
