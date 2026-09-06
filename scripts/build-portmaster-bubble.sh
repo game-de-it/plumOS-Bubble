@@ -65,7 +65,7 @@ PIXMAN_RUNTIME_VERSION="0.42.2-1"
 SQUASHFS_TOOLS_VERSION="1:4.5.1-1"
 ZIP_VERSION="3.0-13"
 BASH_RUNTIME_VERSION="5.2.15-2+b13"
-ADAPTER_VERSION="26"
+ADAPTER_VERSION="27"
 
 usage() {
     cat <<EOF
@@ -621,6 +621,11 @@ find "$stage_dir/plumos/apps/portmaster/upstream/PortMaster/runtimes" \
 
 rsync -a --copy-links --exclude='__pycache__/' --exclude='*.pyc' \
     "$PACKAGE_DIR/plumos/" "$stage_dir/plumos/"
+mkdir -p "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64"
+cc -O2 -fPIC -Wall -Wextra -Werror -shared \
+    -Wl,-z,defs -Wl,-soname,libplumos-portmaster-exec-guard.so \
+    -o "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64/libplumos-portmaster-exec-guard.so" \
+    "$PACKAGE_DIR/src/plumos_portmaster_exec_guard.c" -ldl
 find "$stage_dir/plumos/bin" \
     "$stage_dir/plumos/apps/portmaster/adapter/shims" \
     -type f -exec chmod 0755 {} +
@@ -631,7 +636,6 @@ chmod 0755 \
     "$stage_dir/plumos/apps/portmaster/adapter/plumos_portmaster_update.py"
 mkdir -p \
     "$stage_dir/plumos/apps/portmaster/adapter/bin/aarch64" \
-    "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64" \
     "$stage_dir/plumos/licenses"
 while IFS=':' read -r soname pattern; do
     source_library="$(find /usr/lib/aarch64-linux-gnu -type f \

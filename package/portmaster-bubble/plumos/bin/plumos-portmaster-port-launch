@@ -28,6 +28,8 @@ MOUNTS_FILE="${RUN_ROOT}/port.mounts"
 MOUNT_CLEANUP="${PLUMOS_ROOT}/bin/plumos-portmaster-mount-cleanup"
 FRONTEND_CONTROL="${PLUMOS_ROOT}/bin/plumos-portmaster-frontend-control"
 PORT_BASH="${APP_ROOT}/adapter/bin/aarch64/bash"
+EXEC_GUARD_LIB="${APP_ROOT}/adapter/lib/aarch64/libplumos-portmaster-exec-guard.so"
+SESSION_CLEANUP="${PLUMOS_ROOT}/bin/plumos-portmaster-session-cleanup"
 child=""
 restore_frontend=0
 cleanup_done=0
@@ -108,6 +110,10 @@ cleanup() {
       kill -KILL "-$child" 2>/dev/null || true
     fi
   fi
+  if [ -x "$SESSION_CLEANUP" ]; then
+    PLUMOS_PORTMASTER_SESSION_LOG="$LOG_FILE" \
+      "$BB" sh "$SESSION_CLEANUP" >> "$LOG_FILE" 2>&1 || true
+  fi
   "$BB" sh "${PLUMOS_ROOT}/bin/plumos-portmaster-gptokeyb-stop" stop 2>/dev/null || true
   if [ -x "$MOUNT_CLEANUP" ]; then
     "$BB" sh "$MOUNT_CLEANUP" "$MOUNTS_FILE" \
@@ -120,7 +126,11 @@ cleanup() {
   fi
   rm -f "$PID_FILE" "$START_FILE" "$SCRIPT_FILE"
   if [ "$restore_frontend" -eq 1 ]; then
-    "$BB" sh "$FRONTEND_CONTROL" release >> "$LOG_FILE" 2>&1 || true
+    (
+      unset LD_PRELOAD LD_LIBRARY_PATH PLUMOS_PORTMASTER_REQUIRED_LD_PRELOAD \
+        PLUMOS_PORTMASTER_REQUIRED_LD_LIBRARY_PATH PLUMOS_PORTMASTER_SESSION_ID
+      "$BB" sh "$FRONTEND_CONTROL" release >> "$LOG_FILE" 2>&1 || true
+    )
   fi
 }
 
@@ -285,7 +295,7 @@ export HM_TOOLS_DIR="${DATA_ROOT}/upstream"
 export HM_PORTS_DIR="$PORTS_ROOT"
 export HM_SCRIPTS_DIR="$PORTS_ROOT"
 export PATH="${APP_ROOT}/adapter/shims:${RUN_ROOT}/busybox-bin:${APP_ROOT}/adapter/bin/aarch64:${PLUMOS_ROOT}/bin:${PATH}"
-export LD_LIBRARY_PATH="${RUN_ROOT}/lib"
+export LD_LIBRARY_PATH="${RUN_ROOT}/lib:${PLUMOS_ROOT}/emulator/lib:${PLUMOS_ROOT}/apps/pyxel/lib:${PLUMOS_ROOT}/apps/python/lib:${PLUMOS_ROOT}/lib:${PLUMOS_ROOT}/apps/nextcommander/lib:${PLUMOS_ROOT}/apps/pyxel/site/pygame.libs${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 export SDL_VIDEODRIVER="kmsdrm"
 export SDL_RENDER_DRIVER="opengles2"
 export SDL_AUDIODRIVER="alsa"
@@ -297,6 +307,14 @@ export SDL_GAMECONTROLLERCONFIG="$(cat "$SDL_GAMECONTROLLERCONFIG_FILE")"
 export SDL_VIDEO_KMSDRM_DEVICE_INDEX="${SDL_VIDEO_KMSDRM_DEVICE_INDEX:-0}"
 unset LIBGL_ALWAYS_SOFTWARE MESA_LOADER_DRIVER_OVERRIDE \
   LIBGL_DRIVERS_PATH __EGL_VENDOR_LIBRARY_FILENAMES
+[ -r "$EXEC_GUARD_LIB" ] || {
+  printf 'PortMaster Bubble execution guard is missing: %s\n' "$EXEC_GUARD_LIB" >&2
+  exit 127
+}
+export PLUMOS_PORTMASTER_SESSION_ID="${PLUMOS_PORTMASTER_SESSION_ID:-bubble-$(date +%s)-$$}"
+export PLUMOS_PORTMASTER_REQUIRED_LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
+export PLUMOS_PORTMASTER_REQUIRED_LD_PRELOAD="$EXEC_GUARD_LIB"
+export LD_PRELOAD="${EXEC_GUARD_LIB}${LD_PRELOAD:+:${LD_PRELOAD}}"
 mkdir -p "$XDG_CACHE_HOME" "$HM_PORTS_DIR"
 
 if ! frontend_is_ancestor && frontend_running; then
@@ -307,7 +325,7 @@ fi
 printf '\n[%s] script=%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$script" \
   "$(printf '%s' "$audio_status" | tr '\n' ' ')" >> "$LOG_FILE"
 printf 'renderer_policy=port-owned-hardware-preferred software_forced=false\n' >>"$LOG_FILE"
-LD_LIBRARY_PATH="${RUN_ROOT}/lib" setsid "$PORT_BASH" "$script" "$@" >> "$LOG_FILE" 2>&1 &
+setsid "$PORT_BASH" "$script" "$@" >> "$LOG_FILE" 2>&1 &
 child=$!
 printf '%s\n' "$child" > "$PID_FILE"
 sed 's/.*) //' "/proc/${child}/stat" | awk '{print $20}' > "$START_FILE"

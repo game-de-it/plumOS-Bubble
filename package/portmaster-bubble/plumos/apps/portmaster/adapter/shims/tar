@@ -1,0 +1,45 @@
+#!/bin/sh
+set -eu
+
+busybox="${PLUMOS_BUSYBOX:-/bin/busybox}"
+archive=""
+directory="."
+extract=0
+expect_archive=0
+expect_directory=0
+
+for argument in "$@"; do
+  if [ "$expect_archive" -eq 1 ]; then
+    archive="$argument"
+    expect_archive=0
+    continue
+  fi
+  if [ "$expect_directory" -eq 1 ]; then
+    directory="$argument"
+    expect_directory=0
+    continue
+  fi
+  case "$argument" in
+    -C|--directory) expect_directory=1 ;;
+    -f|--file) expect_archive=1 ;;
+    -x|--extract|-xf|-xvf|-xaf|-xJf) extract=1 ;;
+    *.tar.xz|*.txz) archive="$argument" ;;
+  esac
+done
+
+case "$archive" in
+  *.tar.xz|*.txz) ;;
+  *) exec "$busybox" tar "$@" ;;
+esac
+
+[ "$extract" -eq 1 ] || exec "$busybox" tar "$@"
+[ "$expect_archive" -eq 0 ] && [ "$expect_directory" -eq 0 ] || {
+  printf 'tar: option requires an argument\n' >&2
+  exit 64
+}
+[ -f "$archive" ] || {
+  printf 'tar: cannot open %s\n' "$archive" >&2
+  exit 1
+}
+mkdir -p "$directory"
+"$busybox" unxz -c "$archive" | "$busybox" tar -C "$directory" -xf -

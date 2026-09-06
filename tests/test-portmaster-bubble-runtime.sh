@@ -15,8 +15,11 @@ PKILL="$PACKAGE/apps/portmaster/adapter/shims/pkill"
 PATCH_SHIM="$PACKAGE/apps/portmaster/adapter/shims/run-patchscript"
 PATCHER_OVERRIDE="$PACKAGE/apps/portmaster/adapter/overrides/patcher.txt"
 COMMAND_RUNTIME="$PACKAGE/bin/plumos-portmaster-command-runtime"
+SESSION_CLEANUP="$PACKAGE/bin/plumos-portmaster-session-cleanup"
+TAR_SHIM="$PACKAGE/apps/portmaster/adapter/shims/tar"
+EXEC_GUARD_SOURCE="$ROOT_DIR/package/portmaster-bubble/src/plumos_portmaster_exec_guard.c"
 
-for file in "$RUNTIME" "$GUI_LAUNCH" "$PORT_LAUNCH" "$MOUNT_CLEANUP" "$FRONTEND_CONTROL" "$PGREP" "$PKILL" "$PATCH_SHIM" "$COMMAND_RUNTIME"; do
+for file in "$RUNTIME" "$GUI_LAUNCH" "$PORT_LAUNCH" "$MOUNT_CLEANUP" "$FRONTEND_CONTROL" "$PGREP" "$PKILL" "$PATCH_SHIM" "$COMMAND_RUNTIME" "$SESSION_CLEANUP" "$TAR_SHIM"; do
     /bin/sh -n "$file"
 done
 
@@ -47,6 +50,15 @@ grep -q 'plumos-portmaster-port-stop" stop' "$PKILL"
 grep -q 'PORT_BASH="${APP_ROOT}/adapter/bin/aarch64/bash"' "$PORT_LAUNCH"
 grep -q '^export PORT_BASH$' "$PORT_LAUNCH"
 grep -q 'setsid "$PORT_BASH" "$script"' "$PORT_LAUNCH"
+grep -q 'PLUMOS_PORTMASTER_REQUIRED_LD_LIBRARY_PATH="$LD_LIBRARY_PATH"' "$PORT_LAUNCH"
+grep -q 'PLUMOS_PORTMASTER_REQUIRED_LD_PRELOAD="$EXEC_GUARD_LIB"' "$PORT_LAUNCH"
+grep -q 'plumos-portmaster-session-cleanup' "$PORT_LAUNCH"
+grep -q 'unset LD_PRELOAD LD_LIBRARY_PATH PLUMOS_PORTMASTER_REQUIRED_LD_PRELOAD' "$PORT_LAUNCH"
+grep -q '${PLUMOS_ROOT}/emulator/lib:${PLUMOS_ROOT}/apps/pyxel/lib' "$PORT_LAUNCH"
+grep -q 'plumos_portmaster_exec_guard.c' "$BUILDER"
+grep -q 'libplumos-portmaster-exec-guard.so' "$BUILDER"
+grep -q 'execveat' "$EXEC_GUARD_SOURCE"
+grep -q 'posix_spawnp' "$EXEC_GUARD_SOURCE"
 grep -q 'prepare_patcher_compat || exit 1' "$PORT_LAUNCH"
 grep -q 'PLUMOS_PORTMASTER_PATCH_SCRIPT="$PATCHER_FILE"' "$PATCHER_OVERRIDE"
 grep -q 'exec "$PORT_BASH" "$PLUMOS_PORTMASTER_PATCH_SCRIPT"' "$PATCH_SHIM"
@@ -203,5 +215,5 @@ grep -q "target=/usr/lib/compat" "$work/umount.log"
 grep -q "target=$pm_dir/config" "$work/umount.log"
 ! grep -q 'target=/$' "$work/umount.log"
 
-printf 'portmaster_bubble_runtime=result-ok adapter=%s command_runtime=busybox-all gui_preflight=1 mali_preload=1 pgrep=1 frontend_handoff=1 frontend_restore=1 restart=1 mount_recovery=1\n' \
+printf 'portmaster_bubble_runtime=result-ok adapter=%s command_runtime=busybox-all exec_guard=1 session_cleanup=1 xz_tar=1 gui_preflight=1 mali_preload=1 pgrep=1 frontend_handoff=1 frontend_restore=1 restart=1 mount_recovery=1\n' \
     "$builder_version"
