@@ -493,6 +493,11 @@
   - Runtime update inventoryはfactory-defaultsと静的frontend/standalone configだけを管理し、active
     config/save/state/log/user media/credentialを除外。factory resetは明示選択されたcategoryだけ復元する。
 - [ ] `BUB-P7-05` clean cloneからimageを再現し、source completeness、license、secret/ROM/BIOS混入gateを通す。
+  - source `eadb7f6`からprivate hardware-validation imageを全component再buildし、p1/p2/p3
+    再抽出、filesystem、first-boot中断再開、全component checksum、98 system/196 profile、
+    114 core loadをhost合格。live機の約5.1 GiBのvalidation stateは含めず、seed stateは28 KiB、
+    logs/saves/statesは空、Wi-Fi personalizationとuser ROMは未収録。captured MaliとDraSticの
+    再配布境界が未解決のためpublishable=noを維持し、source/license gate全体はopenとする。
 - [ ] `BUB-P7-06` SD write/readback、cold boot 3回、warm reboot、rollback、全hardware acceptanceを完了する。
 - [ ] `BUB-P7-07` release candidateを利用者が物理確認し、未解決項目を明示する。
 - [ ] `BUB-P7-08` 利用者の明示承認後だけreleaseを公開し、公開assetを再downloadしてchecksumを確認する。

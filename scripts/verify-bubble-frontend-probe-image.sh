@@ -176,14 +176,16 @@ grep -q 'video_context_driver = ""' \
     "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
 grep -q 'video_driver = "gl"' "$app/bin/plumos-retroarch-launch"
 grep -q 'video_context_driver = "kms"' "$app/bin/plumos-retroarch-launch"
-grep -q 'config_save_on_exit = "false"' "$app/bin/plumos-retroarch-launch"
+# Preserve the user's persistent RetroArch setting. The launcher may select a
+# renderer per route, but must not force config_save_on_exit in its append cfg.
+! grep -q 'config_save_on_exit' "$app/bin/plumos-retroarch-launch"
 grep -q 'menu_driver = "rgui"' "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
 grep -q 'rgui_show_start_screen = "false"' \
     "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
 for entry in ui-settings system-settings network-settings performance-settings apps help reboot shutdown; do
     grep -q "\"id\": \"$entry\"" "$app/config/frontend/menus.json"
 done
-jq -e '.bubble_only_start_entries == [] and .bubble_only_apps_entries == [] and
+jq -e '.bubble_only_start_entries == [] and .bubble_only_apps_entries == ["ggfe"] and
     .apps_reference_match == ["plumOS-MF", "plumOS-V90S_v2-public"]' \
     "$app/config/frontend/start-menu-coverage.json" >/dev/null
 for helper in plumos-display-control plumos-network-control \
