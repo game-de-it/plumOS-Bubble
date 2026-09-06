@@ -62,18 +62,18 @@ awk -F '\t' '
     $5 != "frontend" || $6 == "" { exit 1 }
     seen[$1 FS $2]++ { exit 1 }
     { print $1 FS $2 > routes }
-    END { if (length(seen) != 4) exit 1 }
+    END { if (length(seen) != 5) exit 1 }
 ' routes="$tmp/override-routes" "$overrides"
 sort -o "$tmp/override-routes" "$tmp/override-routes"
-comm -23 "$tmp/override-routes" "$tmp/picodrive-routes" >"$tmp/unexposed-overrides"
-test ! -s "$tmp/unexposed-overrides"
+cmp "$tmp/picodrive-routes" "$tmp/override-routes"
 cat >"$tmp/expected-overrides" <<'EOF'
 gamegear	picodrive	rgb565	byteswap	frontend	device-pengo-180f
 mastersystem	picodrive	rgb565	native	frontend	device-wonder-boy-iii-180f
 megadrive	picodrive	rgb565	native	frontend	device-bare-knuckle-180f
 sega32x	picodrive	rgb565	native	frontend	device-bc-racers-180f
+segacd	picodrive	rgb565	native	frontend	device-fatal-fury-special-300f
 EOF
 grep -v '^#' "$overrides" | sort >"$tmp/actual-overrides"
 cmp "$tmp/expected-overrides" "$tmp/actual-overrides"
 
-printf '%s\n' 'bubble_picoarch_rgb565_matrix=result-ok routes=20 rgb565=18 core_byteswap=6 route_overrides=4 xrgb8888=2 compat=1'
+printf '%s\n' 'bubble_picoarch_rgb565_matrix=result-ok routes=20 rgb565=18 core_byteswap=6 route_overrides=5 xrgb8888=2 compat=1'

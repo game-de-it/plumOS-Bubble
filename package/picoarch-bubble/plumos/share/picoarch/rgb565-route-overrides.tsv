@@ -3,3 +3,4 @@ megadrive	picodrive	rgb565	native	frontend	device-bare-knuckle-180f
 mastersystem	picodrive	rgb565	native	frontend	device-wonder-boy-iii-180f
 gamegear	picodrive	rgb565	byteswap	frontend	device-pengo-180f
 sega32x	picodrive	rgb565	native	frontend	device-bc-racers-180f
+segacd	picodrive	rgb565	native	frontend	device-fatal-fury-special-300f

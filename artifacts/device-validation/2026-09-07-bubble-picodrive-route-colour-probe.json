@@ -38,15 +38,19 @@
       "native_sha256": "fac846dc98f993e807eac8043179003eab83611f1cdb56173e3b6f0ffb50c0a7",
       "byteswap_sha256": "10e95e7471cdbda9601503dd6388dacabac417c88abb1438d4ddca0ad4cab593",
       "accepted_byte_order": "native"
-    }
-  ],
-  "not_run": [
+    },
     {
       "system_id": "segacd",
       "core_id": "picodrive",
-      "reason": "The clean device has no Sega CD BIOS under /storage/BIOS; the core returned Missing BIOS before producing a frame."
+      "content": "Fatal Fury Special (Europe) (Demo).cue",
+      "frames": 300,
+      "native_sha256": "1374c30112cb1d2386478a725f5dbb019d98e83e9dae55993be2535e177a8479",
+      "byteswap_sha256": "2c0180347ad742fc9c0c2e2a177de174fef659917ae2b75fa705bc01fe8452a0",
+      "accepted_byte_order": "native",
+      "bios_source": "temporary SHA-verified ROM2 bios_CD_E/U/J set; persistent BIOS unchanged"
     }
   ],
+  "not_run": [],
   "post_condition": {
     "frontend_processes": 1,
     "picoarch_processes": 0,
