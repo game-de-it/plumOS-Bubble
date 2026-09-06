@@ -7,6 +7,8 @@ PROC_ROOT="${PLUMOS_PORTMASTER_PROC_ROOT:-/proc}"
 VALIDATION_HOLD="${PLUMOS_FRONTEND_VALIDATION_HOLD:-/run/plumos/validation/frontend-hold}"
 OWNED_HOLD="${RUN_ROOT}/frontend-hold.owned"
 SLEEP_BIN="${PLUMOS_PORTMASTER_SLEEP_BIN:-sleep}"
+BB="${PLUMOS_BUSYBOX:-/bin/busybox}"
+FRONTEND_LAUNCH="${PLUMOS_PORTMASTER_FRONTEND_LAUNCH:-${PLUMOS_ROOT}/bin/plumos-frontend-launch}"
 action="${1:-status}"
 
 frontend_pids() {
@@ -68,6 +70,24 @@ case "$action" in
   release)
     [ -f "$OWNED_HOLD" ] || exit 0
     rm -f "$VALIDATION_HOLD" "$OWNED_HOLD"
+    # PID 1 has a deliberately bounded frontend restart loop. Repeated device
+    # validation can exhaust that budget, so first give the normal supervisor
+    # a chance to recover and then start the same managed frontend launcher
+    # ourselves. This path is reached only when PortMaster acquired the hold;
+    # the normal Apps child route continues to let its frontend ancestor own
+    # renderer restoration.
+    for _ in 1 2 3; do
+      [ -n "$(frontend_pids)" ] && exit 0
+      "$SLEEP_BIN" 1
+    done
+    if [ -z "$(frontend_pids)" ] && [ -x "$FRONTEND_LAUNCH" ]; then
+      if [ -n "${PLUMOS_PORTMASTER_FRONTEND_START_BIN:-}" ]; then
+        "$PLUMOS_PORTMASTER_FRONTEND_START_BIN" >/dev/null 2>&1 </dev/null
+      else
+        "$BB" setsid "$BB" sh "$FRONTEND_LAUNCH" \
+          >>"${PLUMOS_ROOT}/logs/frontend.log" 2>&1 </dev/null &
+      fi
+    fi
     ;;
   *)
     printf 'usage: plumOS-portmaster-frontend-control [status|acquire|release]\n' >&2

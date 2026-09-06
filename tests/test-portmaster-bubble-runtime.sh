@@ -26,6 +26,7 @@ grep -q 'link_one librt.so.1' "$RUNTIME"
 grep -q 'link_one libtinfo.so.6' "$RUNTIME"
 grep -q -- "-name 'love.aarch64' -exec chmod 0755" "$RUNTIME"
 grep -q 'ctypes.CDLL("libSDL2_mixer-2.0.so.0")' "$GUI_LAUNCH"
+grep -q 'PLUMOS_BUBBLE_PYTHON_LD_PRELOAD="$mali_library' "$GUI_LAUNCH"
 grep -q 'RESTART_FILE="${PM_DIR}/.pugwash-reboot"' "$GUI_LAUNCH"
 grep -q 'restart-marker=stale action=consume' "$GUI_LAUNCH"
 grep -q 'restart-marker=requested count=' "$GUI_LAUNCH"
@@ -100,6 +101,9 @@ printf '%s\n' '#!/bin/sh' \
     'pid=${2:-}' \
     'rm -rf "$FAKE_PROC_ROOT/$pid"' > "$work/frontend-kill"
 chmod 0755 "$work/frontend-kill"
+printf '%s\n' '#!/bin/sh' \
+    ': > "$FAKE_FRONTEND_STARTED"' > "$work/frontend-start"
+chmod 0755 "$work/frontend-start"
 FAKE_PROC_ROOT="$work/frontend-proc" \
 PLUMOS_ROOT="$plumos_root" \
 PLUMOS_PORTMASTER_PROC_ROOT="$work/frontend-proc" \
@@ -115,9 +119,14 @@ PLUMOS_ROOT="$plumos_root" \
 PLUMOS_PORTMASTER_PROC_ROOT="$work/frontend-proc" \
 PLUMOS_PORTMASTER_RUN_ROOT="$run_root" \
 PLUMOS_FRONTEND_VALIDATION_HOLD="$work/validation/frontend-hold" \
+PLUMOS_PORTMASTER_FRONTEND_LAUNCH="$work/frontend-start" \
+PLUMOS_PORTMASTER_FRONTEND_START_BIN="$work/frontend-start" \
+PLUMOS_PORTMASTER_SLEEP_BIN=true \
+FAKE_FRONTEND_STARTED="$work/frontend-started" \
     "$FRONTEND_CONTROL" release
 [ ! -e "$work/validation/frontend-hold" ]
 [ ! -e "$run_root/frontend-hold.owned" ]
+[ -f "$work/frontend-started" ]
 
 mkdir -p "$work/proc/101" "$work/proc/202"
 printf 'love.aarch64\0--game\0' > "$work/proc/101/cmdline"
@@ -162,5 +171,5 @@ grep -q "target=/usr/lib/compat" "$work/umount.log"
 grep -q "target=$pm_dir/config" "$work/umount.log"
 ! grep -q 'target=/$' "$work/umount.log"
 
-printf 'portmaster_bubble_runtime=result-ok adapter=%s gui_preflight=1 pgrep=1 frontend_handoff=1 restart=1 mount_recovery=1\n' \
+printf 'portmaster_bubble_runtime=result-ok adapter=%s gui_preflight=1 mali_preload=1 pgrep=1 frontend_handoff=1 frontend_restore=1 restart=1 mount_recovery=1\n' \
     "$builder_version"

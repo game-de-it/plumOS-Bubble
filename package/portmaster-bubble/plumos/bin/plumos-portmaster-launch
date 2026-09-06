@@ -187,6 +187,13 @@ mali_library="${PLUMOS_ROOT}/emulator/lib/libmali.so.1"
 }
 export SDL_VIDEO_EGL_DRIVER="${SDL_VIDEO_EGL_DRIVER:-$mali_library}"
 export SDL_VIDEO_GL_DRIVER="${SDL_VIDEO_GL_DRIVER:-$mali_library}"
+# The explicit glibc loader used by plumos-python-bubble resolves PySDL2's
+# process-wide EGL/GLES symbols before SDL's driver hints can disambiguate the
+# stock Mesa libraries.  Bubble's vendor stack is one stateful mega-DSO, so
+# preload that exact file inside the managed Python process.  This is the same
+# canonical-library rule used by the working Pyxel and PPSSPP paths and does
+# not enable a software fallback.
+export PLUMOS_BUBBLE_PYTHON_LD_PRELOAD="$mali_library${PLUMOS_BUBBLE_PYTHON_LD_PRELOAD:+:$PLUMOS_BUBBLE_PYTHON_LD_PRELOAD}"
 unset LIBGL_ALWAYS_SOFTWARE MESA_LOADER_DRIVER_OVERRIDE \
   LIBGL_DRIVERS_PATH __EGL_VENDOR_LIBRARY_FILENAMES
 mkdir -p "$HOME" "$XDG_CACHE_HOME" "$HM_PORTS_DIR"
