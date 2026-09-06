@@ -107,6 +107,8 @@ verified and switched file by file with rollback before the final readback.
   appeared in the final launch range;
 - the frontend was absent while the GUI owned DRM; and
 - all temporary incoming deployment directories were removed after readback;
+- a fresh `.tar.xz` fixture was extracted successfully by the new shim on the
+  device (`xz_tar=device-ok`), then its exact temporary files were removed;
 - Apotris, GPTokeYB and the port's `tee` helper were simultaneously alive and
   carried one `bubble-*` session ID, while the FE was stopped;
 - the final Apotris launch range had none of the earlier `command not found`,
