@@ -924,6 +924,7 @@ rsync -a "$stage_dir/plumos/" "$OUT_DIR/plumos/"
     cd "$OUT_DIR/plumos"
     find apps/portmaster bin licenses components/portmaster/manifest.json \
         -type f \
+        ! -path 'apps/portmaster/installed.json' \
         \( -path 'bin/plumos-portmaster-*' \
         -o -path 'apps/portmaster/*' \
         -o -path 'licenses/openal-soft-*' \

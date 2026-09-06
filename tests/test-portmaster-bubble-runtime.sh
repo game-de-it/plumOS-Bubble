@@ -53,6 +53,7 @@ grep -q 'adapter/bin/aarch64/bash' "$BUILDER"
 grep -q 'libtinfo.so.6:libtinfo.so.6.' "$BUILDER"
 grep -q -- "-name 'love.aarch64'" "$BUILDER"
 grep -q 'PortMaster/runtimes/love_\*/love.aarch64' "$UPDATER"
+grep -q "! -path 'apps/portmaster/installed.json'" "$BUILDER"
 
 builder_version="$(sed -n 's/^ADAPTER_VERSION="\([0-9][0-9]*\)"$/\1/p' "$BUILDER")"
 updater_version="$(sed -n 's/^ADAPTER_VERSION = \([0-9][0-9]*\)$/\1/p' "$UPDATER")"
