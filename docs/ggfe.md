@@ -52,18 +52,21 @@ too easy to do by accident, so the only way out is the menu's exit item.
 
 ### Menu
 
-SELECT opens it; SELECT or B closes it. D-pad moves, A acts on the row.
+SELECT opens it; SELECT or B closes it. Up and down move between rows, left
+and right change the value on the row - the way every other plumOS setting
+behaves. A is a synonym for right so a row can be operated one-handed, and is
+the only way to act on a row that has no value.
 
 | Row | Action |
 |---|---|
-| コア | cycle this cartridge's core through the profiles the device actually has, then back to no override |
+| コア | step this cartridge's core through the profiles the device actually has, then round to no override; left steps backwards |
 | アニメーション | switch between `snap` and `gallery` |
 | ケース表示 | show or hide the cases, the same as X |
 | GGFE を終了 | leave GGFE and return to the stock frontend |
 
 The core row shows the profile that will be used and, beneath the list, which
 rule chose it - `ggfe rom override`, `plumos system override`, `systems.json
-default` and so on. Selecting a core writes a ROM-scope entry to
+default` and so on. Choosing a core writes a ROM-scope entry to
 `state/frontend/ggfe-overrides.json`; one more press past the last core clears
 it again so the normal chain decides. Only profiles this device has are
 offered.

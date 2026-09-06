@@ -1526,7 +1526,7 @@ static long long ggfe_profile_now_us(void) {
  * resolution chain decides again.  Written straight to GGFE's own override
  * file; plumOS's is never touched.
  */
-static void ggfe_menu_cycle_core(struct ggfe_app *app, int sel) {
+static void ggfe_menu_cycle_core(struct ggfe_app *app, int sel, int dir) {
   const char *current;
   const char *avail[GGFE_MAX_PROFILES];
   int n = 0, i, at = -1;
@@ -1552,8 +1552,10 @@ static void ggfe_menu_cycle_core(struct ggfe_app *app, int sel) {
       }
     }
   }
-  /* -1 is the "no override" slot, so the cycle is: auto, then each core. */
-  at = (at + 2 > n) ? -1 : at + 1;
+  /* -1 is the "no override" slot, so the ring is: auto, then each core.  Left
+   * walks it backwards and right forwards, which is why the position is
+   * shifted into 0..n before the step and back afterwards. */
+  at = ((at + 1) + (dir < 0 ? n : 1)) % (n + 1) - 1;
   if (!ggfe_override_set_rom(&app->ggfe_overrides, app->entries[sel].rel,
                              at < 0 ? NULL : avail[at])) {
     ggfe_log(app, "ggfe_menu=core-update-failed rom=%s\n",
@@ -2531,43 +2533,29 @@ int main(int argc, char **argv) {
           continue; /* the launch sequence owns input until it completes */
         }
         if (menu.open) {
+          /* Up and down move between rows; left and right change the value on
+           * the row, which is how every other plumOS setting behaves.  A is
+           * kept as a synonym for right so a row can still be operated
+           * one-handed, and is the only way to act on a row with no value. */
+          int adjust = 0;
           switch (ev.code) {
             case BTN_DPAD_UP:
-            case BTN_DPAD_LEFT:
               menu.cursor = (menu.cursor + GGFE_MENU_ROWS - 1) % GGFE_MENU_ROWS;
               break;
             case BTN_DPAD_DOWN:
-            case BTN_DPAD_RIGHT:
               menu.cursor = (menu.cursor + 1) % GGFE_MENU_ROWS;
               break;
+            case BTN_DPAD_LEFT:
+              adjust = -1;
+              break;
+            case BTN_DPAD_RIGHT:
+              adjust = 1;
+              break;
             case BTN_EAST: /* physical A on Bubble */
-              switch (menu.cursor) {
-                case GGFE_MENU_CORE:
-                  ggfe_menu_cycle_core(&app, scroll.target);
-                  break;
-                case GGFE_MENU_MOTION:
-                  scroll.model = (scroll.model == GGFE_MOTION_SNAP)
-                                     ? GGFE_MOTION_GALLERY
-                                     : GGFE_MOTION_SNAP;
-                  copy_string(motion_pref, sizeof(motion_pref),
-                              scroll.model == GGFE_MOTION_GALLERY ? "gallery"
-                                                                  : "snap");
-                  scroll.duration_ms =
-                      (scroll.model == GGFE_MOTION_GALLERY) ? 360 : 240;
-                  ggfe_state_save(&app, show_cases, motion_pref);
-                  ggfe_log(&app, "ggfe_menu=motion value=%s\n", motion_pref);
-                  break;
-                case GGFE_MENU_CASES:
-                  show_cases = !show_cases;
-                  ggfe_state_save(&app, show_cases, motion_pref);
-                  ggfe_log(&app, "ggfe_menu=cases value=%d\n", show_cases);
-                  break;
-                case GGFE_MENU_EXIT:
-                  ggfe_log(&app, "ggfe_input=exit source=menu\n");
-                  running = 0;
-                  break;
-                default:
-                  break;
+              adjust = 1;
+              if (menu.cursor == GGFE_MENU_EXIT) {
+                ggfe_log(&app, "ggfe_input=exit source=menu\n");
+                running = 0;
               }
               break;
             case BTN_SOUTH: /* physical B on Bubble: closes the menu only */
@@ -2577,6 +2565,32 @@ int main(int argc, char **argv) {
               break;
             default:
               break;
+          }
+          if (adjust != 0) {
+            switch (menu.cursor) {
+              case GGFE_MENU_CORE:
+                ggfe_menu_cycle_core(&app, scroll.target, adjust);
+                break;
+              case GGFE_MENU_MOTION:
+                scroll.model = (scroll.model == GGFE_MOTION_SNAP)
+                                   ? GGFE_MOTION_GALLERY
+                                   : GGFE_MOTION_SNAP;
+                copy_string(motion_pref, sizeof(motion_pref),
+                            scroll.model == GGFE_MOTION_GALLERY ? "gallery"
+                                                                : "snap");
+                scroll.duration_ms =
+                    (scroll.model == GGFE_MOTION_GALLERY) ? 360 : 240;
+                ggfe_state_save(&app, show_cases, motion_pref);
+                ggfe_log(&app, "ggfe_menu=motion value=%s\n", motion_pref);
+                break;
+              case GGFE_MENU_CASES:
+                show_cases = !show_cases;
+                ggfe_state_save(&app, show_cases, motion_pref);
+                ggfe_log(&app, "ggfe_menu=cases value=%d\n", show_cases);
+                break;
+              default:
+                break;
+            }
           }
           continue;
         }
@@ -2874,9 +2888,15 @@ int main(int argc, char **argv) {
     printf("show_cases=%d\n", cases);
     printf("state_motion=%s\n", motion);
     if (cycle && cycle[0]) {
+      /* A negative count walks the ring backwards, which is what the left
+       * key does. */
       int times = atoi(cycle), k;
+      int dir = times < 0 ? -1 : 1;
+      if (times < 0) {
+        times = -times;
+      }
       for (k = 0; k < times; k++) {
-        ggfe_menu_cycle_core(&app, 2);
+        ggfe_menu_cycle_core(&app, 2, dir);
       }
     }
     if (app.entry_count > 2) {

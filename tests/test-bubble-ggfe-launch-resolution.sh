@@ -176,6 +176,14 @@ case "$first" in
 esac
 [ "$(cycle_at 5)" = "(auto)" ] ||
     fail "the cycle did not return to no override after every available core"
+# Left walks the same ring backwards, so one step back from no override lands
+# on the last core rather than the first.
+last=$(cycle_at 4)
+back_one=$(cycle_at -1)
+[ "$back_one" = "$last" ] ||
+    fail "stepping back from no override gave '$back_one', expected '$last'"
+[ "$(cycle_at -5)" = "(auto)" ] ||
+    fail "the backward cycle did not return to no override"
 
 # The motion choice survives a restart.
 rm -f "$root/state/frontend/ggfe-state.json"
@@ -194,4 +202,4 @@ if [ "$before" != "$after" ]; then
     fail "GGFE modified the plumOS core-overrides file"
 fi
 
-printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 case_state=persisted motion=snap,gallery core_cycle=ok navigation=wrap,page5 repeat=350/95 threads=1,4 identical=9\n'
+printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 case_state=persisted motion=snap,gallery core_cycle=both-directions navigation=wrap,page5 repeat=350/95 threads=1,4 identical=9\n'
