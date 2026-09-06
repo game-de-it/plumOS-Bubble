@@ -15,6 +15,7 @@ run_test() {
         -o "$guard" "$source" -ldl
     PLUMOS_PORTMASTER_REQUIRED_LD_LIBRARY_PATH=/required/common:/required/video \
     PLUMOS_PORTMASTER_REQUIRED_LD_PRELOAD="$guard" \
+    PLUMOS_PORTMASTER_REQUIRED_SESSION_ID=bubble-test-session \
     PLUMOS_PORTMASTER_SESSION_ID=bubble-test-session \
     LD_PRELOAD="$guard" \
         /bin/sh -c \

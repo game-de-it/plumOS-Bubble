@@ -126,7 +126,7 @@ static int build_guarded_environment(char *const source_envp[],
     memset(guarded, 0, sizeof(*guarded));
     required_library_path = env_value(environ, "PLUMOS_PORTMASTER_REQUIRED_LD_LIBRARY_PATH");
     required_preload = env_value(environ, "PLUMOS_PORTMASTER_REQUIRED_LD_PRELOAD");
-    required_session = env_value(environ, "PLUMOS_PORTMASTER_SESSION_ID");
+    required_session = env_value(environ, "PLUMOS_PORTMASTER_REQUIRED_SESSION_ID");
     if ((!required_library_path || !*required_library_path) &&
         (!required_preload || !*required_preload) &&
         (!required_session || !*required_session))
