@@ -574,10 +574,11 @@
     縦長artの余白、case OFF起動演出、終了後のcase OFF復元を利用者が実機合格。
     `show_cases=1`からOFF保存、次回`show_cases=0`、保存error 0、stale `.next`なしをlog/readback確認。
     ON/OFF双方向の保存はhost fixture、case OFF起動を含む7画面の1/4-thread byte一致も合格。
-  - snapを利用者がgalleryよりテンポ良好と判定。左右の350/95 ms内部key repeat、末尾/先頭の
-    双方向循環、上−5/下＋5の循環移動を実装し、3件/20件navigation契約、press/release repeat、
-    wrap途中を含む9画面の1/4-thread byte一致をhost合格。実機の押しっぱなし、両端循環、±5、
-    選択ROM起動・復帰をacceptanceに残す。
+  - snapを利用者がgalleryよりテンポ良好と判定。source `7250b3e`で左右の350/95 ms内部
+    key repeat、末尾/先頭の双方向循環、上−5/下＋5の循環移動を実装。3件/20件navigation契約、
+    press/release repeat、wrap途中を含む9画面の1/4-thread byte一致をhost合格。20 ROM実機で
+    押しっぱなし、`0→19`/`19→0`、±5、6回の選択ROM起動・復帰、B終了、FE復帰を利用者合格。
+    最終状態はFE 1 process、GGFE/broker 0、`ondemand`、component/global checksum有効。
 - [ ] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
   現行buildはlibpngのみリンクしており該当hitは`NO ARTWORK`板へ落ちる。
   libjpeg導入はtools imageとfrontend/lib双方の変更になるため単独で実施する。

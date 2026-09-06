@@ -458,3 +458,69 @@ The final START exit returned to one frontend process with no GGFE or DRM
 broker, restored `ondemand`, and retained valid component checksums.  Portrait
 margin rendering, case-off launch presentation, and remembered view state are
 accepted.
+
+## Cyclic snap navigation
+
+The user compared both selectable motion models on the device and chose the
+240 ms `snap` model because its visual tempo was better.  Commit `7250b3e`
+keeps that shipped default and adds navigation that does not depend on kernel
+key-repeat events: left and right repeat after 350 ms and then every 95 ms,
+matching the stock frontend.  Up and down make one cyclic five-entry move.
+
+The carousel now treats the library as cyclic geometry as well as cyclic
+selection.  Logical positions remain continuous across the boundary while ROM
+indices are wrapped for drawing, so the final-to-first move occupies one slot
+instead of interpolating across the whole library.  A completed logical turn
+is collapsed back to the physical index before another move, preventing both
+long-path interpolation and floating-point drift after long holds.
+
+Host gates covered three- and twenty-entry wrapping, repeat press/delay/
+interval/release, snap and gallery curves, and nine representative frames
+including both boundary directions.  All nine frames were byte-identical with
+one and four renderer threads.  Physical input, CPU-control and START-menu
+contracts also passed.
+
+The 212-entry frontend component was deployed with source `7250b3e`.  Its live
+delta from the temporary gallery comparison state was three managed files:
+the GGFE binary, active `ggfe.json`, and component manifest.  Component and
+global metadata were switched with them; all 212 component entries and all 213
+frontend global entries passed while the other 12,725 global catalog lines
+remained byte-for-byte unchanged.  Installed hashes were:
+
+```text
+766b485562b930600ed45d6e788f5f45ee326c44fb4034b1b760bd0d9ff65384  bin/plumos-ggfe
+b5a1c6e7854edb8f57e584fc5e7e83b0bae819d81400b26279348f6b3b85e6c9  config/frontend/ggfe.json
+87d3bfbcf53247b1179bde7e902fb6465757d546cd86500024b6e367576e3f81  components/frontend/checksums.sha256
+```
+
+Rollback is
+`/storage/plumos/state/app-deploy/7250b3e-ggfe-cyclic-navigation/rollback.tar`,
+SHA-256
+`b52c2c3e6a9ecf511fb4c553657245e0b58da5c8a1c509bebbdfcc2ee228a061`.
+It is 1,548,288 bytes and includes the prior gallery comparison setting.
+
+The physical library contained 20 ROMs.  Fractional re-aim origins during a
+held direction proved that GGFE's own repeat fired before the preceding snap
+settled.  The two exact boundary routes were recorded as:
+
+```text
+ggfe_scroll=start from=0.000 to=-1 selected=19 delta=-1 duration_ms=240 model=snap
+ggfe_scroll=start from=19.000 to=20 selected=0 delta=1 duration_ms=240 model=snap
+```
+
+Both five-entry directions and their wrap were also observed, including
+`from=19.000 to=24 selected=4 delta=5` and
+`from=4.000 to=-1 selected=19 delta=-5`.  Six selected games launched with
+status zero and GGFE reopened input after every return.  The user accepted the
+held repeat, both one-entry boundary routes, and both five-entry moves by eye.
+
+Seamless cyclic geometry means the former cheap endpoint no longer omits the
+opposite-end neighbours.  With cases on, the accepted visual run therefore
+remained around 27--30 fps with compose commonly 19--20 ms even at a library
+boundary; this does not close the all-position 60 fps gate.  It is an expected
+cost of the requested continuous carousel rather than a motion-curve cost.
+
+Physical B returned to one stock frontend process.  No GGFE, DRM broker or
+emulator remained, the governor returned to `ondemand`, GGFE's state and the
+other mutable setting hashes were retained, and the component/global
+checksums passed again after acceptance.
