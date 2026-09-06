@@ -221,6 +221,12 @@
   - stock hash/vermagic固定の`bcmdhd.ko`、firmware、NVRAMをdevelopment seedへ隔離して組み込み済み。
   - 実機load/associationと再配布license判断は未完了。
 - [ ] `BUB-P4-N02` first connect、credential persist、cold boot reconnect、Wi-Fi OFF persist、bounded recovery を確認する。
+  - 資格情報なしimageで保存済み`wpa_supplicant.conf`まで欠落すると、Bubbleの
+    `ensure_wpa_backend`がscan前に失敗するfirst-connect循環を実機で検出した。
+    MFと同じくmode 0600のruntime-only scan configを`/run`へ生成し、接続成功時だけ
+    永続設定を保存するsource `0dc027a`へ修正。旧payloadでは失敗し新payloadでは
+    SSID取得、永続credential未作成、保存済み設定優先まで通るhost回帰testをimage verifierへ
+    追加した。修正版imageの物理SSID表示、接続、cold boot reconnectを残す。
 - [ ] `BUB-P4-N03` USB host/device/charging controller と同時利用制約を調査し、product policy を決める。
 - [ ] `BUB-P4-S01` OS SD と ROM SD を UUID/label/partition identity で安全に解決する。
   - Bubble runtime inventoryで固定したsecondary controller `/dev/mmcblk3p1`だけを、

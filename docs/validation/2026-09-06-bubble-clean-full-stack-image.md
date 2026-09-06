@@ -5,13 +5,14 @@ Date: 2026-09-06
 ## Result
 
 A new non-publishable physical-device validation image was rebuilt from source
-reference `eadb7f6` after the PortMaster adapter 29 renderer fix.
+reference `0dc027a` after the PortMaster adapter 29 renderer fix and the
+credential-free first-connect Wi-Fi repair.
 
 ```text
 file=plumOS-Bubble-0.1.0-dev-full-stack-validation.img
 image_size=3036676096
-image_sha256=47f28c1a23c1b39713e9f2cdc170f9b7bb1f7a7681111f44532e90c4275fe590
-source_ref=eadb7f6
+image_sha256=adf0c66cd95a0ed29de9795d04dcba2cc1e563dd11a355b83d3566fd819225e4
+source_ref=0dc027a
 personalized=no
 ```
 
@@ -37,6 +38,16 @@ No Wi-Fi personalization was applied and `user_media_included=no`. The prior
 Wi-Fi-personalized image and its two sidecars were removed after this image
 passed verification, leaving one `.img` artifact under `output/image`.
 
+The first clean rebuild exposed a first-connect regression before acceptance:
+removing the personalized file also removed the only usable
+`wpa_supplicant.conf`, while Bubble's `ensure_wpa_backend` still required a
+non-empty saved file before it could scan. The frontend now follows the MF
+contract and creates a mode-0600, credential-free runtime configuration under
+`/run/plumos/network-control` when no saved network exists. It does not create
+a persistent Wi-Fi configuration until association and DHCP succeed. The
+superseded image with SHA-256 `47f28c1a23c1b39713e9f2cdc170f9b7bb1f7a7681111f44532e90c4275fe590`
+must not be used.
+
 ## Verification
 
 The independent image verifier passed after extracting p1, p2 and p3 from the
@@ -50,6 +61,8 @@ final image:
 - full app-layer and all ten component checksum files;
 - 98 systems, 196 launch profiles and all 114 packaged libretro cores;
 - the PicoArch RGB565 route table; and
+- credential-free first-connect SSID scanning without creating a saved
+  network, plus preservation and use of an existing saved configuration; and
 - absence of NES user content.
 
 The image verifier had stale assertions from before persistent RetroArch menu
