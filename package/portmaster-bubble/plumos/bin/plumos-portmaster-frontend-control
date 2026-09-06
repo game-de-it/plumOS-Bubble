@@ -84,7 +84,22 @@ case "$action" in
       if [ -n "${PLUMOS_PORTMASTER_FRONTEND_START_BIN:-}" ]; then
         "$PLUMOS_PORTMASTER_FRONTEND_START_BIN" >/dev/null 2>&1 </dev/null
       else
-        "$BB" setsid "$BB" sh "$FRONTEND_LAUNCH" \
+        # PortMaster exports its KMSDRM/Mali/Python runtime and session tag.
+        # A frontend started from this cleanup branch must not inherit those
+        # values: doing so can make the restored fbdev frontend look like an
+        # owned PortMaster child and can leak the wrong HOME/SDL backend into
+        # later launches. Recreate only the normal plumOS boot contract.
+        "$BB" env -i \
+          PATH="${PLUMOS_ROOT}/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+          HOME=/root USER=root LOGNAME=root LANG="${LANG:-C}" \
+          PLUMOS_ROOT="$PLUMOS_ROOT" \
+          PLUMOS_RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}" \
+          PLUMOS_BUSYBOX="$BB" \
+          PLUMOS_SDCARD_ROOT="${PLUMOS_SDCARD_ROOT:-/storage}" \
+          PLUMOS_ROM_ROOT="${PLUMOS_ROM_ROOT:-/storage/Roms}" \
+          PLUMOS_BIOS_ROOT="${PLUMOS_BIOS_ROOT:-/storage/BIOS}" \
+          PLUMOS_IMAGE_ROOT="${PLUMOS_IMAGE_ROOT:-/storage/Images}" \
+          "$BB" setsid "$BB" sh "$FRONTEND_LAUNCH" \
           >>"${PLUMOS_ROOT}/logs/frontend.log" 2>&1 </dev/null &
       fi
     fi

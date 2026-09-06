@@ -37,6 +37,13 @@ grep -q 'restart-marker=stale action=consume' "$GUI_LAUNCH"
 grep -q 'restart-marker=requested count=' "$GUI_LAUNCH"
 grep -q 'plumos-portmaster-mount-cleanup' "$GUI_LAUNCH" "$PORT_LAUNCH"
 grep -q 'plumos-portmaster-frontend-control' "$GUI_LAUNCH" "$PORT_LAUNCH"
+grep -q '"$BB" env -i' "$FRONTEND_CONTROL"
+grep -q 'PLUMOS_RUNTIME_ROOT="${PLUMOS_RUNTIME_ROOT:-/run/plumos}"' "$FRONTEND_CONTROL"
+if grep -A18 '"$BB" env -i' "$FRONTEND_CONTROL" |
+   grep -Eq 'PLUMOS_PORTMASTER_SESSION_ID|SDL_VIDEODRIVER|LD_PRELOAD|XDG_CONFIG_HOME'; then
+  printf 'frontend restore clean environment leaks PortMaster runtime variables\n' >&2
+  exit 1
+fi
 grep -q 'plumos-portmaster-command-runtime' "$RUNTIME"
 grep -q 'PLUMOS_BUSYBOX:-/bin/busybox.*sh.*COMMAND_RUNTIME' "$RUNTIME"
 ! grep -q '"$BB" sh "$COMMAND_RUNTIME"' "$RUNTIME"
