@@ -45,6 +45,13 @@ grep -Fq '#define GGFE_TARGET_FPS 60.0f' src/frontend/plumos_ggfe.c
 # selectable from ggfe.json, and the shipped default is GGFE's own snap.
 grep -Fq 'GGFE_MOTION_SNAP' src/frontend/plumos_ggfe.c
 grep -Fq 'GGFE_MOTION_GALLERY' src/frontend/plumos_ggfe.c
+grep -Fq '#define GGFE_KEY_REPEAT_DELAY_MS 350' src/frontend/plumos_ggfe.c
+grep -Fq '#define GGFE_KEY_REPEAT_INTERVAL_MS 95' src/frontend/plumos_ggfe.c
+grep -Fq '#define GGFE_PAGE_JUMP 5' src/frontend/plumos_ggfe.c
+grep -Fq 'ggfe_repeat_press(&repeat, (unsigned int)ev.code, -1' src/frontend/plumos_ggfe.c
+grep -Fq 'ggfe_repeat_press(&repeat, (unsigned int)ev.code, 1' src/frontend/plumos_ggfe.c
+grep -Fq 'ggfe_scroll_request(&app, &scroll, -GGFE_PAGE_JUMP);' src/frontend/plumos_ggfe.c
+grep -Fq 'ggfe_scroll_request(&app, &scroll, GGFE_PAGE_JUMP);' src/frontend/plumos_ggfe.c
 python3 - package/frontend-bubble/plumos/config/frontend/ggfe.json <<'PY'
 import json, sys
 motion = json.load(open(sys.argv[1])).get("motion", {})

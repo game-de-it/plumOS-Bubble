@@ -40,8 +40,10 @@ There is no on-screen button legend; the controls are documented here instead.
 
 | Button | Action |
 |---|---|
-| D-pad Left / Up | previous cartridge |
-| D-pad Right / Down | next cartridge |
+| D-pad Left | previous cartridge; hold to repeat |
+| D-pad Right | next cartridge; hold to repeat |
+| D-pad Up | five cartridges back |
+| D-pad Down | five cartridges forward |
 | **A** | launch the selected game |
 | **X** | toggle cartridge cases while browsing |
 | **B** | return to the stock frontend |
@@ -52,15 +54,15 @@ Notes:
 * Physical A is `BTN_EAST` and physical B is `BTN_SOUTH` on this device, per
   `configs/input/bubble-controller-map.json`. GGFE uses those codes, not
   positions.
-* Physical X is `BTN_NORTH`. Its case setting remains active after returning
-  from a game for the lifetime of the current GGFE process. The launch
-  animation itself always shows the case.
-* Carousel motion uses the same policy as plumOS Gallery: a 360 ms time-based
-  smoothstep refreshed at the 60 Hz target, with one further D-pad move queued
-  until the current move finishes. Artwork for the visible destination range
-  is decoded before the transition starts, so first-use PNG work cannot skip
-  the motion. `logs/ggfe.log` reports measured FPS, maximum frame time and slow
-  frame count once per second.
+* Physical X is `BTN_NORTH`. GGFE persists the case setting in its own state
+  file, and the launch animation respects the remembered ON/OFF choice.
+* Left/right wraps between the final and first cartridge in either direction.
+  GGFE supplies the same 350 ms initial delay and 95 ms repeat interval as the
+  plumOS frontend even when the input bridge emits no kernel repeat events.
+  Up/down is a single cyclic five-cartridge jump and does not repeat.
+* Artwork for the visible destination range is decoded before a transition
+  starts, so first-use PNG work cannot skip the motion. `logs/ggfe.log` reports
+  measured FPS, maximum frame time and slow frame count once per second.
 * B/START returns to the stock frontend when GGFE was opened from Apps. During
   the standalone validation procedure, `frontend-hold` deliberately prevents
   that frontend from restarting, so B/START leaves a black screen until the
@@ -135,7 +137,7 @@ Two motions are selectable from `ggfe.json`:
 
 | model | curve | input |
 |---|---|---|
-| `snap` (default) | ease-out with a settle overshoot, 240 ms | re-aims from wherever the carousel is, so a held or tapped D-pad keeps moving |
+| `snap` (default) | ease-out with a settle overshoot, 240 ms | re-aims from wherever the carousel is; GGFE supplies held-key repeat |
 | `gallery` | symmetric smoothstep, 360 ms | always completes, one further press queued behind it |
 
 `snap` is GGFE's own motion; `gallery` matches the plumOS gallery and was

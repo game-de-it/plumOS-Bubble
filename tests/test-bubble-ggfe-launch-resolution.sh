@@ -88,10 +88,13 @@ for threads in 1 4; do
     "$tmp/ggfe-host-$threads" "$root" "$card" "$tmp/render-$threads" \
         >/dev/null 2>&1 || fail "GGFE $threads-thread render failed"
 done
-for shot in g-library g-browse g-open g-hop g-insert g-seated g-no-case-launch; do
+for shot in g-library g-browse g-wrap-left g-wrap-right g-open g-hop g-insert g-seated g-no-case-launch; do
     cmp "$tmp/render-1/$shot.png" "$tmp/render-4/$shot.png" ||
         fail "one-thread and four-thread output differ: $shot"
 done
+
+expect_line "navigation=left_wrap:2 right_wrap:0 after_settle:1 up5:1 down5:2 twenty:19/0/15/5" "$tmp/out.txt"
+expect_line "repeat=delay:350 interval:95 before:0 first:1 gap:0 second:1 released:0 delta:1" "$tmp/out.txt"
 
 # Availability: an unpackaged core is reported, not silently dropped.
 expect_line "retroarch:genesis_plus_gx          available" "$tmp/out.txt"
@@ -165,4 +168,4 @@ if [ "$before" != "$after" ]; then
     fail "GGFE modified the plumOS core-overrides file"
 fi
 
-printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 case_state=persisted motion=snap,gallery threads=1,4 identical=7\n'
+printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 case_state=persisted motion=snap,gallery navigation=wrap,page5 repeat=350/95 threads=1,4 identical=9\n'

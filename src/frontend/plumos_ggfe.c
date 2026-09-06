@@ -118,6 +118,9 @@ static int plumos_fbdev_load_png_rgba(const char *path, unsigned char **out,
 #define GGFE_MAX_BANDS 4
 #define GGFE_STRIPES 24
 #define GGFE_TARGET_FPS 60.0f
+#define GGFE_KEY_REPEAT_DELAY_MS 350
+#define GGFE_KEY_REPEAT_INTERVAL_MS 95
+#define GGFE_PAGE_JUMP 5
 
 struct ggfe_image {
   unsigned char *rgb; /* RGB8 */
@@ -1096,6 +1099,38 @@ static void ggfe_carousel_slot(float d, float *x, float *z, float *ry,
   *dim = 1.0f - (1.0f - GGFE_NEIGHBOUR_DIM) * (ad < 1.0f ? ad : 1.0f);
 }
 
+static int ggfe_wrap_index(int index, int count) {
+  if (count <= 0) {
+    return 0;
+  }
+  index %= count;
+  if (index < 0) {
+    index += count;
+  }
+  return index;
+}
+
+/* Place a physical ROM index on the nearest equivalent turn of the cyclic
+ * carousel.  A move from the final ROM to the first is therefore one slot,
+ * not a sweep back through the entire library. */
+static float ggfe_cyclic_distance(int index, float pos, int count) {
+  float d;
+  float half;
+
+  if (count <= 0) {
+    return 0.0f;
+  }
+  d = fmodf((float)index - pos, (float)count);
+  half = (float)count * 0.5f;
+  if (d > half) {
+    d -= (float)count;
+  }
+  if (d < -half) {
+    d += (float)count;
+  }
+  return d;
+}
+
 /* ------------------------------------------------------------------ */
 /* launch timeline                                                    */
 /* ------------------------------------------------------------------ */
@@ -1330,21 +1365,14 @@ static struct cart3d_tex *ggfe_label_tex(struct ggfe_app *app, int entry) {
  * advancing by wall time across that one-off stall made a one-slot move look
  * like a jump on Bubble. */
 static void ggfe_warm_labels(struct ggfe_app *app, int center) {
-  int first = center - 4;
-  int last = center + 4;
-  int i;
+  int offset;
 
-  if (!app) {
+  if (!app || app->entry_count <= 0) {
     return;
   }
-  if (first < 0) {
-    first = 0;
-  }
-  if (last >= app->entry_count) {
-    last = app->entry_count - 1;
-  }
-  for (i = first; i <= last; i++) {
-    (void)ggfe_label_tex(app, i);
+  for (offset = -4; offset <= 4; offset++) {
+    (void)ggfe_label_tex(
+        app, ggfe_wrap_index(center + offset, app->entry_count));
   }
 }
 
@@ -1371,7 +1399,9 @@ static int ggfe_order_cmp(const void *a, const void *b) {
 static void ggfe_draw_hud(struct ggfe_app *app, const struct ggfe_frame *f,
                           int sel) {
   char label[64];
-  float settle = 1.0f - 2.2f * fabsf(f->pos - (float)sel);
+  float settle =
+      1.0f - 2.2f * fabsf(ggfe_cyclic_distance(sel, f->pos,
+                                                app->entry_count));
   int w;
 
   if (app->header_logo.rgb) {
@@ -1446,10 +1476,9 @@ static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
   struct ggfe_order order[16];
   int n_order = 0, i, n = 0, glass_n = 0;
   struct cart3d_draw *glass;
-  int sel = (int)(f->pos + (f->pos < 0.0f ? -0.5f : 0.5f));
-
-  if (sel < 0) sel = 0;
-  if (sel > app->entry_count - 1) sel = app->entry_count - 1;
+  int logical_sel =
+      (int)(f->pos + (f->pos < 0.0f ? -0.5f : 0.5f));
+  int sel = ggfe_wrap_index(logical_sel, app->entry_count);
 
   GGFE_STAGE_BEGIN();
   ggfe_prepare_parallel(&app->pool, &app->target, background);
@@ -1460,7 +1489,7 @@ static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
   GGFE_STAGE_END(GGFE_STAGE_CONSOLE);
 
   for (i = 0; i < app->entry_count && n_order < 16; i++) {
-    float d = (float)i - f->pos;
+    float d = ggfe_cyclic_distance(i, f->pos, app->entry_count);
     if (fabsf(d) > GGFE_CAROUSEL_SPAN) {
       continue;
     }
@@ -1799,54 +1828,83 @@ struct ggfe_scroll_state {
   int to;
   int active;
   int pending_target;
+  int pending_to;
   int pending_active;
   long long start_ms;
+};
+
+struct ggfe_repeat_state {
+  unsigned int key_code;
+  int delta;
+  int active;
+  long long next_ms;
 };
 
 static float ggfe_scroll_position(struct ggfe_app *app,
                                   struct ggfe_scroll_state *scroll,
                                   long long now_ms);
 
-static void ggfe_scroll_request(struct ggfe_app *app,
-                                struct ggfe_scroll_state *scroll, int delta) {
+static void ggfe_scroll_request_at(struct ggfe_app *app,
+                                   struct ggfe_scroll_state *scroll, int delta,
+                                   long long now_ms) {
   int next;
+  int next_to;
 
-  if (!app || !scroll || delta == 0) {
+  if (!app || !scroll || delta == 0 || app->entry_count <= 1) {
     return;
   }
-  next = scroll->target + (delta < 0 ? -1 : 1);
-  if (next < 0 || next >= app->entry_count) {
+  delta %= app->entry_count;
+  if (delta == 0) {
     return;
   }
-  ggfe_warm_labels(app, next);
 
   if (scroll->model == GGFE_MOTION_SNAP) {
     /* Re-aim from wherever the carousel currently is, so a second press does
-     * not wait for the first to finish and does not jump the origin. */
-    scroll->from = ggfe_scroll_position(app, scroll, ggfe_now_ms());
+     * not wait for the first to finish and does not jump the origin.  Resolve
+     * the current position first: that also normalises a completed wrap before
+     * the next logical destination is calculated. */
+    scroll->from = ggfe_scroll_position(app, scroll, now_ms);
+    next = ggfe_wrap_index(scroll->target + delta, app->entry_count);
+    next_to = scroll->to + delta;
+    ggfe_warm_labels(app, next);
     scroll->target = next;
-    scroll->to = next;
-    scroll->start_ms = ggfe_now_ms();
+    scroll->to = next_to;
+    scroll->start_ms = now_ms;
     scroll->active = 1;
-    ggfe_log(app, "ggfe_scroll=start from=%.3f to=%d duration_ms=%d model=snap\n",
-             (double)scroll->from, scroll->to, scroll->duration_ms);
+    ggfe_log(app,
+             "ggfe_scroll=start from=%.3f to=%d selected=%d delta=%d "
+             "duration_ms=%d model=snap\n",
+             (double)scroll->from, scroll->to, scroll->target, delta,
+             scroll->duration_ms);
     return;
   }
 
+  next = ggfe_wrap_index(scroll->target + delta, app->entry_count);
+  next_to = scroll->to + delta;
+  ggfe_warm_labels(app, next);
   if (scroll->active) {
     scroll->pending_target = next;
+    scroll->pending_to = next_to;
     scroll->pending_active = 1;
-    ggfe_log(app, "ggfe_scroll=queued target=%d\n", next);
+    ggfe_log(app, "ggfe_scroll=queued target=%d logical=%d delta=%d\n", next,
+             next_to, delta);
     return;
   }
-  scroll->from = (float)scroll->target;
+  scroll->from = (float)scroll->to;
   scroll->target = next;
-  scroll->to = next;
-  scroll->start_ms = ggfe_now_ms();
+  scroll->to = next_to;
+  scroll->start_ms = now_ms;
   scroll->active = 1;
   ggfe_log(app,
-           "ggfe_scroll=start from=%.3f to=%d duration_ms=%d model=gallery\n",
-           (double)scroll->from, scroll->to, scroll->duration_ms);
+           "ggfe_scroll=start from=%.3f to=%d selected=%d delta=%d "
+           "duration_ms=%d model=gallery\n",
+           (double)scroll->from, scroll->to, scroll->target, delta,
+           scroll->duration_ms);
+}
+
+static void ggfe_scroll_request(struct ggfe_app *app,
+                                struct ggfe_scroll_state *scroll, int delta) {
+  ggfe_scroll_request_at(app, scroll, delta, ggfe_now_ms());
 }
 
 static float ggfe_scroll_position(struct ggfe_app *app,
@@ -1864,16 +1922,23 @@ static float ggfe_scroll_position(struct ggfe_app *app,
     if (scroll->model == GGFE_MOTION_GALLERY && scroll->pending_active) {
       int next = scroll->pending_target;
       scroll->pending_active = 0;
-      scroll->from = (float)scroll->target;
+      scroll->from = (float)scroll->to;
       scroll->target = next;
-      scroll->to = next;
+      scroll->to = scroll->pending_to;
       scroll->start_ms = now_ms;
       scroll->active = 1;
       ggfe_log(app,
-               "ggfe_scroll=start from=%.3f to=%d duration_ms=%d queued=1\n",
-               (double)scroll->from, scroll->to, scroll->duration_ms);
+               "ggfe_scroll=start from=%.3f to=%d selected=%d duration_ms=%d "
+               "queued=1\n",
+               (double)scroll->from, scroll->to, scroll->target,
+               scroll->duration_ms);
       return scroll->from;
     }
+    /* Equivalent cyclic positions render identically.  Collapse completed
+     * turns back to the physical index so a very long hold cannot accumulate
+     * floating-point drift. */
+    scroll->from = (float)scroll->target;
+    scroll->to = scroll->target;
     return (float)scroll->target;
   }
   if (elapsed <= 0) {
@@ -1884,6 +1949,43 @@ static float ggfe_scroll_position(struct ggfe_app *app,
                    scroll->model == GGFE_MOTION_SNAP
                        ? ggfe_ease_back(progress)
                        : ggfe_ease_in_out(progress));
+}
+
+static void ggfe_repeat_press(struct ggfe_repeat_state *repeat,
+                              unsigned int key_code, int delta,
+                              long long now_ms) {
+  if (!repeat) {
+    return;
+  }
+  repeat->key_code = key_code;
+  repeat->delta = delta;
+  repeat->active = 1;
+  repeat->next_ms = now_ms + GGFE_KEY_REPEAT_DELAY_MS;
+}
+
+static void ggfe_repeat_release(struct ggfe_repeat_state *repeat,
+                                unsigned int key_code) {
+  if (repeat && repeat->active && repeat->key_code == key_code) {
+    memset(repeat, 0, sizeof(*repeat));
+  }
+}
+
+static void ggfe_repeat_cancel(struct ggfe_repeat_state *repeat) {
+  if (repeat) {
+    memset(repeat, 0, sizeof(*repeat));
+  }
+}
+
+static int ggfe_repeat_due(struct ggfe_repeat_state *repeat, long long now_ms,
+                           int *delta) {
+  if (!repeat || !repeat->active || now_ms < repeat->next_ms) {
+    return 0;
+  }
+  if (delta) {
+    *delta = repeat->delta;
+  }
+  repeat->next_ms = now_ms + GGFE_KEY_REPEAT_INTERVAL_MS;
+  return 1;
 }
 
 
@@ -2104,6 +2206,7 @@ int main(int argc, char **argv) {
   char log_path[PATH_MAX];
   int input_fd;
   struct ggfe_scroll_state scroll;
+  struct ggfe_repeat_state repeat;
   float launch_t = -1.0f;
   int show_cases;
   long long last_ms;
@@ -2176,6 +2279,7 @@ int main(int argc, char **argv) {
   last_present_ms = last_ms;
   stats_start_ms = last_ms;
   memset(&scroll, 0, sizeof(scroll));
+  memset(&repeat, 0, sizeof(repeat));
   scroll.model = (strcmp(app.cfg.motion_model, "gallery") == 0)
                      ? GGFE_MOTION_GALLERY
                      : GGFE_MOTION_SNAP;
@@ -2211,7 +2315,16 @@ int main(int argc, char **argv) {
         if (read(input_fd, &ev, sizeof(ev)) != (ssize_t)sizeof(ev)) {
           break;
         }
-        if (ev.type != EV_KEY || ev.value != 1) {
+        if (ev.type != EV_KEY) {
+          continue;
+        }
+        if (ev.value == 0) {
+          ggfe_repeat_release(&repeat, (unsigned int)ev.code);
+          continue;
+        }
+        /* Kernel repeat events are not available on every Bubble input
+         * bridge.  GGFE generates its own repeat from press/release state. */
+        if (ev.value != 1) {
           continue;
         }
         if (launch_t >= 0.0f) {
@@ -2219,16 +2332,27 @@ int main(int argc, char **argv) {
         }
         switch (ev.code) {
           case BTN_DPAD_LEFT:
-          case BTN_DPAD_UP:
+            ggfe_repeat_press(&repeat, (unsigned int)ev.code, -1,
+                              ggfe_now_ms());
             ggfe_scroll_request(&app, &scroll, -1);
             break;
+          case BTN_DPAD_UP:
+            ggfe_repeat_cancel(&repeat);
+            ggfe_scroll_request(&app, &scroll, -GGFE_PAGE_JUMP);
+            break;
           case BTN_DPAD_RIGHT:
-          case BTN_DPAD_DOWN:
+            ggfe_repeat_press(&repeat, (unsigned int)ev.code, 1,
+                              ggfe_now_ms());
             ggfe_scroll_request(&app, &scroll, 1);
+            break;
+          case BTN_DPAD_DOWN:
+            ggfe_repeat_cancel(&repeat);
+            ggfe_scroll_request(&app, &scroll, GGFE_PAGE_JUMP);
             break;
           case BTN_EAST: /* physical A on Bubble */
           {
             char why[96];
+            ggfe_repeat_cancel(&repeat);
             ggfe_log(&app, "ggfe_input=launch code=%u physical=A target=%d\n",
                      (unsigned int)ev.code, scroll.target);
             if (ggfe_can_launch(&app, &app.entries[scroll.target], why,
@@ -2248,6 +2372,7 @@ int main(int argc, char **argv) {
             break;
           case BTN_SOUTH: /* physical B on Bubble */
           case BTN_START:
+            ggfe_repeat_cancel(&repeat);
             ggfe_log(&app, "ggfe_input=exit code=%u physical=%s\n",
                      (unsigned int)ev.code,
                      ev.code == BTN_SOUTH ? "B" : "START");
@@ -2256,6 +2381,13 @@ int main(int argc, char **argv) {
           default:
             break;
         }
+      }
+    }
+
+    if (running && launch_t < 0.0f) {
+      int repeat_delta;
+      if (ggfe_repeat_due(&repeat, ggfe_now_ms(), &repeat_delta)) {
+        ggfe_scroll_request(&app, &scroll, repeat_delta);
       }
     }
 
@@ -2353,6 +2485,7 @@ int main(int argc, char **argv) {
         close(input_fd);
         input_fd = -1;
       }
+      ggfe_repeat_cancel(&repeat);
       ggfe_launch_rom(&app, &renderer, &app.entries[scroll.target]);
       input_fd = ggfe_open_input();
       if (input_fd < 0) {
@@ -2443,7 +2576,9 @@ int main(int argc, char **argv) {
     float t;
     int show_cases;
   } shots[] = {{"g-library", 2.0f, -1.0f, 1},
-               {"g-browse", 2.5f, -1.0f, 1},
+               {"g-browse", 1.5f, -1.0f, 1},
+               {"g-wrap-left", -0.5f, -1.0f, 1},
+               {"g-wrap-right", 2.5f, -1.0f, 1},
                {"g-open", 2.0f, 0.14f, 1},
                {"g-hop", 2.0f, 0.50f, 1},
                {"g-insert", 2.0f, 1.02f, 1},
@@ -2489,6 +2624,59 @@ int main(int argc, char **argv) {
       tr.active = 1;
     }
   }
+  {
+    struct ggfe_scroll_state nav;
+    int left_wrap, right_wrap, up_five, down_five, after_settle;
+
+    memset(&nav, 0, sizeof(nav));
+    nav.model = GGFE_MOTION_SNAP;
+    nav.duration_ms = 240;
+    ggfe_scroll_request_at(&app, &nav, -1, 0);
+    left_wrap = nav.target;
+    memset(&nav, 0, sizeof(nav));
+    nav.model = GGFE_MOTION_SNAP;
+    nav.duration_ms = 240;
+    nav.target = app.entry_count - 1;
+    nav.to = app.entry_count - 1;
+    ggfe_scroll_request_at(&app, &nav, 1, 0);
+    right_wrap = nav.target;
+    ggfe_scroll_request_at(&app, &nav, 1, 300);
+    after_settle = nav.to;
+    memset(&nav, 0, sizeof(nav));
+    nav.model = GGFE_MOTION_SNAP;
+    nav.duration_ms = 240;
+    ggfe_scroll_request_at(&app, &nav, -GGFE_PAGE_JUMP, 0);
+    up_five = nav.target;
+    memset(&nav, 0, sizeof(nav));
+    nav.model = GGFE_MOTION_SNAP;
+    nav.duration_ms = 240;
+    ggfe_scroll_request_at(&app, &nav, GGFE_PAGE_JUMP, 0);
+    down_five = nav.target;
+    printf("navigation=left_wrap:%d right_wrap:%d after_settle:%d up5:%d "
+           "down5:%d twenty:%d/%d/%d/%d\n",
+           left_wrap, right_wrap, after_settle, up_five, down_five,
+           ggfe_wrap_index(-1, 20), ggfe_wrap_index(20, 20),
+           ggfe_wrap_index(-GGFE_PAGE_JUMP, 20),
+           ggfe_wrap_index(GGFE_PAGE_JUMP, 20));
+  }
+  {
+    struct ggfe_repeat_state rp;
+    int delta = 0;
+    int before_delay, first, before_interval, second, after_release;
+
+    memset(&rp, 0, sizeof(rp));
+    ggfe_repeat_press(&rp, 123U, 1, 1000);
+    before_delay = ggfe_repeat_due(&rp, 1349, &delta);
+    first = ggfe_repeat_due(&rp, 1350, &delta);
+    before_interval = ggfe_repeat_due(&rp, 1444, &delta);
+    second = ggfe_repeat_due(&rp, 1445, &delta);
+    ggfe_repeat_release(&rp, 123U);
+    after_release = ggfe_repeat_due(&rp, 2000, &delta);
+    printf("repeat=delay:%d interval:%d before:%d first:%d gap:%d "
+           "second:%d released:%d delta:%d\n",
+           GGFE_KEY_REPEAT_DELAY_MS, GGFE_KEY_REPEAT_INTERVAL_MS,
+           before_delay, first, before_interval, second, after_release, delta);
+  }
   printf("scanned %d ROMs, cartridge %d tris, label tri %d/%d\n",
          app.entry_count, app.cart.count, app.label_tri[0], app.label_tri[1]);
   for (i = 0; i < app.entry_count; i++) {
@@ -2521,9 +2709,6 @@ int main(int argc, char **argv) {
 
   for (s = 0; s < sizeof(shots) / sizeof(shots[0]); s++) {
     float pos = shots[s].pos;
-    if (pos > (float)(app.entry_count - 1)) {
-      pos = (float)(app.entry_count - 1);
-    }
     if (shots[s].t < 0.0f) {
       ggfe_browse_frame(pos, shots[s].show_cases, &frame);
     } else {
