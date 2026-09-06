@@ -184,6 +184,8 @@ grep -q 'video_context_driver = "kms"' "$app/bin/plumos-retroarch-launch"
 grep -q 'menu_driver = "rgui"' "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
 grep -q 'rgui_show_start_screen = "false"' \
     "$app/factory-defaults/retroarch/retroarch-bubble.cfg"
+jq -e '.language == "en.lang"' \
+    "$app/factory-defaults/system/settings.json" >/dev/null
 for entry in ui-settings system-settings network-settings performance-settings apps help reboot shutdown; do
     grep -q "\"id\": \"$entry\"" "$app/config/frontend/menus.json"
 done

@@ -2,7 +2,7 @@
   "version": 1,
   "device": "bubble",
   "model": "GKD Bubble",
-  "language": "ja.lang",
+  "language": "en.lang",
   "timezone": "Asia/Tokyo",
   "brightness": 10,
   "volume": 8,

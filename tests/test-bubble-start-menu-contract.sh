@@ -6,6 +6,7 @@ package="$repo_root/package/frontend-bubble/plumos"
 menus="$package/config/frontend/menus.json"
 apps="$package/config/frontend/apps.json"
 coverage="$package/config/frontend/start-menu-coverage.json"
+system_defaults="$package/factory-defaults/system/settings.json"
 gg_boxart_rescue="$package/share/frontend/artwork-scraper/rescue/gamegear/Named_Boxarts.tsv"
 gg_title_rescue="$package/share/frontend/artwork-scraper/rescue/gamegear/Named_Titles.tsv"
 
@@ -25,6 +26,7 @@ expected_legacy_hidden='["settings","network"]'
 [[ $(jq -c '.apps_catalog_order' "$coverage") == "$expected_apps_catalog" ]]
 [[ $(jq -c '.apps_hidden_order' "$coverage") == "$expected_apps_hidden" ]]
 [[ $(jq -c '.legacy_hidden_order' "$coverage") == "$expected_legacy_hidden" ]]
+jq -e '.language == "en.lang"' "$system_defaults" >/dev/null
 # GGFE is the Game Gear frontend and exists only on Bubble; it is tracked
 # here rather than added to the common plumOS apps list.
 jq -e '.bubble_only_start_entries == [] and .bubble_only_apps_entries == ["ggfe"]' "$coverage" >/dev/null
