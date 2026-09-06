@@ -5,11 +5,13 @@ PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
 RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
 WIFI_IFACE=${PLUMOS_WIFI_INTERFACE:-wlan0}
+WIFI_SYS_CLASS_NET=${PLUMOS_WIFI_SYS_CLASS_NET:-/sys/class/net}
 RUN_DIR=${PLUMOS_NETWORK_RUN_DIR:-$RUNTIME_ROOT/network-control}
 STATUS_FILE=${PLUMOS_WPA_STATUS:-$RUN_DIR/wpa_status.txt}
 WPA_CONFIG=${PLUMOS_WPA_CONFIG:-$PLUMOS_ROOT/config/wpa_supplicant.conf}
 WPA_CTRL=${PLUMOS_WPA_CTRL_DIR:-/run/wpa_supplicant}
 WPA_PID=${PLUMOS_WPA_PID_FILE:-/run/wpa_supplicant.pid}
+WPA_SCAN_CONFIG=${PLUMOS_WPA_SCAN_CONFIG:-$RUN_DIR/wpa-scan.conf}
 DHCP_PID=${PLUMOS_DHCP_PID_FILE:-/run/udhcpc-wlan0.pid}
 DHCP_SCRIPT=${PLUMOS_DHCP_SCRIPT:-/usr/share/udhcpc/default.script}
 WPA_SUPPLICANT=${PLUMOS_WPA_SUPPLICANT:-/usr/sbin/wpa_supplicant}
@@ -32,7 +34,7 @@ log() {
         >>"$LOG" 2>/dev/null || true
 }
 
-iface_exists() { [ -d "/sys/class/net/$WIFI_IFACE" ]; }
+iface_exists() { [ -d "$WIFI_SYS_CLASS_NET/$WIFI_IFACE" ]; }
 
 iface_ip() {
     "$BB" ip -4 addr show dev "$WIFI_IFACE" 2>/dev/null |
@@ -117,26 +119,63 @@ wait_wpa_control() {
     return 1
 }
 
+write_scan_config() {
+    out=$1
+    next=$out.next.$$
+    old_umask=$(umask)
+    umask 077
+    {
+        printf 'ctrl_interface=%s\n' "$WPA_CTRL"
+        printf 'update_config=0\n'
+        printf 'country=JP\n'
+    } >"$next" || {
+        umask "$old_umask"
+        return 1
+    }
+    "$BB" chmod 0600 "$next" || {
+        "$BB" rm -f "$next"
+        umask "$old_umask"
+        return 1
+    }
+    "$BB" mv -f "$next" "$out" || {
+        "$BB" rm -f "$next"
+        umask "$old_umask"
+        return 1
+    }
+    umask "$old_umask"
+}
+
 # Bring up only the interface and wpa_supplicant control socket.  Scanning and
 # first-time connection must not wait for an association that cannot exist in
 # a credential-free image.  This mirrors the split used by the MF frontend.
 ensure_wpa_backend() {
+    backend_config=$WPA_CONFIG
+    config_source=saved
+
     iface_exists || { printf 'result=failed\nstage=interface\n'; return 1; }
     "$BB" ip link set "$WIFI_IFACE" up >/dev/null 2>&1 || {
         printf 'result=failed\nstage=interface-up\n'; return 1;
     }
     wpa_ready && return 0
-    [ -x "$WPA_SUPPLICANT" ] && [ -x "$WPA_CLI" ] && [ -s "$WPA_CONFIG" ] || {
+    [ -x "$WPA_SUPPLICANT" ] && [ -x "$WPA_CLI" ] || {
         printf 'result=failed\nstage=wpa-backend\n'; return 1;
     }
+    if [ ! -s "$backend_config" ]; then
+        write_scan_config "$WPA_SCAN_CONFIG" || {
+            printf 'result=failed\nstage=scan-config\n'
+            return 1
+        }
+        backend_config=$WPA_SCAN_CONFIG
+        config_source=runtime-only
+    fi
     "$WPA_SUPPLICANT" -B -P "$WPA_PID" -i "$WIFI_IFACE" -D nl80211,wext \
-        -c "$WPA_CONFIG" >>"$LOG" 2>&1 || {
+        -c "$backend_config" >>"$LOG" 2>&1 || {
         printf 'result=failed\nstage=wpa-start\n'; return 1;
     }
     wait_wpa_control || {
         printf 'result=failed\nstage=wpa-control\n'; return 1;
     }
-    log "wifi backend=result-ready association=not-required"
+    log "wifi backend=result-ready association=not-required config=$config_source"
 }
 
 request_dhcp() {

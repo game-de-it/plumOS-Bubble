@@ -94,6 +94,9 @@ grep -q 'ensure_wpa_backend' <<<"$connect_body"
 ! grep -q 'wifi_on' <<<"$connect_body"
 grep -q 'association=not-required' "$network_control"
 grep -q 'config_has_network' <<<"$wifi_on_body"
+grep -q 'write_scan_config' "$network_control"
+grep -q 'config_source=runtime-only' "$network_control"
+"$repo_root/tests/test-bubble-wifi-first-connect.sh" "$network_control"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

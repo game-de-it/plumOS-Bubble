@@ -154,6 +154,8 @@ app=$verify/app-layer/plumos
 for component in frontend nextcommander music-player network-services retroarch libretro-cores picoarch standalone pyxel portmaster; do
     (cd "$app" && sha256sum -c "components/$component/checksums.sha256")
 done
+"$repo_root/tests/test-bubble-wifi-first-connect.sh" \
+    "$app/bin/plumos-network-control"
 jq -e '.device == "bubble" and .user_media_included == false and
     .catalog_complete == true and .release_complete == false and
     .publishable == false and .core_baseline == "all-114-source-records"' \
