@@ -362,6 +362,8 @@
     save/cache directoryを機械可読な除外規則へ追加する。
     `systems.json`の`scan_excluded_directories`をscannerが大小文字を無視して適用し、
     root/通常subdirectoryの`.bin`は収録したまま`SAVE`以下だけを除外するhost fixtureを追加済み。
+    source `7deab58`をclean image実機へ反映し、Mega Drive 153件を21 msで走査、
+    正規`.bin`を維持したまま`EDMD/SAVE`由来は0件であることを確認した。
 - [ ] `BUB-P6-06` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。
   - MF/V90S/Pixel2のPortMaster履歴を再監査し、GUI restart marker、component-owned
     Bash/patcher/LOVE、font/cairo/audio/transitive DSO、`pgrep -f`、GPTokeYB所有権付き停止、
@@ -378,7 +380,10 @@
     将来追加される異なるruntime種別の代表試験を残す。
   - clean image再試験でPortMaster GUI launcherへTERMした際、bootstrapの子がDRMを保持した
     ままFEをreleaseする競合を検出。GUIにも所有session IDを付与し、全tagged processの
-    TERM/KILL・回収をmount解除とFE releaseより先に行う契約へ修正した。実機再試験を残す。
+    TERM/KILL・回収をmount解除とFE releaseより先に行う契約へ修正した。source `7deab58`の
+    実機強制TERMでtagged child/mountを0へ回収した。復帰FEがPortMasterのsession/SDL/HOMEを
+    継承する別の環境漏れも検出し、source `d3b8bb6`で`env -i`の通常boot契約からFEを再起動。
+    再試験は子0、mount 0、FE 1 process、PortMaster環境漏れ0で合格した。
   - 通常FE導線のApotrisで音声のみ進み画面が出ない状態を再現。port launcherだけcanonical
     `libmali.so.1`とFE DRM broker共有DSOを継承せず、EGL/GLES/GBM別名のmega-DSOを分離map
     していた。adapter 29でmanaged DRM share、canonical Mali、SDL EGL/GL driverを同じ
@@ -396,8 +401,9 @@
     本体がrebootしなかった。recovery consoleでもpower requestを監視・確定できるloopへ変更し、
     意図的なrestart-limit到達からReboot/Shutdown双方を実機確認する。
   - clean imageのPortMaster GUIはMali/DRMで25秒生存したが、launcherへの強制`TERM`後に
-    GUI childが一時DRM ownerとして残ったままFEが復帰した。即時に単一ownerへ復旧済み。
-    power/rebootが利用する強制終了境界では、子のDRM解放確認後にだけFEを再開する契約を追加する。
+    GUI childが一時DRM ownerとして残ったままFEが復帰した。owned session cleanupをFE release
+    より先へ追加し、実機強制TERMで子/mount/hold 0、clean環境のFE 1 processへ復帰することを
+    source `d3b8bb6`で確認した。power/rebootが利用する強制終了境界の本件は合格とする。
 - [ ] `BUB-P6-08` 全system表示、全profile選択、全core load smoke、代表content起動をhostで通してから、
   ROMセットを変更せず一括実機acceptanceを開始する。
   - hostでは全system/profile解決と114/114 core load smokeまで合格。
@@ -486,7 +492,9 @@
     byte-swap対象とする機械可読表へ固定し、`systems.json`との全件一致をrelease gateへ追加した。
     その後PicoDriveはcore内でもsystemによりbyte orderが異なることを実機同一180 frameで確認。
     Game Gearだけbyte-swap、Mega Drive/Master System/32Xはnativeとし、core既定に加えて
-    `system_id + core_id`の上書き表を導入した。Sega CDは実機BIOS不在のため再確認を残す。
+    `system_id + core_id`の上書き表を導入した。ROM2のSHA検証済みBIOSをtmpfsへ一時配置して
+    Sega CDも300 frameでnativeを確認し、source `286007b`でPicoDrive公開5 systemすべてを
+    route表へ固定した。永続BIOS/ROMは変更せず、一時BIOSは試験後に削除した。
   - 起動168導線のrendererを再監査し、Mali 128、GL非使用CPU framebuffer 40、意図しない
     llvmpipe/softpipe/swrast mapping 0。geometryを出す123導線はhorizontal 112、vertical 11。
     VarthでArcade/CPS1 9導線を再試験し全起動、geometry出力8導線は3:4・360x480中央配置。
@@ -567,7 +575,9 @@
     `640x480` full viewportを確保し4:3へ伸長する。以前の`360x480+140+0`契約へ戻し、
     fresh factory configを含むruntime testで固定する。
     RetroArch自身がCore Provided aspectへcore rotationを反映済みなのにDRM backendが再度
-    reciprocalを取る二重反転を除去し、source/build contractへ固定済み。実機再試験を残す。
+    reciprocalを取る二重反転を除去し、source/build contractへ固定済み。source `7deab58`の
+    実機再試験でFBNeo Image FightとMAME2003+ Varthの双方がrotation 3、aspect 0.750、
+    `360x480+140+0` viewport/scanoutへ戻ったため合格とする。
 - [ ] GGFE（Game Gear専用フロントエンド）を実装する。カートリッジをCPU software 3Dで描画し、
   GLもEGLも`/dev/mali0`も使わず、RetroArchとGPU/DRM masterを奪い合わない構成とする。
   - `plumos_cart3d.h`（3Dラスタライザ）、`plumos_ggfe_model.h`（実物採寸のカート/ケース形状）、

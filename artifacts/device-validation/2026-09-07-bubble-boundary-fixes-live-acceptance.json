@@ -1,0 +1,53 @@
+{
+  "device": "GKD Bubble",
+  "date": "2026-09-07",
+  "source_refs": ["7deab58", "d3b8bb6", "286007b"],
+  "app_layer": {
+    "source_ref": "286007b",
+    "global_checksum_files": 12451,
+    "result": "ok"
+  },
+  "library_scan": {
+    "system_id": "megadrive",
+    "elapsed_ms": 21,
+    "roms": 153,
+    "scan_excluded_directories": 5,
+    "save_path_hits": 0,
+    "ordinary_bin_content_retained": true
+  },
+  "picodrive": {
+    "routes": [
+      {"system_id": "megadrive", "byte_order": "native", "frames": 180, "sha256": "10c99c9db3f74023664710564065a25c11a7dc1f1de4d382a17e410f234f0c58"},
+      {"system_id": "mastersystem", "byte_order": "native", "frames": 180, "sha256": "a2b9f3f16ff9cb7592318d28da04edbc88ef6c8fbb775053fd2f2bcf40ea8977"},
+      {"system_id": "gamegear", "byte_order": "byteswap", "frames": 180, "sha256": "95922bd5642b02e685ae8dd06740a0ce6267953addb5bb5a00dfd93338a69180"},
+      {"system_id": "sega32x", "byte_order": "native", "frames": 180, "sha256": "fac846dc98f993e807eac8043179003eab83611f1cdb56173e3b6f0ffb50c0a7"},
+      {"system_id": "segacd", "byte_order": "native", "frames": 300, "sha256": "1374c30112cb1d2386478a725f5dbb019d98e83e9dae55993be2535e177a8479"}
+    ],
+    "all_frontend_routes_explicitly_classified": true,
+    "temporary_bios_removed": true,
+    "persistent_bios_modified": false
+  },
+  "vertical_arcade": [
+    {"system_id": "fbneo", "content": "imgfight.zip", "aspect": 0.75, "rotation": 3, "viewport": "360x480+140+0", "scanout": "360x480"},
+    {"system_id": "mame2003plus", "content": "varthj.zip", "aspect": 0.75, "rotation": 3, "viewport": "360x480+140+0", "scanout": "360x480"}
+  ],
+  "portmaster_forced_term": {
+    "owned_processes_after_cleanup": 0,
+    "temporary_mounts_after_cleanup": 0,
+    "frontend_processes": 1,
+    "frontend_portmaster_environment_variables": 0,
+    "software_fallback": false,
+    "result": "ok"
+  },
+  "post_condition": {
+    "frontend_processes": 1,
+    "runtime_processes": 0,
+    "validation_holds": 0,
+    "portmaster_mounts": 0,
+    "portmaster_tagged_processes": 0,
+    "persistent_volume": 8,
+    "runtime_volume": 8,
+    "cpu_governor": "ondemand",
+    "wifi_ipv4": "192.168.10.101/24"
+  }
+}

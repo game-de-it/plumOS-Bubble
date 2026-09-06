@@ -55,8 +55,9 @@ KMSDRM context, fitted 256x192 to 640x480, advanced PCM and restored `ondemand`.
 
 The PicoArch Game Gear logs explicitly selected RGB565 byte swapping for both
 Gearsystem and PicoDrive. The host matrix also passed all 20 PicoArch core IDs:
-18 RGB565, seven corrected byte-order routes, two XRGB8888 routes and one
-compatibility alias.
+18 RGB565, six core-default byte-swap classifications, two XRGB8888 routes and
+one compatibility alias. PicoDrive's system-specific result is recorded in the
+follow-up section below.
 
 Raw reports are:
 
@@ -64,8 +65,10 @@ Raw reports are:
 - `artifacts/device-validation/2026-09-07-bubble-emulator-focused-retest.json`
 - `artifacts/device-validation/2026-09-07-bubble-pyxel-pfs-retest.json`
 - `artifacts/device-validation/2026-09-07-bubble-vertical-arcade-isolated-retest.json`
+- `artifacts/device-validation/2026-09-07-bubble-picodrive-route-colour-probe.json`
+- `artifacts/device-validation/2026-09-07-bubble-boundary-fixes-live-acceptance.json`
 
-## Display regression found
+## Display regression found in the first pass
 
 Horizontal RetroArch contracts and the Pyxel fit contract were centered and
 bounded. Vertical arcade is not accepted on this fresh image.
@@ -77,10 +80,9 @@ vertical request. Both active DRM contracts nevertheless allocated a full
 from the earlier accepted runtime was a centered `360x480` viewport. The
 current result rotates the content but stretches its 3:4 presentation to 4:3.
 
-The source-level display contract test still passes, so it does not cover the
-fresh factory-config runtime state which reproduces this fault. Physical LCD
-observation should be repeated only after the runtime viewport fix; the machine
-contract is already sufficient to fail the current image.
+The original source-level display contract did not cover this fresh
+factory-config runtime state. The follow-up below adds that regression boundary
+and records the corrected device contract.
 
 ## PortMaster and GGFE
 
@@ -96,7 +98,8 @@ recur while the GUI was left running. A forced `TERM` of the 25-second launcher
 returned before its GUI child had released DRM, allowing the frontend to start
 while that child briefly remained a display owner. The validation immediately
 stopped the frontend, removed the PortMaster-owned child/mounts, and restored a
-single frontend. This forced-termination cleanup race remains open.
+single frontend. This forced-termination cleanup race was resolved and
+re-tested in the follow-up below.
 
 GGFE found all 20 Game Gear ROMs, used four worker threads and DRM double
 buffering, applied `performance` only while alive, and restored `ondemand`.
@@ -107,6 +110,33 @@ the normal frontend did not return after this direct GGFE probe; it was restored
 once through `plumos-frontend-launch`. This is a validation-induced lifecycle
 limit, not a normal Apps-route acceptance.
 
+## Follow-up fixes accepted on the live clean image
+
+Sources `7deab58`, `d3b8bb6` and `286007b` were deployed as scoped app-layer
+updates with component metadata, rollback archives and global metadata. The
+final component checks and the complete 12,451-file app-layer check passed with
+global source reference `286007b`. Active settings, ROMs, saves and installed
+PortMaster state were not replaced.
+
+- The Mega Drive scan loaded all 98 systems and indexed 153 valid entries in
+  21 ms. It retained ordinary `.bin` content, including content below normal
+  subdirectories, while returning zero entries below `EDMD/SAVE`.
+- PicoDrive was compared with byte swapping both disabled and enabled at a
+  fixed frame on every frontend-exposed system. Mega Drive, Master System, 32X
+  and Sega CD are native RGB565; Game Gear is byte-swapped. The production
+  defaults reproduced the accepted frame hashes for all five routes. Sega CD
+  used the SHA-verified ROM2 `bios_CD_E/U/J` set in tmpfs only; persistent BIOS
+  and ROM storage were unchanged and the temporary BIOS was removed.
+- The rebuilt RetroArch DRM backend reported aspect `0.750000`, rotation 3 and
+  centered `360x480+140+0` viewport/scanout for both FBNeo Image Fight and MAME
+  2003+ Varth. This closes the fresh-config double reciprocal regression.
+- Forced `TERM` of a live PortMaster GUI removed every owned child before mount
+  cleanup and FE release. A second issue found by that acceptance run was that
+  the restored FE inherited PortMaster's session tag, KMSDRM SDL variables and
+  PortMaster HOME. FE restoration now starts from a minimal boot environment;
+  the repeated run ended with zero tagged processes, zero temporary mounts and
+  one FE process with no PortMaster environment variables.
+
 ## Post-condition
 
 All temporary matrix directories and the two staged BIOS files were removed.
@@ -115,7 +145,10 @@ no emulator, PortMaster or GGFE process, no validation hold or temporary bind
 mount, runtime volume restored to 8, governor `ondemand`, Wi-Fi at
 `192.168.10.101`, and about 5.5 GiB free in `/storage`. Frontend,
 libretro-cores, RetroArch, PicoArch, standalone, Pyxel and PortMaster component
-checksums all passed after the probes.
+checksums all passed after the probes. After the follow-up deployment and
+retests, the final global 12,451-file checksum also passed, runtime and
+persistent volume were 8, every CPU policy was `ondemand`, and Wi-Fi remained
+at `192.168.10.101`.
 
 Physical speaker output, controls, RetroArch menu open/close and ordinary
 in-game exits were not re-accepted in this unattended pass. Those earlier
