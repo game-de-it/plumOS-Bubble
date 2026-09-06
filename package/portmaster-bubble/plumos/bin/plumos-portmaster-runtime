@@ -83,7 +83,7 @@ prepare() {
       "$COMMAND_RUNTIME" >&2
     exit 1
   }
-  "$BB" sh "$COMMAND_RUNTIME" >/dev/null
+  "${PLUMOS_BUSYBOX:-/bin/busybox}" sh "$COMMAND_RUNTIME" >/dev/null
   [ -e /dev/fd ] || ln -s /proc/self/fd /dev/fd 2>/dev/null || true
   [ -e /dev/stdin ] || ln -s /proc/self/fd/0 /dev/stdin 2>/dev/null || true
   [ -e /dev/stdout ] || ln -s /proc/self/fd/1 /dev/stdout 2>/dev/null || true
