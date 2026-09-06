@@ -130,7 +130,9 @@ in the stock frontend.
 `state/frontend/ggfe-state.json` holds GGFE's own view state - currently just
 whether the cases are shown. It is written when the toggle is pressed, through
 a temporary and a rename so a power cut leaves the previous file rather than a
-truncated one.
+truncated one. The temporary file is flushed and synced before the rename, the
+directory entry is synced afterwards, and write/sync failures are logged rather
+than installing incomplete state.
 
 It is deliberately separate from the launch overrides and from anything the
 stock frontend owns, so the three cannot corrupt one another.

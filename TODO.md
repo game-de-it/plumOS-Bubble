@@ -569,6 +569,11 @@
   - source `9d98b66`のHUD glyph cacheを通常Apps導線で実機合格。20 ROM走査、物理scroll、
     case ON/OFF、3回のRA起動・正常終了・GGFE入力再取得、物理B終了、FE復帰を確認した。
     最終状態はFE 1 process、GGFE/broker 0、`ondemand`、component checksumと設定hash不変。
+  - source `baa76ed` + `27bd746`で縦長box art余白を本体色へ変更し、case表示状態を
+    `state/frontend/ggfe-state.json`へatomic保存、case OFF起動では蓋開き区間をskipする。
+    縦長artの余白、case OFF起動演出、終了後のcase OFF復元を利用者が実機合格。
+    `show_cases=1`からOFF保存、次回`show_cases=0`、保存error 0、stale `.next`なしをlog/readback確認。
+    ON/OFF双方向の保存はhost fixture、case OFF起動を含む7画面の1/4-thread byte一致も合格。
 - [ ] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
   現行buildはlibpngのみリンクしており該当hitは`NO ARTWORK`板へ落ちる。
   libjpeg導入はtools imageとfrontend/lib双方の変更になるため単独で実施する。

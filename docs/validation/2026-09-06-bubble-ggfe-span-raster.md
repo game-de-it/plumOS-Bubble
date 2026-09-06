@@ -399,3 +399,62 @@ clean GGFE exit.  Final state had one frontend process, no GGFE or DRM broker,
 `ondemand`, valid component checksums, and unchanged mutable settings.  The
 glyph cache and its normal lifecycle are accepted; all-position 60 fps remains
 open.
+
+## Presentation fixes and remembered case state
+
+Commit `baa76ed` addresses three physical presentation findings: portrait box
+art margins now use the cartridge shell colour rather than a blurred dark copy
+of the artwork, case visibility is stored in GGFE's own
+`state/frontend/ggfe-state.json`, and a case-off launch skips the lid-opening
+portion of the timeline while keeping the case hidden.  Commit `27bd746`
+strengthens the state transaction by checking every write/flush/file-sync/close
+result, syncing the directory after rename, and logging durability failures.
+
+A generated portrait artwork fixture rendered both revisions side by side.
+The old frame visibly carried the artwork's red-brown colour into both side
+bars; the new frame used the neutral shell colour.  A separate case-off launch
+frame showed no tray or lid and entered at `GGFE_LAUNCH_NO_CASE_START`.  The
+permanent host test verifies default ON, saved OFF, restored OFF, saved ON, and
+restored ON.  It also compares seven representative case-on/case-off frames
+between one and four renderer threads byte-for-byte.
+
+The rebuilt 212-entry component was staged and verified.  The live delta was
+four managed files with no removals: the GGFE binary, managed and factory
+`ggfe.json`, and component manifest.  Before updating the managed config, its
+device hash was proven identical to the previous packaged default, so no user
+customisation was overwritten.  All 213 frontend global entries passed and the
+other 12,725 catalog lines remained byte-for-byte unchanged.  Installed hashes
+were:
+
+```text
+959c2ccefdfd69a5ae03776e4db5313063f375ab584270884c8e0e1c3ff44480  bin/plumos-ggfe
+58c7a923bd4a3c2d160c1b479abd8dcd3ecdb9132c89e03396c2370106ae92e7  components/frontend/checksums.sha256
+c4cd46524bbad09651016ca20fb00950c41e0b3f6de1810d39136c2c0e248840  config/frontend/ggfe.json
+```
+
+Rollback is
+`/storage/plumos/state/app-deploy/27bd746-ggfe-presentation-state/rollback.tar`,
+SHA-256
+`ce84bcafa6aaaddd59a987dfbae31921577b500967d1091a7f0b49382ceae088`.
+Its size is 1,549,824 bytes.  Frontend and system setting hashes were
+unchanged.
+
+The user physically accepted all three visible behaviours.  The first Apps
+launch reported `show_cases=1`, physical X wrote OFF, and the log recorded:
+
+```text
+ggfe_input=case-toggle code=307 visible=0
+ggfe_state=saved show_cases=0
+```
+
+Three case-off physical A launches returned status zero and reopened GGFE
+input.  After leaving and reopening GGFE, the next process reported
+`ggfe_start=ok roms=20 show_cases=0`, proving device-side OFF persistence.
+There were no state write, rename, or sync errors and no stale `.next` file.
+The reverse OFF-to-ON persistence is covered by the host round-trip fixture;
+the physical run left the preference OFF.
+
+The final START exit returned to one frontend process with no GGFE or DRM
+broker, restored `ondemand`, and retained valid component checksums.  Portrait
+margin rendering, case-off launch presentation, and remembered view state are
+accepted.
