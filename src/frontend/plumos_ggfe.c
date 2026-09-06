@@ -1554,8 +1554,12 @@ static void ggfe_menu_cycle_core(struct ggfe_app *app, int sel) {
   }
   /* -1 is the "no override" slot, so the cycle is: auto, then each core. */
   at = (at + 2 > n) ? -1 : at + 1;
-  ggfe_override_set_rom(&app->ggfe_overrides, app->entries[sel].rel,
-                        at < 0 ? NULL : avail[at]);
+  if (!ggfe_override_set_rom(&app->ggfe_overrides, app->entries[sel].rel,
+                             at < 0 ? NULL : avail[at])) {
+    ggfe_log(app, "ggfe_menu=core-update-failed rom=%s\n",
+             app->entries[sel].rel);
+    return;
+  }
   if (join_path(path, sizeof(path), app->plumos_root,
                 app->cfg.ggfe_overrides) &&
       ggfe_overrides_save(&app->ggfe_overrides, path,
@@ -1564,6 +1568,13 @@ static void ggfe_menu_cycle_core(struct ggfe_app *app, int sel) {
              at < 0 ? "(auto)" : avail[at]);
   } else {
     ggfe_log(app, "ggfe_menu=core-save-failed rom=%s\n", app->entries[sel].rel);
+    /* The menu must not claim a choice that did not reach durable storage. */
+    ggfe_overrides_free(&app->ggfe_overrides);
+    if (join_path(path, sizeof(path), app->plumos_root,
+                  app->cfg.ggfe_overrides)) {
+      (void)ggfe_overrides_load(&app->ggfe_overrides, path,
+                                app->cfg.launch_system);
+    }
   }
 }
 

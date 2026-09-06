@@ -362,7 +362,9 @@ static int ggfe_overrides_save(const struct ggfe_override_set *set,
   char tmp[PATH_MAX];
   char dir[PATH_MAX];
   FILE *f;
+  int dir_fd;
   int i, first = 1;
+  int ok = 1;
 
   if (path_parent(dir, sizeof(dir), path)) {
     (void)mkdir(dir, 0755);
@@ -397,11 +399,31 @@ static int ggfe_overrides_save(const struct ggfe_override_set *set,
     first = 0;
   }
   fprintf(f, "%s]\n}\n", first ? "" : "\n  ");
-  fflush(f);
-  fsync(fileno(f));
-  fclose(f);
+  if (ferror(f) || fflush(f) != 0 || fsync(fileno(f)) != 0) {
+    ok = 0;
+  }
+  if (fclose(f) != 0) {
+    ok = 0;
+  }
+  if (!ok) {
+    (void)unlink(tmp);
+    return 0;
+  }
   if (rename(tmp, path) != 0) {
     (void)unlink(tmp);
+    return 0;
+  }
+  /* Persist the rename itself as well as the file contents. */
+  if (!path_parent(dir, sizeof(dir), path)) {
+    return 0;
+  }
+  dir_fd = open(dir, O_RDONLY | O_CLOEXEC);
+  if (dir_fd < 0) {
+    return 0;
+  }
+  ok = (fsync(dir_fd) == 0);
+  close(dir_fd);
+  if (!ok) {
     return 0;
   }
   return 1;
