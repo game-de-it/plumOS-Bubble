@@ -88,7 +88,7 @@ for threads in 1 4; do
     "$tmp/ggfe-host-$threads" "$root" "$card" "$tmp/render-$threads" \
         >/dev/null 2>&1 || fail "GGFE $threads-thread render failed"
 done
-for shot in g-library g-browse g-open g-hop g-insert g-seated; do
+for shot in g-library g-browse g-open g-hop g-insert g-seated g-no-case-launch; do
     cmp "$tmp/render-1/$shot.png" "$tmp/render-4/$shot.png" ||
         fail "one-thread and four-thread output differ: $shot"
 done
@@ -128,4 +128,4 @@ if [ "$before" != "$after" ]; then
     fail "GGFE modified the plumOS core-overrides file"
 fi
 
-printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 case_state=persisted threads=1,4 identical=6\n'
+printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 case_state=persisted threads=1,4 identical=7\n'

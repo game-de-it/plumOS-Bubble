@@ -15,6 +15,7 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <signal.h>
@@ -1583,13 +1584,16 @@ static void ggfe_state_save(struct ggfe_app *app, int show_cases) {
   char tmp[PATH_MAX];
   char dir[PATH_MAX];
   FILE *f;
+  int save_errno = 0;
+  int dir_fd;
 
   if (!ggfe_state_path(app, path, sizeof(path))) {
     return;
   }
-  if (path_parent(dir, sizeof(dir), path)) {
-    (void)mkdir(dir, 0755);
+  if (!path_parent(dir, sizeof(dir), path)) {
+    return;
   }
+  (void)mkdir(dir, 0755);
   if ((size_t)snprintf(tmp, sizeof(tmp), "%s.next", path) >= sizeof(tmp)) {
     return;
   }
@@ -1598,15 +1602,38 @@ static void ggfe_state_save(struct ggfe_app *app, int show_cases) {
     ggfe_log(app, "ggfe_state=write-failed path=%s errno=%d\n", tmp, errno);
     return;
   }
-  fprintf(f, "{\n  \"version\": 1,\n  \"show_cases\": %s\n}\n",
-          show_cases ? "true" : "false");
-  fflush(f);
-  fsync(fileno(f));
-  fclose(f);
+  if (fprintf(f, "{\n  \"version\": 1,\n  \"show_cases\": %s\n}\n",
+              show_cases ? "true" : "false") < 0 ||
+      fflush(f) != 0 || fsync(fileno(f)) != 0) {
+    save_errno = errno ? errno : EIO;
+  }
+  if (fclose(f) != 0 && save_errno == 0) {
+    save_errno = errno ? errno : EIO;
+  }
+  if (save_errno != 0) {
+    ggfe_log(app, "ggfe_state=write-failed path=%s errno=%d\n", tmp,
+             save_errno);
+    (void)unlink(tmp);
+    return;
+  }
   if (rename(tmp, path) != 0) {
     ggfe_log(app, "ggfe_state=rename-failed path=%s errno=%d\n", path, errno);
     (void)unlink(tmp);
     return;
+  }
+  /* Persist the directory entry as well as the file contents.  A directory
+   * sync failure does not invalidate the live rename, but it must be visible
+   * in the diagnostic log rather than silently overstating durability. */
+  dir_fd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+  if (dir_fd >= 0) {
+    if (fsync(dir_fd) != 0) {
+      ggfe_log(app, "ggfe_state=dir-sync-failed path=%s errno=%d\n", dir,
+               errno);
+    }
+    close(dir_fd);
+  } else {
+    ggfe_log(app, "ggfe_state=dir-open-failed path=%s errno=%d\n", dir,
+             errno);
   }
   ggfe_log(app, "ggfe_state=saved show_cases=%d\n", show_cases);
 }
@@ -2361,9 +2388,14 @@ int main(int argc, char **argv) {
     const char *name;
     float pos;
     float t;
-  } shots[] = {{"g-library", 2.0f, -1.0f},   {"g-browse", 2.5f, -1.0f},
-               {"g-open", 2.0f, 0.14f},      {"g-hop", 2.0f, 0.50f},
-               {"g-insert", 2.0f, 1.02f},    {"g-seated", 2.0f, 1.28f}};
+    int show_cases;
+  } shots[] = {{"g-library", 2.0f, -1.0f, 1},
+               {"g-browse", 2.5f, -1.0f, 1},
+               {"g-open", 2.0f, 0.14f, 1},
+               {"g-hop", 2.0f, 0.50f, 1},
+               {"g-insert", 2.0f, 1.02f, 1},
+               {"g-seated", 2.0f, 1.28f, 1},
+               {"g-no-case-launch", 2.0f, GGFE_LAUNCH_NO_CASE_START, 0}};
   size_t s;
   int i;
 
@@ -2416,9 +2448,9 @@ int main(int argc, char **argv) {
       pos = (float)(app.entry_count - 1);
     }
     if (shots[s].t < 0.0f) {
-      ggfe_browse_frame(pos, 1, &frame);
+      ggfe_browse_frame(pos, shots[s].show_cases, &frame);
     } else {
-      ggfe_launch_frame(shots[s].t, pos, 1, &frame);
+      ggfe_launch_frame(shots[s].t, pos, shots[s].show_cases, &frame);
     }
     ggfe_compose(&app, &frame, background);
     snprintf(path, sizeof(path), "%s/%s.png", out_dir, shots[s].name);
