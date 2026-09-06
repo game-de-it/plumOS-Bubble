@@ -15,6 +15,7 @@ POWER_REQUEST=${PLUMOS_POWER_REQUEST:-$RUNTIME_ROOT/power-action/request}
 NETWORK_SERVICES=${PLUMOS_NETWORK_SERVICES:-$PLUMOS_ROOT/bin/plumos-network-services}
 VOLUME_KEYS_SERVICE=${PLUMOS_VOLUME_KEYS_SERVICE:-$PLUMOS_ROOT/bin/plumos-volume-keys-service}
 RUNTIME_QUIESCE=${PLUMOS_RUNTIME_QUIESCE:-$PLUMOS_ROOT/bin/plumos-runtime-quiesce}
+POWER_FINALIZER=${PLUMOS_POWER_FINALIZER:-$PLUMOS_ROOT/bin/plumos-power-request-finalizer}
 FOREGROUND_MARKER=${PLUMOS_FOREGROUND_MARKER:-$RUNTIME_ROOT/frontend/foreground.pgid}
 ACTION=shutdown
 POWER_OFF=0
@@ -49,6 +50,20 @@ log() {
     message="$($BB date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown) $*"
     printf '%s\n' "$message" >>"$LOG" 2>/dev/null || true
     printf 'plumos-bubble-power=%s\n' "$*" >/dev/console 2>/dev/null || true
+}
+
+start_power_finalizer() {
+    [ -x "$POWER_FINALIZER" ] || {
+        log 'stage=power-fallback result=unavailable owner=pid1-only'
+        return 0
+    }
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+        PLUMOS_BUSYBOX="$BB" PLUMOS_POWER_REQUEST="$POWER_REQUEST" \
+        PLUMOS_POWER_ACTION_LOG="$LOG" PLUMOS_MOUNTS_FILE="$MOUNTS_FILE" \
+        PLUMOS_USER_MOUNT="$USER_MOUNT" PLUMOS_CLEAN_P3_MARKER="$CLEAN_P3_MARKER" \
+        "$BB" sh "$POWER_FINALIZER" "$ACTION" \
+        >>"$LOG" 2>&1 </dev/null &
+    log "stage=power-fallback result=armed action=$ACTION"
 }
 
 if [ "$ACTION" = sleep ]; then
@@ -123,6 +138,7 @@ if ! "$BB" grep -qs " $USER_MOUNT " "$MOUNTS_FILE" 2>/dev/null; then
                 pending_result="updated-from-$pending_action"
             fi
             "$BB" sync
+            start_power_finalizer
             log "result=requested action=$ACTION owner=pid1 pending=$pending_result"
             printf 'result=requested action=%s owner=pid1 pending=%s\n' \
                 "$ACTION" "$pending_result"
@@ -189,5 +205,6 @@ if ! "$BB" mv -f "$POWER_REQUEST.next.$$" "$POWER_REQUEST"; then
     log 'result=error stage=power-request-commit'
     exit 1
 fi
+start_power_finalizer
 log "result=requested action=$ACTION owner=pid1"
 exit 0

@@ -107,7 +107,7 @@ case "${1:-}" in
     printf '%s\n' basename cat chmod cp df dirname find grep head ln mkdir mv \
       readlink rm sed sha256sum sort sync tail tar tee tr unzip xargs
     ;;
-  ln|mkdir|mv|rm) command "$@" ;;
+  ln|mkdir|mv|rm|sed) command "$@" ;;
   *) printf '%s\n' "${0##*/}" "$@" ;;
 esac
 EOF
@@ -172,6 +172,7 @@ chmod 0755 "$work/frontend-kill"
 printf '%s\n' '#!/bin/sh' \
     ': > "$FAKE_FRONTEND_STARTED"' > "$work/frontend-start"
 chmod 0755 "$work/frontend-start"
+printf '%s\n' E81_FRONTEND_RESTART_LIMIT_RECOVERY_CONSOLE > "$work/system-stage.txt"
 FAKE_PROC_ROOT="$work/frontend-proc" \
 PLUMOS_ROOT="$plumos_root" \
 PLUMOS_PORTMASTER_PROC_ROOT="$work/frontend-proc" \
@@ -190,6 +191,8 @@ PLUMOS_FRONTEND_VALIDATION_HOLD="$work/validation/frontend-hold" \
 PLUMOS_PORTMASTER_FRONTEND_LAUNCH="$work/frontend-start" \
 PLUMOS_PORTMASTER_FRONTEND_START_BIN="$work/frontend-start" \
 PLUMOS_PORTMASTER_SLEEP_BIN=true \
+PLUMOS_SYSTEM_STAGE_FILE="$work/system-stage.txt" \
+PLUMOS_BUSYBOX="$work/busybox" \
 FAKE_FRONTEND_STARTED="$work/frontend-started" \
     "$FRONTEND_CONTROL" release
 [ ! -e "$work/validation/frontend-hold" ]

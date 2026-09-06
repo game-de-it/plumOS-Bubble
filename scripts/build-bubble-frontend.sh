@@ -203,6 +203,8 @@ cat >"$component/manifest.json" <<EOF
     "foreground_policy": "quiesce-display-owner-and-handoff-drm",
     "overlay": "bin/plumos-power-menu-overlay",
     "runtime_quiesce": "bin/plumos-runtime-quiesce",
+    "request_finalizer": "bin/plumos-power-request-finalizer",
+    "request_finalizer_policy": "pid1-preferred-8s-recovery-fallback",
     "drm_handoff": "scm-rights-broker",
     "drm_broker": "bin/plumos-drm-broker-run",
     "drm_share": "frontend/lib/libplumos-drm-share.so",

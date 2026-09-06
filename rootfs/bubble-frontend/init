@@ -199,7 +199,12 @@ capture_snapshot() {
 finalize_power_action() {
     action=$1
     request=/run/plumos/power-action/request
+    claim=/run/plumos/power-action/finalizing
     clean_marker=/storage/plumos/provision/clean-shutdown
+    if ! $bb mkdir "$claim" 2>/dev/null; then
+        log "stage=S90_POWER_FINALIZE_ALREADY_CLAIMED action=$action"
+        return 0
+    fi
     log "stage=S90_POWER_FINALIZE_BEGIN action=$action"
     $bb rm -f "$request"
     $bb sync
@@ -223,6 +228,26 @@ finalize_power_action() {
     esac
     log 'stage=E92_POWER_BACKEND_RETURNED'
     return 1
+}
+
+recovery_power_watch() {
+    while :; do
+        power_request=$($bb cat /run/plumos/power-action/request 2>/dev/null || true)
+        case "$power_request" in
+            reboot|shutdown)
+                log "stage=S89_RECOVERY_POWER_REQUEST action=$power_request"
+                finalize_power_action "$power_request"
+                ;;
+        esac
+        $bb sleep 1
+    done
+}
+
+enter_recovery_console() {
+    reason=$1
+    log "stage=S88_RECOVERY_POWER_WATCH_READY reason=$reason"
+    recovery_power_watch &
+    exec $bb sh
 }
 
 start_recovery_network_background() {
@@ -301,7 +326,7 @@ if [ ! -f /storage/plumos/manifest.json ] || \
     log 'stage=E39_APP_LAYER_METADATA_MISSING'
     fat_stage E39_APP_LAYER_METADATA_MISSING
     show_progress boot-error
-    exec $bb sh
+    enter_recovery_console app-layer-metadata-missing
 fi
 for required in \
     /storage/plumos/bin/plumos-frontend-launch \
@@ -311,14 +336,14 @@ for required in \
         log "stage=E39_FRONTEND_REQUIRED_FILE_MISSING path=$required"
         fat_stage E39_FRONTEND_REQUIRED_FILE_MISSING
         show_progress boot-error
-        exec $bb sh
+        enter_recovery_console frontend-required-file-missing
     fi
 done
 if [ ! -x /storage/plumos/bin/plumos-frontend-launch ]; then
     log 'stage=E39_FRONTEND_LAUNCHER_NOT_EXECUTABLE'
     fat_stage E39_FRONTEND_LAUNCHER_NOT_EXECUTABLE
     show_progress boot-error
-    exec $bb sh
+    enter_recovery_console frontend-launcher-not-executable
 fi
 log 'stage=S39_APP_LAYER_METADATA_READY verification=build-update-deploy'
 fat_stage S39_APP_LAYER_METADATA_READY
@@ -344,6 +369,10 @@ while :; do
     case "$power_request" in
         reboot|shutdown) finalize_power_action "$power_request" ;;
     esac
+    if [ -e /run/plumos/validation/frontend-hold ]; then
+        log 'stage=S43_FRONTEND_INTENTIONAL_HOLD restart-budget=preserved'
+        continue
+    fi
     log "stage=E80_FRONTEND_EXIT rc=$rc attempt=$restart_count"
     capture_snapshot
     restart_count=$((restart_count + 1))
@@ -351,7 +380,7 @@ while :; do
         log 'stage=E81_FRONTEND_RESTART_LIMIT_RECOVERY_CONSOLE'
         fat_stage E81_FRONTEND_RESTART_LIMIT_RECOVERY_CONSOLE
         show_progress boot-error
-        exec $bb sh
+        enter_recovery_console frontend-restart-limit
     fi
     $bb sleep 2
 done

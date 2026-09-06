@@ -9,6 +9,7 @@ OWNED_HOLD="${RUN_ROOT}/frontend-hold.owned"
 SLEEP_BIN="${PLUMOS_PORTMASTER_SLEEP_BIN:-sleep}"
 BB="${PLUMOS_BUSYBOX:-/bin/busybox}"
 FRONTEND_LAUNCH="${PLUMOS_PORTMASTER_FRONTEND_LAUNCH:-${PLUMOS_ROOT}/bin/plumos-frontend-launch}"
+SYSTEM_STAGE_FILE="${PLUMOS_SYSTEM_STAGE_FILE:-/flash/plumos-probe/system-stage.txt}"
 action="${1:-status}"
 
 frontend_pids() {
@@ -70,17 +71,20 @@ case "$action" in
   release)
     [ -f "$OWNED_HOLD" ] || exit 0
     rm -f "$VALIDATION_HOLD" "$OWNED_HOLD"
-    # PID 1 has a deliberately bounded frontend restart loop. Repeated device
-    # validation can exhaust that budget, so first give the normal supervisor
-    # a chance to recover and then start the same managed frontend launcher
-    # ourselves. This path is reached only when PortMaster acquired the hold;
-    # the normal Apps child route continues to let its frontend ancestor own
-    # renderer restoration.
-    for _ in 1 2 3; do
+    # A current launcher stays under PID 1 while the hold is active and
+    # continues booting when the marker disappears. Never race that owner with
+    # a second frontend. Legacy images can already have reached the explicit
+    # E81 recovery console; only that state is allowed to use the compatibility
+    # fallback below.
+    for _ in 1 2 3 4 5; do
       [ -n "$(frontend_pids)" ] && exit 0
+      stage="$("$BB" sed -n '1p' "$SYSTEM_STAGE_FILE" 2>/dev/null || true)"
+      [ "$stage" = E81_FRONTEND_RESTART_LIMIT_RECOVERY_CONSOLE ] && break
       "$SLEEP_BIN" 1
     done
-    if [ -z "$(frontend_pids)" ] && [ -x "$FRONTEND_LAUNCH" ]; then
+    stage="$("$BB" sed -n '1p' "$SYSTEM_STAGE_FILE" 2>/dev/null || true)"
+    if [ "$stage" = E81_FRONTEND_RESTART_LIMIT_RECOVERY_CONSOLE ] && \
+       [ -z "$(frontend_pids)" ] && [ -x "$FRONTEND_LAUNCH" ]; then
       if [ -n "${PLUMOS_PORTMASTER_FRONTEND_START_BIN:-}" ]; then
         "$PLUMOS_PORTMASTER_FRONTEND_START_BIN" >/dev/null 2>&1 </dev/null
       else

@@ -33,7 +33,10 @@ if [ -e "$VALIDATION_HOLD" ]; then
         "$BB" sleep 1
     done
     printf 'frontend_validation_hold=released marker=%s\n' "$VALIDATION_HOLD" >>"$LOG"
-    exit 0
+    # Keep this PID 1-owned launcher alive. Exiting here made the supervisor
+    # count an intentional renderer hand-off as another frontend failure and
+    # introduced a second restart race before the frontend became visible.
+    printf 'frontend_validation_hold=continue owner=supervisor\n' >>"$LOG"
 fi
 if [ -x "$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2" ]; then
     "$BB" sh "$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2" start || true

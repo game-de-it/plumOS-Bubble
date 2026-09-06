@@ -1,0 +1,75 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+REQUEST=${PLUMOS_POWER_REQUEST:-$RUNTIME_ROOT/power-action/request}
+CLAIM=${PLUMOS_POWER_FINALIZE_CLAIM:-$RUNTIME_ROOT/power-action/finalizing}
+LOG=${PLUMOS_POWER_ACTION_LOG:-$PLUMOS_ROOT/logs/power-action.log}
+MOUNTS_FILE=${PLUMOS_MOUNTS_FILE:-/proc/mounts}
+USER_MOUNT=${PLUMOS_USER_MOUNT:-/storage/user}
+CLEAN_MARKER=${PLUMOS_CLEAN_P3_MARKER:-$PLUMOS_ROOT/provision/clean-shutdown}
+WAIT_SECONDS=${PLUMOS_POWER_FINALIZE_WAIT_SECONDS:-8}
+POWER_BACKEND=${PLUMOS_POWER_BACKEND:-}
+expected=${1:-}
+
+case "$expected" in
+    reboot|shutdown) ;;
+    *) exit 64 ;;
+esac
+case "$WAIT_SECONDS" in *[!0-9]*|'') WAIT_SECONDS=8 ;; esac
+
+log() {
+    message="$($BB date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown) $*"
+    printf '%s\n' "$message" >>"$LOG" 2>/dev/null || true
+    printf 'plumos-bubble-power=%s\n' "$*" >/dev/console 2>/dev/null || true
+}
+
+requested_action() {
+    $BB sed -n '1p' "$REQUEST" 2>/dev/null || true
+}
+
+# PID 1 normally consumes the request immediately after the frontend exits.
+# This delayed owner exists for recovery-console and legacy unsupervised-FE
+# states only. If PID 1 removed or changed the request, it exits harmlessly.
+$BB sleep "$WAIT_SECONDS"
+[ "$(requested_action)" = "$expected" ] || exit 0
+if ! $BB mkdir "$CLAIM" 2>/dev/null; then
+    exit 0
+fi
+if [ "$(requested_action)" != "$expected" ]; then
+    $BB rmdir "$CLAIM" 2>/dev/null || true
+    exit 0
+fi
+
+log "stage=S92_POWER_FALLBACK_BEGIN action=$expected wait_seconds=$WAIT_SECONDS"
+$BB rm -f "$REQUEST"
+$BB sync
+if $BB grep -qs " $USER_MOUNT " "$MOUNTS_FILE" 2>/dev/null; then
+    log 'stage=E92_USER_STORAGE_STILL_MOUNTED clean-shutdown-proof=invalid'
+    $BB rm -f "$CLEAN_MARKER" 2>/dev/null || true
+fi
+if $BB mount -o remount,ro /storage 2>/dev/null; then
+    log "stage=S93_STORAGE_READ_ONLY action=$expected"
+else
+    log 'stage=E93_STORAGE_READ_ONLY_FAILED clean-shutdown-proof=invalid'
+    $BB rm -f "$CLEAN_MARKER" 2>/dev/null || true
+fi
+$BB mount -o remount,ro /flash 2>/dev/null || true
+$BB sync
+
+if [ -n "$POWER_BACKEND" ]; then
+    "$POWER_BACKEND" "$expected"
+    backend_rc=$?
+else
+    case "$expected" in
+        reboot) "$BB" reboot -f ; backend_rc=$? ;;
+        shutdown) "$BB" poweroff -f ; backend_rc=$? ;;
+    esac
+fi
+# A real terminal backend does not return. Keep a failed or synthetic backend
+# retryable rather than stranding a stale claim for the rest of this boot.
+$BB rmdir "$CLAIM" 2>/dev/null || true
+log "stage=E94_POWER_BACKEND_RETURNED action=$expected rc=$backend_rc"
+exit "$backend_rc"

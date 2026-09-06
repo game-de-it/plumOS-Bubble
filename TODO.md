@@ -400,6 +400,12 @@
     その後のsafe reboot requestを消費するPID 1 supervisorが残らず、network/storage停止後も
     本体がrebootしなかった。recovery consoleでもpower requestを監視・確定できるloopへ変更し、
     意図的なrestart-limit到達からReboot/Shutdown双方を実機確認する。
+  - 2026-09-07にも、PortMaster cleanupが3秒後に起動したsupervisor外FEからShutdownを選ぶと、
+    FE/SSH/share停止後もICMPだけ応答して電源断しない状態を再現。validation hold解除後は同じ
+    PID 1所有launcherを継続し、hold中の終了はrestart budgetへ数えず、manual FE fallbackを
+    明示的な`E81`だけへ限定した。さらにPID 1と8秒遅延fallback finalizerがatomic claimを共有し、
+    recovery consoleでもrequestを監視する。host契約は合格、整合済みlive deploy後に通常FEと
+    意図的`E81`のReboot/Shutdown実機4経路を確認する。
   - clean imageのPortMaster GUIはMali/DRMで25秒生存したが、launcherへの強制`TERM`後に
     GUI childが一時DRM ownerとして残ったままFEが復帰した。owned session cleanupをFE release
     より先へ追加し、実機強制TERMで子/mount/hold 0、clean環境のFE 1 processへ復帰することを
