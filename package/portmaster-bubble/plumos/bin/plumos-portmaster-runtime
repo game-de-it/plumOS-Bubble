@@ -69,6 +69,13 @@ prepare() {
       exit 1
     }
   done
+  if [ -d "${PM_DIR}/runtimes" ]; then
+    find "${PM_DIR}/runtimes" -mindepth 2 -maxdepth 2 -type f \
+      -name 'love.aarch64' -exec chmod 0755 {} + || {
+        printf 'plumos-portmaster-runtime: cannot enable AArch64 LOVE runtime\n' >&2
+        exit 1
+      }
+  fi
   mkdir -p "$RUN_ROOT" "$LIB_DIR" "${PLUMOS_ROOT}/logs/apps"
   [ -e /dev/fd ] || ln -s /proc/self/fd /dev/fd 2>/dev/null || true
   [ -e /dev/stdin ] || ln -s /proc/self/fd/0 /dev/stdin 2>/dev/null || true
@@ -162,6 +169,8 @@ prepare() {
   # folded its implementation into libc.
   link_one librt.so.1 \
     "${ADAPTER_DIR}/lib/aarch64/librt.so.1"
+  link_one libtinfo.so.6 \
+    "${ADAPTER_DIR}/lib/aarch64/libtinfo.so.6"
   link_one libSDL2_gfx-1.0.so.0 \
     "${ADAPTER_DIR}/lib/aarch64/libSDL2_gfx-1.0.so.0"
   link_one libopenal.so.1 \

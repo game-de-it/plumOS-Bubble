@@ -167,7 +167,7 @@ export XDG_DATA_HOME="${DATA_ROOT}/upstream"
 export HM_TOOLS_DIR="${DATA_ROOT}/upstream"
 export HM_PORTS_DIR="${PLUMOS_ROM_ROOT}/PORTS"
 export HM_SCRIPTS_DIR="${PLUMOS_ROM_ROOT}/PORTS"
-export PATH="${PLUMOS_ROOT}/bin:${PATH}"
+export PATH="${ADAPTER_DIR}/shims:${ADAPTER_DIR}/bin/aarch64:${PLUMOS_ROOT}/bin:${PATH}"
 export LD_LIBRARY_PATH="${RUN_ROOT}/lib:${PLUMOS_ROOT}/apps/pyxel/lib:${PLUMOS_ROOT}/apps/python/lib:${PLUMOS_ROOT}/lib:${PLUMOS_ROOT}/apps/nextcommander/lib:${PLUMOS_ROOT}/emulator/lib:${PLUMOS_ROOT}/apps/pyxel/site/pygame.libs:${LD_LIBRARY_PATH:-}"
 export PLUMOS_BUBBLE_PYTHON_EXTRA_LIBRARY_PATH="${RUN_ROOT}/lib:${PLUMOS_ROOT}/lib:${PLUMOS_ROOT}/apps/nextcommander/lib:${PLUMOS_ROOT}/emulator/lib:${PLUMOS_ROOT}/apps/pyxel/site/pygame.libs"
 export PYSDL2_DLL_PATH="${RUN_ROOT}/lib"
@@ -189,6 +189,12 @@ export SDL_VIDEO_GL_DRIVER="${SDL_VIDEO_GL_DRIVER:-$mali_library}"
 unset LIBGL_ALWAYS_SOFTWARE MESA_LOADER_DRIVER_OVERRIDE \
   LIBGL_DRIVERS_PATH __EGL_VENDOR_LIBRARY_FILENAMES
 mkdir -p "$HOME" "$XDG_CACHE_HOME" "$HM_PORTS_DIR"
+for helper in pgrep pkill; do
+  command -v "$helper" >/dev/null 2>&1 || {
+    printf 'plumos-portmaster-launch: GUI helper is missing: %s\n' "$helper" >&2
+    exit 127
+  }
+done
 
 # Do this while the frontend still owns its renderer on direct launches.  A
 # missing transitive DSO must fail back to the menu instead of producing a

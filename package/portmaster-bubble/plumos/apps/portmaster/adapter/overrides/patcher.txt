@@ -1,0 +1,20 @@
+#!/bin/bash
+# plumOS Bubble wrapper for PortMaster's common LOVE patcher.
+
+source "$controlfolder/runtimes/love_11.5/love.txt"
+
+CHANGELOG=""
+if [ "$CHANGELOG" = true ]; then
+  CHANGELOG="-n"
+fi
+
+# Port patch scripts normally use #!/bin/bash. Bubble keeps bash inside this
+# managed component, so let LOVE invoke a POSIX shim which then enters that
+# runtime with the original script and question-answer environment intact.
+export PLUMOS_PORTMASTER_PATCH_SCRIPT="$PATCHER_FILE"
+PATCHER_FILE="${PLUMOS_PORTMASTER_PATCH_SHIM:-${PLUMOS_ROOT}/apps/portmaster/adapter/shims/run-patchscript}"
+
+$GPTOKEYB "$LOVE_GPTK" &
+$LOVE_RUN "$controlfolder/utils/patcher" -f "$PATCHER_FILE" -g "$PATCHER_GAME" -t "$PATCHER_TIME" "$CHANGELOG" -q "$PATCHER_QUESTIONS"
+
+pm_gptokeyb_finish

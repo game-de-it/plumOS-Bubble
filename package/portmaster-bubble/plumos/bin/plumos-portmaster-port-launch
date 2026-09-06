@@ -26,6 +26,7 @@ START_FILE="${RUN_ROOT}/port.starttime"
 SCRIPT_FILE="${RUN_ROOT}/port.script"
 MOUNTS_FILE="${RUN_ROOT}/port.mounts"
 MOUNT_CLEANUP="${PLUMOS_ROOT}/bin/plumos-portmaster-mount-cleanup"
+PORT_BASH="${APP_ROOT}/adapter/bin/aarch64/bash"
 child=""
 restore_frontend=0
 cleanup_done=0
@@ -140,6 +141,26 @@ prepare_compat_mount() {
   printf '%s\n' "$compat_target" >> "$MOUNTS_FILE"
 }
 
+prepare_patcher_compat() {
+  patcher_target="${PM_DIR}/utils/patcher.txt"
+  patcher_override="${PLUMOS_PORTMASTER_PATCHER_OVERRIDE:-${APP_ROOT}/adapter/overrides/patcher.txt}"
+
+  for required in "$patcher_target" "$patcher_override"; do
+    [ -f "$required" ] || {
+      printf 'PortMaster patcher compatibility file is missing: %s\n' \
+        "$required" >&2
+      return 1
+    }
+  done
+  if is_mounted "$patcher_target"; then
+    printf 'PortMaster has a stale patcher compatibility mount: %s\n' \
+      "$patcher_target" >&2
+    return 1
+  fi
+  mount --bind "$patcher_override" "$patcher_target" || return 1
+  printf '%s\n' "$patcher_target" >> "$MOUNTS_FILE"
+}
+
 patch_known_port_runtime_path() {
   case "$(basename "$script" | tr '[:upper:]' '[:lower:]')" in
     'moonlight new.sh') ;;
@@ -189,6 +210,11 @@ if port_requires_armhf; then
   exit 78
 fi
 
+[ -x "$PORT_BASH" ] || {
+  printf 'PortMaster bash runtime is missing: %s\n' "$PORT_BASH" >&2
+  exit 127
+}
+
 if [ -f "$PID_FILE" ]; then
   old_pid="$(cat "$PID_FILE" 2>/dev/null || true)"
   if [ -d "/proc/${old_pid}" ]; then
@@ -233,6 +259,7 @@ fi
 : > "$MOUNTS_FILE"
 patch_known_port_runtime_path || exit 1
 prepare_compat_mount || exit 1
+prepare_patcher_compat || exit 1
 for name in config libs themes; do
   source_dir="${STATE_ROOT}/${name}"
   target_dir="${PM_DIR}/${name}"
@@ -248,6 +275,7 @@ export PLUMOS_ROOT PLUMOS_RUNTIME_ROOT="/run/plumos"
 export PLUMOS_PORTMASTER_APP_ROOT="$APP_ROOT"
 export PLUMOS_PORTMASTER_DATA_ROOT="$DATA_ROOT"
 export PLUMOS_PORTMASTER_MOUNTS_FILE="$MOUNTS_FILE"
+export PORT_BASH
 export HOME="${STATE_ROOT}/home"
 export XDG_CONFIG_HOME="${HOME}/.config"
 export XDG_CACHE_HOME="${RUN_ROOT}/cache"
@@ -278,7 +306,7 @@ fi
 printf '\n[%s] script=%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$script" \
   "$(printf '%s' "$audio_status" | tr '\n' ' ')" >> "$LOG_FILE"
 printf 'renderer_policy=port-owned-hardware-preferred software_forced=false\n' >>"$LOG_FILE"
-LD_LIBRARY_PATH="${RUN_ROOT}/lib" setsid bash "$script" "$@" >> "$LOG_FILE" 2>&1 &
+LD_LIBRARY_PATH="${RUN_ROOT}/lib" setsid "$PORT_BASH" "$script" "$@" >> "$LOG_FILE" 2>&1 &
 child=$!
 printf '%s\n' "$child" > "$PID_FILE"
 sed 's/.*) //' "/proc/${child}/stat" | awk '{print $20}' > "$START_FILE"

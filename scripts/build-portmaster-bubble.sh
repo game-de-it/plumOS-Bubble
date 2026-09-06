@@ -64,7 +64,8 @@ CAIRO_COMPAT_SHA256="445ed8208a6e4823de1226a74ca319d3600e83f6369f99b14265006599c
 PIXMAN_RUNTIME_VERSION="0.42.2-1"
 SQUASHFS_TOOLS_VERSION="1:4.5.1-1"
 ZIP_VERSION="3.0-13"
-ADAPTER_VERSION="20"
+BASH_RUNTIME_VERSION="5.2.15-2+b13"
+ADAPTER_VERSION="21"
 
 usage() {
     cat <<EOF
@@ -125,6 +126,16 @@ actual_zip_version="$(dpkg-query -W -f='${Version}' zip)"
 }
 [ -x /usr/bin/zip ] || {
     printf 'error: /usr/bin/zip is unavailable\n' >&2
+    exit 1
+}
+actual_bash_runtime_version="$(dpkg-query -W -f='${Version}' bash)"
+[ "$actual_bash_runtime_version" = "$BASH_RUNTIME_VERSION" ] || {
+    printf 'error: bash runtime version mismatch: expected %s, got %s\n' \
+        "$BASH_RUNTIME_VERSION" "$actual_bash_runtime_version" >&2
+    exit 1
+}
+[ -x /bin/bash ] || {
+    printf 'error: /bin/bash is unavailable\n' >&2
     exit 1
 }
 lzo_library="$(find /usr/lib/aarch64-linux-gnu -type f -name 'liblzo2.so.*' | sort | tail -n 1)"
@@ -604,6 +615,9 @@ release_version="$(tr -d '\r\n' < "$stage_dir/plumos/apps/portmaster/upstream/Po
 chmod 0755 \
     "$stage_dir/plumos/apps/portmaster/upstream/PortMaster/gptokeyb" \
     "$stage_dir/plumos/apps/portmaster/upstream/PortMaster/gptokeyb2"
+find "$stage_dir/plumos/apps/portmaster/upstream/PortMaster/runtimes" \
+    -mindepth 2 -maxdepth 2 -type f -name 'love.aarch64' \
+    -exec chmod 0755 {} +
 
 rsync -a --copy-links --exclude='__pycache__/' --exclude='*.pyc' \
     "$PACKAGE_DIR/plumos/" "$stage_dir/plumos/"
@@ -648,11 +662,14 @@ libgthread-2.0.so.0:libgthread-2.0.so.0.*
 libglib-2.0.so.0:libglib-2.0.so.0.*
 libpcre2-8.so.0:libpcre2-8.so.0.*
 librt.so.1:librt.so.1
+libtinfo.so.6:libtinfo.so.6.*
 EOF
 install -m 0755 /usr/bin/unsquashfs \
     "$stage_dir/plumos/apps/portmaster/adapter/bin/aarch64/unsquashfs"
 install -m 0755 /usr/bin/zip \
     "$stage_dir/plumos/apps/portmaster/adapter/bin/aarch64/zip"
+install -m 0755 /bin/bash \
+    "$stage_dir/plumos/apps/portmaster/adapter/bin/aarch64/bash"
 install -m 0644 "$openal_library" \
     "$stage_dir/plumos/apps/portmaster/adapter/lib/aarch64/libopenal.so.1"
 install -m 0644 "$lzo_library" \
@@ -793,6 +810,23 @@ for owned_soname in libgthread-2.0.so.0 librt.so.1; do
             ;;
     esac
 done
+closure="$(LD_LIBRARY_PATH="$gui_library_path" \
+    ldd "$stage_dir/plumos/apps/portmaster/adapter/bin/aarch64/bash" 2>&1)"
+if printf '%s\n' "$closure" | grep -q 'not found'; then
+    printf 'error: PortMaster bash transitive dependency is missing:\n%s\n' \
+        "$closure" >&2
+    exit 1
+fi
+bash_tinfo_path="$(printf '%s\n' "$closure" | \
+    awk '$1 == "libtinfo.so.6" && $2 == "=>" {print $3; exit}')"
+case "$bash_tinfo_path" in
+    "$runtime_audit_dir/"*) ;;
+    *)
+        printf 'error: PortMaster bash libtinfo escaped component runtime: %s\n' \
+            "${bash_tinfo_path:-missing}" >&2
+        exit 1
+        ;;
+esac
 rm -rf "$runtime_audit_dir"
 install -m 0644 "$openal_src/COPYING" \
     "$stage_dir/plumos/licenses/openal-soft-LGPL-2.0-or-later.txt"
@@ -810,6 +844,10 @@ install -m 0644 /usr/share/doc/squashfs-tools/copyright \
     "$stage_dir/plumos/licenses/squashfs-tools-copyright.txt"
 install -m 0644 /usr/share/doc/zip/copyright \
     "$stage_dir/plumos/licenses/zip-copyright.txt"
+install -m 0644 /usr/share/doc/bash/copyright \
+    "$stage_dir/plumos/licenses/bash-copyright.txt"
+install -m 0644 /usr/share/doc/libtinfo6/copyright \
+    "$stage_dir/plumos/licenses/libtinfo-copyright.txt"
 install -m 0644 /usr/share/doc/liblzo2-2/copyright \
     "$stage_dir/plumos/licenses/liblzo2-copyright.txt"
 install -m 0644 "$theora_compat_src/COPYING" \
@@ -896,6 +934,8 @@ rsync -a "$stage_dir/plumos/" "$OUT_DIR/plumos/"
         -o -path 'licenses/readline-compat-*' \
         -o -path 'licenses/squashfs-tools-*' \
         -o -path 'licenses/zip-*' \
+        -o -path 'licenses/bash-*' \
+        -o -path 'licenses/libtinfo-*' \
         -o -path 'licenses/liblzo2-*' \
         -o -path 'licenses/libtheora-*' \
         -o -path 'licenses/cairo-*' \

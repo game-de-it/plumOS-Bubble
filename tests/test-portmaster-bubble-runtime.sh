@@ -9,8 +9,12 @@ PORT_LAUNCH="$PACKAGE/bin/plumos-portmaster-port-launch"
 MOUNT_CLEANUP="$PACKAGE/bin/plumos-portmaster-mount-cleanup"
 BUILDER="$ROOT_DIR/scripts/build-portmaster-bubble.sh"
 UPDATER="$PACKAGE/apps/portmaster/adapter/plumos_portmaster_update.py"
+PGREP="$PACKAGE/apps/portmaster/adapter/shims/pgrep"
+PKILL="$PACKAGE/apps/portmaster/adapter/shims/pkill"
+PATCH_SHIM="$PACKAGE/apps/portmaster/adapter/shims/run-patchscript"
+PATCHER_OVERRIDE="$PACKAGE/apps/portmaster/adapter/overrides/patcher.txt"
 
-for file in "$RUNTIME" "$GUI_LAUNCH" "$PORT_LAUNCH" "$MOUNT_CLEANUP"; do
+for file in "$RUNTIME" "$GUI_LAUNCH" "$PORT_LAUNCH" "$MOUNT_CLEANUP" "$PGREP" "$PKILL" "$PATCH_SHIM"; do
     /bin/sh -n "$file"
 done
 
@@ -18,12 +22,29 @@ grep -q 'link_one libgthread-2.0.so.0' "$RUNTIME"
 grep -q 'link_one libglib-2.0.so.0' "$RUNTIME"
 grep -q 'link_one libpcre2-8.so.0' "$RUNTIME"
 grep -q 'link_one librt.so.1' "$RUNTIME"
+grep -q 'link_one libtinfo.so.6' "$RUNTIME"
+grep -q -- "-name 'love.aarch64' -exec chmod 0755" "$RUNTIME"
 grep -q 'ctypes.CDLL("libSDL2_mixer-2.0.so.0")' "$GUI_LAUNCH"
 grep -q 'RESTART_FILE="${PM_DIR}/.pugwash-reboot"' "$GUI_LAUNCH"
 grep -q 'restart-marker=stale action=consume' "$GUI_LAUNCH"
 grep -q 'restart-marker=requested count=' "$GUI_LAUNCH"
 grep -q 'plumos-portmaster-mount-cleanup' "$GUI_LAUNCH" "$PORT_LAUNCH"
 grep -q 'libgthread-2.0.so.0:libgthread-2.0.so.0.' "$BUILDER"
+grep -q 'ADAPTER_DIR}/shims:${ADAPTER_DIR}/bin/aarch64' "$GUI_LAUNCH"
+grep -q 'command -v "$helper"' "$GUI_LAUNCH"
+grep -q 'called_by_owned_gptokey' "$PKILL"
+grep -q 'plumos-portmaster-port-stop" stop' "$PKILL"
+grep -q 'PORT_BASH="${APP_ROOT}/adapter/bin/aarch64/bash"' "$PORT_LAUNCH"
+grep -q '^export PORT_BASH$' "$PORT_LAUNCH"
+grep -q 'setsid "$PORT_BASH" "$script"' "$PORT_LAUNCH"
+grep -q 'prepare_patcher_compat || exit 1' "$PORT_LAUNCH"
+grep -q 'PLUMOS_PORTMASTER_PATCH_SCRIPT="$PATCHER_FILE"' "$PATCHER_OVERRIDE"
+grep -q 'exec "$PORT_BASH" "$PLUMOS_PORTMASTER_PATCH_SCRIPT"' "$PATCH_SHIM"
+grep -q 'BASH_RUNTIME_VERSION="5.2.15-2+b13"' "$BUILDER"
+grep -q 'adapter/bin/aarch64/bash' "$BUILDER"
+grep -q 'libtinfo.so.6:libtinfo.so.6.' "$BUILDER"
+grep -q -- "-name 'love.aarch64'" "$BUILDER"
+grep -q 'PortMaster/runtimes/love_\*/love.aarch64' "$UPDATER"
 
 builder_version="$(sed -n 's/^ADAPTER_VERSION="\([0-9][0-9]*\)"$/\1/p' "$BUILDER")"
 updater_version="$(sed -n 's/^ADAPTER_VERSION = \([0-9][0-9]*\)$/\1/p' "$UPDATER")"
@@ -53,6 +74,23 @@ printf '%s\n' '#!/bin/sh' \
     'mv "$FAKE_MOUNTINFO.tmp" "$FAKE_MOUNTINFO"' > "$work/umount"
 chmod 0755 "$work/umount"
 
+mkdir -p "$work/proc/101" "$work/proc/202"
+printf 'love.aarch64\0--game\0' > "$work/proc/101/cmdline"
+printf 'love.aarch64\n' > "$work/proc/101/comm"
+printf 'plumos-controller-ui-fbdev\0--renderer\0fbdev\0' \
+    > "$work/proc/202/cmdline"
+printf 'plumos-controller-ui-fbdev\n' > "$work/proc/202/comm"
+[ "$(PLUMOS_PORTMASTER_PROC_ROOT="$work/proc" "$PGREP" -f 'love[.]aarch64')" = 101 ]
+[ "$(PLUMOS_PORTMASTER_PROC_ROOT="$work/proc" "$PGREP" '^plumos-controller')" = 202 ]
+if PLUMOS_PORTMASTER_PROC_ROOT="$work/proc" "$PGREP" -f missing >/dev/null; then
+    printf 'pgrep shim matched an absent process\n' >&2
+    exit 1
+fi
+if PLUMOS_PORTMASTER_PROC_ROOT="$work/proc" "$PGREP" -x love >/dev/null 2>&1; then
+    printf 'pgrep shim accepted an unsupported option\n' >&2
+    exit 1
+fi
+
 if PLUMOS_ROOT="$plumos_root" PLUMOS_PORTMASTER_RUN_ROOT="$run_root" \
    PLUMOS_PORTMASTER_MOUNTINFO="$mountinfo" \
    /bin/sh "$MOUNT_CLEANUP" "$work/unmanaged.track" 2>/dev/null; then
@@ -79,5 +117,5 @@ grep -q "target=/usr/lib/compat" "$work/umount.log"
 grep -q "target=$pm_dir/config" "$work/umount.log"
 ! grep -q 'target=/$' "$work/umount.log"
 
-printf 'portmaster_bubble_runtime=result-ok adapter=%s gui_preflight=1 restart=1 mount_recovery=1\n' \
+printf 'portmaster_bubble_runtime=result-ok adapter=%s gui_preflight=1 pgrep=1 restart=1 mount_recovery=1\n' \
     "$builder_version"

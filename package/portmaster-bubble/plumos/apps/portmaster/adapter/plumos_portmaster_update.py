@@ -46,7 +46,10 @@ EXECUTABLE_FILES = (
     "PortMaster/gptokeyb",
     "PortMaster/gptokeyb2",
 )
-ADAPTER_VERSION = 20
+EXECUTABLE_GLOBS = (
+    "PortMaster/runtimes/love_*/love.aarch64",
+)
+ADAPTER_VERSION = 21
 STALE_UPDATE_PREFIXES = (
     "portmaster-download-",
     "upstream.next.",
@@ -188,6 +191,12 @@ def enable_runtime_executables(stage: Path) -> None:
             path.chmod(0o755)
         except OSError as error:
             fail(f"cannot enable runtime executable {relative}: {error}")
+    for pattern in EXECUTABLE_GLOBS:
+        for path in stage.glob(pattern):
+            try:
+                path.chmod(0o755)
+            except OSError as error:
+                fail(f"cannot enable runtime executable {path}: {error}")
 
 
 def hash_file(path: Path, algorithm: str) -> str:
