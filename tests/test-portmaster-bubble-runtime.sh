@@ -14,8 +14,9 @@ PGREP="$PACKAGE/apps/portmaster/adapter/shims/pgrep"
 PKILL="$PACKAGE/apps/portmaster/adapter/shims/pkill"
 PATCH_SHIM="$PACKAGE/apps/portmaster/adapter/shims/run-patchscript"
 PATCHER_OVERRIDE="$PACKAGE/apps/portmaster/adapter/overrides/patcher.txt"
+COMMAND_RUNTIME="$PACKAGE/bin/plumos-portmaster-command-runtime"
 
-for file in "$RUNTIME" "$GUI_LAUNCH" "$PORT_LAUNCH" "$MOUNT_CLEANUP" "$FRONTEND_CONTROL" "$PGREP" "$PKILL" "$PATCH_SHIM"; do
+for file in "$RUNTIME" "$GUI_LAUNCH" "$PORT_LAUNCH" "$MOUNT_CLEANUP" "$FRONTEND_CONTROL" "$PGREP" "$PKILL" "$PATCH_SHIM" "$COMMAND_RUNTIME"; do
     /bin/sh -n "$file"
 done
 
@@ -33,9 +34,11 @@ grep -q 'restart-marker=stale action=consume' "$GUI_LAUNCH"
 grep -q 'restart-marker=requested count=' "$GUI_LAUNCH"
 grep -q 'plumos-portmaster-mount-cleanup' "$GUI_LAUNCH" "$PORT_LAUNCH"
 grep -q 'plumos-portmaster-frontend-control' "$GUI_LAUNCH" "$PORT_LAUNCH"
+grep -q 'plumos-portmaster-command-runtime' "$RUNTIME"
+grep -q 'busybox-bin' "$GUI_LAUNCH" "$PORT_LAUNCH"
 ! grep -q 'plumos-frontend-stop' "$GUI_LAUNCH" "$PORT_LAUNCH"
 grep -q 'libgthread-2.0.so.0:libgthread-2.0.so.0.' "$BUILDER"
-grep -q 'ADAPTER_DIR}/shims:${ADAPTER_DIR}/bin/aarch64' "$GUI_LAUNCH"
+grep -q 'ADAPTER_DIR}/shims:${RUN_ROOT}/busybox-bin:${ADAPTER_DIR}/bin/aarch64' "$GUI_LAUNCH"
 grep -q 'command -v "$helper"' "$GUI_LAUNCH"
 grep -q 'called_by_owned_gptokey' "$PKILL"
 grep -q 'plumos-portmaster-port-stop" stop' "$PKILL"
@@ -57,6 +60,31 @@ updater_version="$(sed -n 's/^ADAPTER_VERSION = \([0-9][0-9]*\)$/\1/p' "$UPDATER
 
 work="$(mktemp -d /tmp/plumos-portmaster-bubble-test.XXXXXX)"
 trap 'rm -rf "$work"' EXIT
+
+cat >"$work/busybox" <<'EOF'
+#!/bin/sh
+case "${1:-}" in
+  --list)
+    printf '%s\n' basename cat chmod cp df dirname find grep head ln mkdir mv \
+      readlink rm sed sha256sum sort sync tail tar tee tr unzip xargs
+    ;;
+  ln|mkdir|mv|rm) command "$@" ;;
+  *) printf '%s\n' "${0##*/}" "$@" ;;
+esac
+EOF
+chmod 0755 "$work/busybox"
+command_run="$work/command-run"
+PLUMOS_BUSYBOX="$work/busybox" PLUMOS_PORTMASTER_RUN_ROOT="$command_run" \
+  "$COMMAND_RUNTIME" >/dev/null
+for command_name in basename cp df rm tar tee unzip; do
+  [ -x "$command_run/busybox-bin/$command_name" ] || {
+    printf 'PortMaster command runtime omitted %s\n' "$command_name" >&2
+    exit 1
+  }
+done
+[ "$("$command_run/busybox-bin/df" -PT /roms/ports/Test.sh)" = \
+  $'df\n-PT\n/roms/ports/Test.sh' ]
+
 plumos_root="$work/plumos"
 run_root="$work/run"
 pm_dir="$plumos_root/state/portmaster/data/upstream/PortMaster"
@@ -172,5 +200,5 @@ grep -q "target=/usr/lib/compat" "$work/umount.log"
 grep -q "target=$pm_dir/config" "$work/umount.log"
 ! grep -q 'target=/$' "$work/umount.log"
 
-printf 'portmaster_bubble_runtime=result-ok adapter=%s gui_preflight=1 mali_preload=1 pgrep=1 frontend_handoff=1 frontend_restore=1 restart=1 mount_recovery=1\n' \
+printf 'portmaster_bubble_runtime=result-ok adapter=%s command_runtime=busybox-all gui_preflight=1 mali_preload=1 pgrep=1 frontend_handoff=1 frontend_restore=1 restart=1 mount_recovery=1\n' \
     "$builder_version"

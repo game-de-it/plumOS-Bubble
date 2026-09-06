@@ -1,0 +1,49 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/storage/plumos}"
+RUN_ROOT="${PLUMOS_PORTMASTER_RUN_ROOT:-/run/plumos/portmaster}"
+BB="${PLUMOS_BUSYBOX:-/bin/busybox}"
+BIN_DIR="${RUN_ROOT}/busybox-bin"
+NEXT_DIR="${BIN_DIR}.next.$$"
+
+[ -x "$BB" ] || {
+  printf 'plumos-portmaster-command-runtime: BusyBox is unavailable: %s\n' "$BB" >&2
+  exit 127
+}
+
+"$BB" rm -rf "$NEXT_DIR"
+"$BB" mkdir -p "$NEXT_DIR"
+
+# Bubble intentionally has a very small root filesystem. BusyBox contains the
+# normal Unix command applets, but only a small subset have /bin symlinks.
+# PortMaster's managed Bash and GUI subprocesses cannot use ash's in-process
+# applet lookup, so publish the complete BusyBox command surface in volatile
+# state. Adapter shims stay earlier in PATH and retain ownership of lifecycle
+# sensitive commands such as mount, umount and pkill.
+"$BB" --list | while IFS= read -r applet; do
+  case "$applet" in
+    ''|*/*)
+      printf 'plumos-portmaster-command-runtime: invalid BusyBox applet: %s\n' \
+        "$applet" >&2
+      "$BB" rm -rf "$NEXT_DIR"
+      exit 1
+      ;;
+  esac
+  "$BB" ln -s "$BB" "$NEXT_DIR/$applet"
+done
+
+for required in \
+  basename cat chmod cp df dirname find grep head ln mkdir mv readlink rm sed \
+  sha256sum sort sync tail tar tee tr unzip xargs; do
+  [ -x "$NEXT_DIR/$required" ] || {
+    printf 'plumos-portmaster-command-runtime: required applet is missing: %s\n' \
+      "$required" >&2
+    "$BB" rm -rf "$NEXT_DIR"
+    exit 1
+  }
+done
+
+"$BB" rm -rf "$BIN_DIR"
+"$BB" mv "$NEXT_DIR" "$BIN_DIR"
+printf '%s\n' "$BIN_DIR"

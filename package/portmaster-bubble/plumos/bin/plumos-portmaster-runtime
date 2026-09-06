@@ -10,6 +10,7 @@ PM_DIR="${DATA_ROOT}/upstream/PortMaster"
 BASELINE_ROOT="${APP_ROOT}/upstream"
 ADAPTER_DIR="${APP_ROOT}/adapter"
 LIB_DIR="${RUN_ROOT}/lib"
+COMMAND_RUNTIME="${PLUMOS_ROOT}/bin/plumos-portmaster-command-runtime"
 NEXTCOMMANDER_LIB="${PLUMOS_ROOT}/apps/nextcommander/lib"
 PYTHON_LIB="${PLUMOS_ROOT}/apps/python/lib"
 EMULATOR_LIB="${PLUMOS_ROOT}/emulator/lib"
@@ -77,6 +78,12 @@ prepare() {
       }
   fi
   mkdir -p "$RUN_ROOT" "$LIB_DIR" "${PLUMOS_ROOT}/logs/apps"
+  [ -x "$COMMAND_RUNTIME" ] || {
+    printf 'plumos-portmaster-runtime: command runtime is missing: %s\n' \
+      "$COMMAND_RUNTIME" >&2
+    exit 1
+  }
+  "$BB" sh "$COMMAND_RUNTIME" >/dev/null
   [ -e /dev/fd ] || ln -s /proc/self/fd /dev/fd 2>/dev/null || true
   [ -e /dev/stdin ] || ln -s /proc/self/fd/0 /dev/stdin 2>/dev/null || true
   [ -e /dev/stdout ] || ln -s /proc/self/fd/1 /dev/stdout 2>/dev/null || true
