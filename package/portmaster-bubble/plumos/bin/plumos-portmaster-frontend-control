@@ -1,0 +1,76 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT="${PLUMOS_ROOT:-/storage/plumos}"
+RUN_ROOT="${PLUMOS_PORTMASTER_RUN_ROOT:-/run/plumos/portmaster}"
+PROC_ROOT="${PLUMOS_PORTMASTER_PROC_ROOT:-/proc}"
+VALIDATION_HOLD="${PLUMOS_FRONTEND_VALIDATION_HOLD:-/run/plumos/validation/frontend-hold}"
+OWNED_HOLD="${RUN_ROOT}/frontend-hold.owned"
+SLEEP_BIN="${PLUMOS_PORTMASTER_SLEEP_BIN:-sleep}"
+action="${1:-status}"
+
+frontend_pids() {
+  for process_dir in "$PROC_ROOT"/[0-9]*; do
+    [ -r "$process_dir/cmdline" ] || continue
+    pid=${process_dir##*/}
+    cmdline="$(tr '\000' ' ' < "$process_dir/cmdline" 2>/dev/null || true)"
+    case "$cmdline" in
+      *"${PLUMOS_ROOT}/bin/plumos-controller-ui-bubble"*|\
+      *"${PLUMOS_ROOT}/bin/plumos-controller-ui-fbdev"*) printf '%s\n' "$pid" ;;
+    esac
+  done
+}
+
+send_signal() {
+  signal=$1
+  pid=$2
+  if [ -n "${PLUMOS_PORTMASTER_KILL_BIN:-}" ]; then
+    "$PLUMOS_PORTMASTER_KILL_BIN" "-$signal" "$pid"
+  else
+    kill "-$signal" "$pid"
+  fi
+}
+
+case "$action" in
+  status)
+    pids="$(frontend_pids)"
+    [ -n "$pids" ] || exit 1
+    printf '%s\n' "$pids"
+    ;;
+  acquire)
+    mkdir -p "$RUN_ROOT" "$(dirname "$VALIDATION_HOLD")"
+    if [ -e "$VALIDATION_HOLD" ] && [ ! -f "$OWNED_HOLD" ]; then
+      printf 'plumos-portmaster-frontend-control: refusing foreign validation hold: %s\n' \
+        "$VALIDATION_HOLD" >&2
+      exit 75
+    fi
+    printf 'owner=portmaster\n' > "$OWNED_HOLD.next"
+    mv -f "$OWNED_HOLD.next" "$OWNED_HOLD"
+    printf 'owner=portmaster\n' > "$VALIDATION_HOLD.next"
+    mv -f "$VALIDATION_HOLD.next" "$VALIDATION_HOLD"
+
+    for pid in $(frontend_pids); do
+      send_signal TERM "$pid" 2>/dev/null || true
+    done
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      [ -z "$(frontend_pids)" ] && break
+      "$SLEEP_BIN" 1
+    done
+    for pid in $(frontend_pids); do
+      send_signal KILL "$pid" 2>/dev/null || true
+    done
+    [ -z "$(frontend_pids)" ] || {
+      printf 'plumos-portmaster-frontend-control: frontend did not stop\n' >&2
+      rm -f "$VALIDATION_HOLD" "$OWNED_HOLD"
+      exit 1
+    }
+    ;;
+  release)
+    [ -f "$OWNED_HOLD" ] || exit 0
+    rm -f "$VALIDATION_HOLD" "$OWNED_HOLD"
+    ;;
+  *)
+    printf 'usage: plumOS-portmaster-frontend-control [status|acquire|release]\n' >&2
+    exit 64
+    ;;
+esac

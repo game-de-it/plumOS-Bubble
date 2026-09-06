@@ -7,6 +7,7 @@ RUNTIME="$PACKAGE/bin/plumos-portmaster-runtime"
 GUI_LAUNCH="$PACKAGE/bin/plumos-portmaster-launch"
 PORT_LAUNCH="$PACKAGE/bin/plumos-portmaster-port-launch"
 MOUNT_CLEANUP="$PACKAGE/bin/plumos-portmaster-mount-cleanup"
+FRONTEND_CONTROL="$PACKAGE/bin/plumos-portmaster-frontend-control"
 BUILDER="$ROOT_DIR/scripts/build-portmaster-bubble.sh"
 UPDATER="$PACKAGE/apps/portmaster/adapter/plumos_portmaster_update.py"
 PGREP="$PACKAGE/apps/portmaster/adapter/shims/pgrep"
@@ -14,7 +15,7 @@ PKILL="$PACKAGE/apps/portmaster/adapter/shims/pkill"
 PATCH_SHIM="$PACKAGE/apps/portmaster/adapter/shims/run-patchscript"
 PATCHER_OVERRIDE="$PACKAGE/apps/portmaster/adapter/overrides/patcher.txt"
 
-for file in "$RUNTIME" "$GUI_LAUNCH" "$PORT_LAUNCH" "$MOUNT_CLEANUP" "$PGREP" "$PKILL" "$PATCH_SHIM"; do
+for file in "$RUNTIME" "$GUI_LAUNCH" "$PORT_LAUNCH" "$MOUNT_CLEANUP" "$FRONTEND_CONTROL" "$PGREP" "$PKILL" "$PATCH_SHIM"; do
     /bin/sh -n "$file"
 done
 
@@ -29,6 +30,8 @@ grep -q 'RESTART_FILE="${PM_DIR}/.pugwash-reboot"' "$GUI_LAUNCH"
 grep -q 'restart-marker=stale action=consume' "$GUI_LAUNCH"
 grep -q 'restart-marker=requested count=' "$GUI_LAUNCH"
 grep -q 'plumos-portmaster-mount-cleanup' "$GUI_LAUNCH" "$PORT_LAUNCH"
+grep -q 'plumos-portmaster-frontend-control' "$GUI_LAUNCH" "$PORT_LAUNCH"
+! grep -q 'plumos-frontend-stop' "$GUI_LAUNCH" "$PORT_LAUNCH"
 grep -q 'libgthread-2.0.so.0:libgthread-2.0.so.0.' "$BUILDER"
 grep -q 'ADAPTER_DIR}/shims:${ADAPTER_DIR}/bin/aarch64' "$GUI_LAUNCH"
 grep -q 'command -v "$helper"' "$GUI_LAUNCH"
@@ -74,6 +77,48 @@ printf '%s\n' '#!/bin/sh' \
     'mv "$FAKE_MOUNTINFO.tmp" "$FAKE_MOUNTINFO"' > "$work/umount"
 chmod 0755 "$work/umount"
 
+mkdir -p "$work/frontend-proc/303"
+printf '%s\0%s\0' "$plumos_root/bin/plumos-controller-ui-fbdev" --renderer \
+    > "$work/frontend-proc/303/cmdline"
+mkdir -p "$work/validation"
+[ "$(PLUMOS_ROOT="$plumos_root" \
+      PLUMOS_PORTMASTER_PROC_ROOT="$work/frontend-proc" \
+      PLUMOS_PORTMASTER_RUN_ROOT="$run_root" \
+      PLUMOS_FRONTEND_VALIDATION_HOLD="$work/validation/frontend-hold" \
+      "$FRONTEND_CONTROL" status)" = 303 ]
+printf 'foreign\n' > "$work/validation/frontend-hold"
+if PLUMOS_ROOT="$plumos_root" \
+   PLUMOS_PORTMASTER_PROC_ROOT="$work/frontend-proc" \
+   PLUMOS_PORTMASTER_RUN_ROOT="$run_root" \
+   PLUMOS_FRONTEND_VALIDATION_HOLD="$work/validation/frontend-hold" \
+      "$FRONTEND_CONTROL" acquire >/dev/null 2>&1; then
+    printf 'frontend control accepted a foreign validation hold\n' >&2
+    exit 1
+fi
+rm -f "$work/validation/frontend-hold"
+printf '%s\n' '#!/bin/sh' \
+    'pid=${2:-}' \
+    'rm -rf "$FAKE_PROC_ROOT/$pid"' > "$work/frontend-kill"
+chmod 0755 "$work/frontend-kill"
+FAKE_PROC_ROOT="$work/frontend-proc" \
+PLUMOS_ROOT="$plumos_root" \
+PLUMOS_PORTMASTER_PROC_ROOT="$work/frontend-proc" \
+PLUMOS_PORTMASTER_RUN_ROOT="$run_root" \
+PLUMOS_FRONTEND_VALIDATION_HOLD="$work/validation/frontend-hold" \
+PLUMOS_PORTMASTER_KILL_BIN="$work/frontend-kill" \
+PLUMOS_PORTMASTER_SLEEP_BIN=true \
+    "$FRONTEND_CONTROL" acquire
+[ -f "$work/validation/frontend-hold" ]
+[ -f "$run_root/frontend-hold.owned" ]
+[ ! -d "$work/frontend-proc/303" ]
+PLUMOS_ROOT="$plumos_root" \
+PLUMOS_PORTMASTER_PROC_ROOT="$work/frontend-proc" \
+PLUMOS_PORTMASTER_RUN_ROOT="$run_root" \
+PLUMOS_FRONTEND_VALIDATION_HOLD="$work/validation/frontend-hold" \
+    "$FRONTEND_CONTROL" release
+[ ! -e "$work/validation/frontend-hold" ]
+[ ! -e "$run_root/frontend-hold.owned" ]
+
 mkdir -p "$work/proc/101" "$work/proc/202"
 printf 'love.aarch64\0--game\0' > "$work/proc/101/cmdline"
 printf 'love.aarch64\n' > "$work/proc/101/comm"
@@ -117,5 +162,5 @@ grep -q "target=/usr/lib/compat" "$work/umount.log"
 grep -q "target=$pm_dir/config" "$work/umount.log"
 ! grep -q 'target=/$' "$work/umount.log"
 
-printf 'portmaster_bubble_runtime=result-ok adapter=%s gui_preflight=1 pgrep=1 restart=1 mount_recovery=1\n' \
+printf 'portmaster_bubble_runtime=result-ok adapter=%s gui_preflight=1 pgrep=1 frontend_handoff=1 restart=1 mount_recovery=1\n' \
     "$builder_version"

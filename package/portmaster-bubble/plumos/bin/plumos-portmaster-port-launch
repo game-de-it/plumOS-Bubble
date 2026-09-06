@@ -26,6 +26,7 @@ START_FILE="${RUN_ROOT}/port.starttime"
 SCRIPT_FILE="${RUN_ROOT}/port.script"
 MOUNTS_FILE="${RUN_ROOT}/port.mounts"
 MOUNT_CLEANUP="${PLUMOS_ROOT}/bin/plumos-portmaster-mount-cleanup"
+FRONTEND_CONTROL="${PLUMOS_ROOT}/bin/plumos-portmaster-frontend-control"
 PORT_BASH="${APP_ROOT}/adapter/bin/aarch64/bash"
 child=""
 restore_frontend=0
@@ -83,7 +84,8 @@ frontend_is_ancestor() {
 }
 
 frontend_running() {
-  "$BB" sh "${PLUMOS_ROOT}/bin/plumos-frontend-stop" status 2>/dev/null | grep -q 'pid='
+  [ -x "$FRONTEND_CONTROL" ] &&
+    "$BB" sh "$FRONTEND_CONTROL" status >/dev/null 2>&1
 }
 
 is_mounted() {
@@ -117,9 +119,8 @@ cleanup() {
       >> "$LOG_FILE" 2>&1 || true
   fi
   rm -f "$PID_FILE" "$START_FILE" "$SCRIPT_FILE"
-  if [ "$restore_frontend" -eq 1 ] && ! frontend_running; then
-    "$BB" setsid "$BB" sh "${PLUMOS_ROOT}/bin/plumos-frontend-launch" \
-      >/dev/null 2>&1 </dev/null &
+  if [ "$restore_frontend" -eq 1 ]; then
+    "$BB" sh "$FRONTEND_CONTROL" release >> "$LOG_FILE" 2>&1 || true
   fi
 }
 
@@ -299,7 +300,7 @@ unset LIBGL_ALWAYS_SOFTWARE MESA_LOADER_DRIVER_OVERRIDE \
 mkdir -p "$XDG_CACHE_HOME" "$HM_PORTS_DIR"
 
 if ! frontend_is_ancestor && frontend_running; then
-  "$BB" sh "${PLUMOS_ROOT}/bin/plumos-frontend-stop" stop >> "$LOG_FILE" 2>&1
+  "$BB" sh "$FRONTEND_CONTROL" acquire >> "$LOG_FILE" 2>&1 || exit 1
   restore_frontend=1
 fi
 

@@ -24,6 +24,7 @@ LOG_FILE="${PLUMOS_ROOT}/logs/apps/portmaster.log"
 PID_FILE="${RUN_ROOT}/portmaster.pid"
 MOUNTS_FILE="${RUN_ROOT}/state.mounts"
 MOUNT_CLEANUP="${PLUMOS_ROOT}/bin/plumos-portmaster-mount-cleanup"
+FRONTEND_CONTROL="${PLUMOS_ROOT}/bin/plumos-portmaster-frontend-control"
 child_pid=""
 restore_frontend=0
 cleanup_done=0
@@ -45,7 +46,8 @@ frontend_is_ancestor() {
 }
 
 frontend_running() {
-  "$BB" sh "${PLUMOS_ROOT}/bin/plumos-frontend-stop" status 2>/dev/null | grep -q 'pid='
+  [ -x "$FRONTEND_CONTROL" ] &&
+    "$BB" sh "$FRONTEND_CONTROL" status >/dev/null 2>&1
 }
 
 is_mounted() {
@@ -70,9 +72,8 @@ cleanup() {
   # Port installs can replace thousands of FAT32 entries. Finish that write
   # boundary before returning control to the frontend or accepting a reboot.
   sync
-  if [ "$restore_frontend" -eq 1 ] && ! frontend_running; then
-    "$BB" setsid "$BB" sh "${PLUMOS_ROOT}/bin/plumos-frontend-launch" \
-      >/dev/null 2>&1 </dev/null &
+  if [ "$restore_frontend" -eq 1 ]; then
+    "$BB" sh "$FRONTEND_CONTROL" release >> "$LOG_FILE" 2>&1 || true
   fi
 }
 
@@ -208,7 +209,7 @@ if ! "$BB" sh "${PLUMOS_ROOT}/bin/plumos-python-bubble" -c \
 fi
 
 if ! frontend_is_ancestor && frontend_running; then
-  "$BB" sh "${PLUMOS_ROOT}/bin/plumos-frontend-stop" stop >> "$LOG_FILE" 2>&1
+  "$BB" sh "$FRONTEND_CONTROL" acquire >> "$LOG_FILE" 2>&1 || exit 1
   restore_frontend=1
 fi
 
