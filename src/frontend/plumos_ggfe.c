@@ -118,7 +118,6 @@ static int plumos_fbdev_load_png_rgba(const char *path, unsigned char **out,
 #define GGFE_MAX_BANDS 4
 #define GGFE_STRIPES 24
 #define GGFE_TARGET_FPS 60.0f
-#define GGFE_SCROLL_MS 360
 
 struct ggfe_image {
   unsigned char *rgb; /* RGB8 */
@@ -1137,6 +1136,13 @@ static float ggfe_ease_in(float k) { return k * k * k; }
 
 static float ggfe_ease_in_out(float k) { return 3.0f * k * k - 2.0f * k * k * k; }
 
+/* Ease out with a small settle overshoot, the way a carousel snaps.  This is
+ * GGFE's own motion; the gallery model uses the symmetric smoothstep above. */
+static float ggfe_ease_back(float k) {
+  float d = k - 1.0f;
+  return 1.0f + 1.9f * d * d * d + 0.9f * d * d;
+}
+
 /* Slide into the mouth, then seat with a small overshoot. */
 static float ggfe_insert_curve(float t, float a, float b, float c) {
   float y = ggfe_lerp(GGFE_Y_IDLE, GGFE_Y_INSERTED - 3.0f,
@@ -1760,6 +1766,127 @@ static void ggfe_app_free(struct ggfe_app *app) {
   free(app->entries);
 }
 
+static long long ggfe_now_ms(void) {
+  struct timespec ts;
+  if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+    return 0;
+  }
+  return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+}
+
+/*
+ * Two carousel motions, chosen by ggfe.json.
+ *
+ * "snap" is GGFE's own and the default: a short ease-out with a settle
+ * overshoot that re-aims from wherever the carousel currently is, so a held or
+ * rapidly tapped D-pad keeps moving instead of queueing.
+ *
+ * "gallery" matches the plumOS gallery: a longer symmetric smoothstep that
+ * always completes, with one further press queued behind it.
+ *
+ * The choice is presentation only.  Compose cost is set by how many
+ * cartridges fall inside the carousel span - 1.03 ms at either end of a
+ * library against 1.51 ms in the middle on the build machine - and does not
+ * change with the easing curve or with whether the carousel is moving at all.
+ */
+enum ggfe_motion { GGFE_MOTION_SNAP = 0, GGFE_MOTION_GALLERY };
+
+struct ggfe_scroll_state {
+  enum ggfe_motion model;
+  int duration_ms;
+  int target;
+  float from;
+  int to;
+  int active;
+  int pending_target;
+  int pending_active;
+  long long start_ms;
+};
+
+static float ggfe_scroll_position(struct ggfe_app *app,
+                                  struct ggfe_scroll_state *scroll,
+                                  long long now_ms);
+
+static void ggfe_scroll_request(struct ggfe_app *app,
+                                struct ggfe_scroll_state *scroll, int delta) {
+  int next;
+
+  if (!app || !scroll || delta == 0) {
+    return;
+  }
+  next = scroll->target + (delta < 0 ? -1 : 1);
+  if (next < 0 || next >= app->entry_count) {
+    return;
+  }
+  ggfe_warm_labels(app, next);
+
+  if (scroll->model == GGFE_MOTION_SNAP) {
+    /* Re-aim from wherever the carousel currently is, so a second press does
+     * not wait for the first to finish and does not jump the origin. */
+    scroll->from = ggfe_scroll_position(app, scroll, ggfe_now_ms());
+    scroll->target = next;
+    scroll->to = next;
+    scroll->start_ms = ggfe_now_ms();
+    scroll->active = 1;
+    ggfe_log(app, "ggfe_scroll=start from=%.3f to=%d duration_ms=%d model=snap\n",
+             (double)scroll->from, scroll->to, scroll->duration_ms);
+    return;
+  }
+
+  if (scroll->active) {
+    scroll->pending_target = next;
+    scroll->pending_active = 1;
+    ggfe_log(app, "ggfe_scroll=queued target=%d\n", next);
+    return;
+  }
+  scroll->from = (float)scroll->target;
+  scroll->target = next;
+  scroll->to = next;
+  scroll->start_ms = ggfe_now_ms();
+  scroll->active = 1;
+  ggfe_log(app,
+           "ggfe_scroll=start from=%.3f to=%d duration_ms=%d model=gallery\n",
+           (double)scroll->from, scroll->to, scroll->duration_ms);
+}
+
+static float ggfe_scroll_position(struct ggfe_app *app,
+                                  struct ggfe_scroll_state *scroll,
+                                  long long now_ms) {
+  long long elapsed;
+  float progress;
+
+  if (!scroll->active) {
+    return (float)scroll->target;
+  }
+  elapsed = now_ms - scroll->start_ms;
+  if (elapsed >= scroll->duration_ms) {
+    scroll->active = 0;
+    if (scroll->model == GGFE_MOTION_GALLERY && scroll->pending_active) {
+      int next = scroll->pending_target;
+      scroll->pending_active = 0;
+      scroll->from = (float)scroll->target;
+      scroll->target = next;
+      scroll->to = next;
+      scroll->start_ms = now_ms;
+      scroll->active = 1;
+      ggfe_log(app,
+               "ggfe_scroll=start from=%.3f to=%d duration_ms=%d queued=1\n",
+               (double)scroll->from, scroll->to, scroll->duration_ms);
+      return scroll->from;
+    }
+    return (float)scroll->target;
+  }
+  if (elapsed <= 0) {
+    return scroll->from;
+  }
+  progress = (float)elapsed / (float)scroll->duration_ms;
+  return ggfe_lerp(scroll->from, (float)scroll->to,
+                   scroll->model == GGFE_MOTION_SNAP
+                       ? ggfe_ease_back(progress)
+                       : ggfe_ease_in_out(progress));
+}
+
+
 #ifndef PLUMOS_GGFE_HOST
 /* ------------------------------------------------------------------ */
 /* device: panel, input and the launch handoff                        */
@@ -1957,13 +2084,6 @@ static int ggfe_can_launch(struct ggfe_app *app, const struct ggfe_entry *entry,
   return 0;
 }
 
-static long long ggfe_now_ms(void) {
-  struct timespec ts;
-  if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
-    return 0;
-  }
-  return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
-}
 
 static long long ggfe_now_us(void) {
   struct timespec ts;
@@ -1971,80 +2091,6 @@ static long long ggfe_now_us(void) {
     return 0;
   }
   return (long long)ts.tv_sec * 1000000LL + ts.tv_nsec / 1000LL;
-}
-
-/* Match plumOS gallery motion: one time-based smoothstep is allowed to finish,
- * while one further direction press is queued behind it.  This keeps a held
- * or rapidly tapped D-pad from snapping the interpolation origin repeatedly. */
-struct ggfe_scroll_state {
-  int target;
-  int from;
-  int to;
-  int active;
-  int pending_target;
-  int pending_active;
-  long long start_ms;
-};
-
-static void ggfe_scroll_request(struct ggfe_app *app,
-                                struct ggfe_scroll_state *scroll, int delta) {
-  int next;
-
-  if (!app || !scroll || delta == 0) {
-    return;
-  }
-  next = scroll->target + (delta < 0 ? -1 : 1);
-  if (next < 0 || next >= app->entry_count) {
-    return;
-  }
-  ggfe_warm_labels(app, next);
-  if (scroll->active) {
-    scroll->pending_target = next;
-    scroll->pending_active = 1;
-    ggfe_log(app, "ggfe_scroll=queued target=%d\n", next);
-    return;
-  }
-  scroll->from = scroll->target;
-  scroll->target = next;
-  scroll->to = next;
-  scroll->start_ms = ggfe_now_ms();
-  scroll->active = 1;
-  ggfe_log(app, "ggfe_scroll=start from=%d to=%d duration_ms=%d\n",
-           scroll->from, scroll->to, GGFE_SCROLL_MS);
-}
-
-static float ggfe_scroll_position(struct ggfe_app *app,
-                                  struct ggfe_scroll_state *scroll,
-                                  long long now_ms) {
-  long long elapsed;
-  float progress;
-
-  if (!scroll->active) {
-    return (float)scroll->target;
-  }
-  elapsed = now_ms - scroll->start_ms;
-  if (elapsed >= GGFE_SCROLL_MS) {
-    scroll->active = 0;
-    if (scroll->pending_active) {
-      int next = scroll->pending_target;
-      scroll->pending_active = 0;
-      scroll->from = scroll->target;
-      scroll->target = next;
-      scroll->to = next;
-      scroll->start_ms = now_ms;
-      scroll->active = 1;
-      ggfe_log(app, "ggfe_scroll=start from=%d to=%d duration_ms=%d queued=1\n",
-               scroll->from, scroll->to, GGFE_SCROLL_MS);
-      return (float)scroll->from;
-    }
-    return (float)scroll->target;
-  }
-  if (elapsed <= 0) {
-    return (float)scroll->from;
-  }
-  progress = (float)elapsed / (float)GGFE_SCROLL_MS;
-  return ggfe_lerp((float)scroll->from, (float)scroll->to,
-                   ggfe_ease_in_out(progress));
 }
 
 int main(int argc, char **argv) {
@@ -2130,6 +2176,13 @@ int main(int argc, char **argv) {
   last_present_ms = last_ms;
   stats_start_ms = last_ms;
   memset(&scroll, 0, sizeof(scroll));
+  scroll.model = (strcmp(app.cfg.motion_model, "gallery") == 0)
+                     ? GGFE_MOTION_GALLERY
+                     : GGFE_MOTION_SNAP;
+  scroll.duration_ms = app.cfg.scroll_ms;
+  ggfe_log(&app, "ggfe_motion=model=%s scroll_ms=%d\n",
+           scroll.model == GGFE_MOTION_GALLERY ? "gallery" : "snap",
+           scroll.duration_ms);
 
   while (running) {
     long long now = ggfe_now_ms();
@@ -2411,6 +2464,30 @@ int main(int argc, char **argv) {
       ggfe_state_save(&app, set[0] != '0');
     }
     printf("show_cases=%d\n", ggfe_state_load(&app, 1));
+  }
+  printf("motion=%s scroll_ms=%d\n", app.cfg.motion_model, app.cfg.scroll_ms);
+  {
+    /* Trace both curves so the difference is inspectable without a device:
+     * snap overshoots past the target and settles, gallery does not. */
+    struct ggfe_scroll_state tr;
+    int i;
+    memset(&tr, 0, sizeof(tr));
+    tr.model = (strcmp(app.cfg.motion_model, "gallery") == 0)
+                   ? GGFE_MOTION_GALLERY
+                   : GGFE_MOTION_SNAP;
+    tr.duration_ms = app.cfg.scroll_ms;
+    tr.from = 0.0f;
+    tr.to = 1;
+    tr.target = 1;
+    tr.active = 1;
+    tr.start_ms = 0;
+    printf("motion_curve=");
+    for (i = 0; i <= 10; i++) {
+      printf("%.3f%s", (double)ggfe_scroll_position(
+                           &app, &tr, (long long)(tr.duration_ms * i / 10)),
+             i == 10 ? "\n" : ",");
+      tr.active = 1;
+    }
   }
   printf("scanned %d ROMs, cartridge %d tris, label tri %d/%d\n",
          app.entry_count, app.cart.count, app.label_tri[0], app.label_tri[1]);

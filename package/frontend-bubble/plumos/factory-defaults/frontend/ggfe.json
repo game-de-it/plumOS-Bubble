@@ -2,6 +2,10 @@
   "version": 1,
   "system": "gamegear",
   "state": "state/frontend/ggfe-state.json",
+  "motion": {
+    "model": "snap",
+    "scroll_ms": 240
+  },
   "rom_dirs": ["GG", "GameGear", "MD", "gamegear"],
   "rom_extensions": ["gg", "sms", "zip", "7z"],
   "extensions": ["png", "jpg", "jpeg", "webp"],

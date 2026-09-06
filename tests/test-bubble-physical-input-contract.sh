@@ -41,7 +41,16 @@ awk '
   END { exit !(saw_close && saw_launch && saw_reopen) }
 ' src/frontend/plumos_ggfe.c
 grep -Fq '#define GGFE_TARGET_FPS 60.0f' src/frontend/plumos_ggfe.c
-grep -Fq '#define GGFE_SCROLL_MS 360' src/frontend/plumos_ggfe.c
+# The scroll duration is no longer a constant: both carousel motions are
+# selectable from ggfe.json, and the shipped default is GGFE's own snap.
+grep -Fq 'GGFE_MOTION_SNAP' src/frontend/plumos_ggfe.c
+grep -Fq 'GGFE_MOTION_GALLERY' src/frontend/plumos_ggfe.c
+python3 - package/frontend-bubble/plumos/config/frontend/ggfe.json <<'PY'
+import json, sys
+motion = json.load(open(sys.argv[1])).get("motion", {})
+assert motion.get("model") == "snap", motion
+assert 60 <= int(motion.get("scroll_ms", 0)) <= 2000, motion
+PY
 grep -Fq 'ggfe_warm_labels(app, next);' src/frontend/plumos_ggfe.c
 grep -Fq '{ BTN_THUMBL, IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_L3 }' "$pico_patch"
 grep -Fq '{ BTN_THUMBR, IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_R3 }' "$pico_patch"

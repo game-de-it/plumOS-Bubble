@@ -125,6 +125,41 @@ by the same chain inside `plumos-text-ui` from `systems.json` and
 `core-overrides.json`. A value here would silently override what the user set
 in the stock frontend.
 
+## Carousel motion
+
+Two motions are selectable from `ggfe.json`:
+
+```json
+"motion": { "model": "snap", "scroll_ms": 240 }
+```
+
+| model | curve | input |
+|---|---|---|
+| `snap` (default) | ease-out with a settle overshoot, 240 ms | re-aims from wherever the carousel is, so a held or tapped D-pad keeps moving |
+| `gallery` | symmetric smoothstep, 360 ms | always completes, one further press queued behind it |
+
+`snap` is GGFE's own motion; `gallery` matches the plumOS gallery and was
+adopted while chasing the frame rate.
+
+**The choice is presentation only.** Compose cost is set by how many
+cartridges fall inside the carousel span, and does not change with the easing
+curve or with whether the carousel is moving. Measured on the build machine
+across a six-ROM library:
+
+| carousel position | ms/frame |
+|---|---:|
+| 0.0, at the end of the library | 1.03 |
+| 1.0 | 1.36 |
+| 2.0, resting mid-library | 1.51 |
+| 2.5, mid-scroll | 1.42 |
+| 5.0, at the other end | 1.03 |
+
+Mid-scroll is slightly *cheaper* than resting on a slot. What the device
+measurements recorded as "static at the left edge is 60 fps, scrolling in the
+middle is 30" is the difference between four cartridges on screen and seven,
+not between still and moving. The motion model changes how long the carousel
+spends in the busier state, not what a frame there costs.
+
 ## Remembered view options
 
 `state/frontend/ggfe-state.json` holds GGFE's own view state - currently just

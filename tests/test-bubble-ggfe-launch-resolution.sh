@@ -120,6 +120,43 @@ GGFE_SET_CASES=1 "$tmp/ggfe-host" "$root" "$card" "$tmp" >/dev/null 2>&1 || true
 "$tmp/ggfe-host" "$root" "$card" "$tmp" >"$tmp/state2.txt" 2>&1 || true
 expect_line "show_cases=1" "$tmp/state2.txt"
 
+# Both carousel motions are selectable and behave differently: snap overshoots
+# past the target and settles, gallery is symmetric and never passes it.
+motion_curve() {
+    python3 - "$1" "$2" "$root/config/frontend/ggfe.json" <<'PY'
+import collections, json, sys
+path = sys.argv[3]
+d = json.load(open(path), object_pairs_hook=collections.OrderedDict)
+d.setdefault("motion", collections.OrderedDict())
+d["motion"]["model"] = sys.argv[1]
+d["motion"]["scroll_ms"] = int(sys.argv[2])
+open(path, "w").write(json.dumps(d, indent=2, ensure_ascii=False) + "\n")
+PY
+    "$tmp/ggfe-host" "$root" "$card" "$tmp" 2>/dev/null | grep '^motion_curve=' |
+        sed 's/^motion_curve=//'
+}
+
+snap_curve=$(motion_curve snap 240)
+gallery_curve=$(motion_curve gallery 360)
+if [ "$snap_curve" = "$gallery_curve" ]; then
+    fail "the motion model is not being honoured"
+fi
+# snap must pass 1.0 somewhere in the middle; gallery must never exceed it
+python3 - "$snap_curve" "$gallery_curve" <<'PY' || exit 1
+import sys
+snap = [float(v) for v in sys.argv[1].split(",")]
+gallery = [float(v) for v in sys.argv[2].split(",")]
+if max(snap) <= 1.0:
+    print("snap did not overshoot:", snap, file=sys.stderr)
+    raise SystemExit(1)
+if max(gallery) > 1.0001:
+    print("gallery overshot:", gallery, file=sys.stderr)
+    raise SystemExit(1)
+if snap[3] <= gallery[3]:
+    print("snap is not the faster start", file=sys.stderr)
+    raise SystemExit(1)
+PY
+
 # GGFE must never write plumOS's override file.
 before=$(cksum <"$root/state/frontend/core-overrides.json")
 "$tmp/ggfe-host" "$root" "$card" "$tmp" >/dev/null 2>&1 || true
@@ -128,4 +165,4 @@ if [ "$before" != "$after" ]; then
     fail "GGFE modified the plumOS core-overrides file"
 fi
 
-printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 case_state=persisted threads=1,4 identical=7\n'
+printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 case_state=persisted motion=snap,gallery threads=1,4 identical=7\n'
