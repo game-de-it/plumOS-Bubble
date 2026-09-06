@@ -1,0 +1,57 @@
+{
+  "device": "GKD Bubble",
+  "date": "2026-09-07",
+  "method": "PicoArch frame probe at identical frame count with RGB565 byte swapping disabled and enabled; frontend held and runtime volume zero",
+  "routes": [
+    {
+      "system_id": "megadrive",
+      "core_id": "picodrive",
+      "content": "Bare Knuckle - Ikari no Tekken ~ Streets of Rage (World).md",
+      "frames": 180,
+      "native_sha256": "10c99c9db3f74023664710564065a25c11a7dc1f1de4d382a17e410f234f0c58",
+      "byteswap_sha256": "18ec8fbcb1bbf5100a28260df77cea750007718edde6a90a14caf167dd2c5221",
+      "accepted_byte_order": "native"
+    },
+    {
+      "system_id": "mastersystem",
+      "core_id": "picodrive",
+      "content": "Wonder Boy 3.sms",
+      "frames": 180,
+      "native_sha256": "a2b9f3f16ff9cb7592318d28da04edbc88ef6c8fbb775053fd2f2bcf40ea8977",
+      "byteswap_sha256": "5c96bd97ef1a985fe43be82e799209f11d5630d3f7e436c719d6ac513ffcae4e",
+      "accepted_byte_order": "native"
+    },
+    {
+      "system_id": "gamegear",
+      "core_id": "picodrive",
+      "content": "Pengo.gg",
+      "frames": 180,
+      "native_sha256": "01a22e013d3cadb2e2272ade02f323f537c5280073bc9a89165aa24fa86365b1",
+      "byteswap_sha256": "95922bd5642b02e685ae8dd06740a0ce6267953addb5bb5a00dfd93338a69180",
+      "accepted_byte_order": "byteswap"
+    },
+    {
+      "system_id": "sega32x",
+      "core_id": "picodrive",
+      "content": "BC Racers (USA).32x",
+      "frames": 180,
+      "native_sha256": "fac846dc98f993e807eac8043179003eab83611f1cdb56173e3b6f0ffb50c0a7",
+      "byteswap_sha256": "10e95e7471cdbda9601503dd6388dacabac417c88abb1438d4ddca0ad4cab593",
+      "accepted_byte_order": "native"
+    }
+  ],
+  "not_run": [
+    {
+      "system_id": "segacd",
+      "core_id": "picodrive",
+      "reason": "The clean device has no Sega CD BIOS under /storage/BIOS; the core returned Missing BIOS before producing a frame."
+    }
+  ],
+  "post_condition": {
+    "frontend_processes": 1,
+    "picoarch_processes": 0,
+    "validation_hold": false,
+    "persistent_volume": 8,
+    "runtime_volume": 8
+  }
+}

@@ -16,17 +16,22 @@ rom_root=$tmp/roms
 runtime=$tmp/run
 mkdir -p "$root/bin" "$root/picoarch/bin" "$root/picoarch/lib" \
     "$root/emulator/lib" "$root/cores" "$root/share/alsa" "$root/share/picoarch" \
-    "$rom_root/nes" "$rom_root/gamegear" "$runtime"
+    "$rom_root/nes" "$rom_root/gamegear" "$rom_root/megadrive" \
+    "$rom_root/sega32x" "$runtime"
 cp package/picoarch-bubble/plumos/bin/plumos-picoarch-launch \
     "$root/bin/plumos-picoarch-launch"
 cp package/picoarch-bubble/plumos/share/picoarch/rgb565-byte-order.tsv \
     "$root/share/picoarch/rgb565-byte-order.tsv"
+cp package/picoarch-bubble/plumos/share/picoarch/rgb565-route-overrides.tsv \
+    "$root/share/picoarch/rgb565-route-overrides.tsv"
 : >"$root/cores/quicknes_libretro.so"
 : >"$root/cores/gearsystem_libretro.so"
 : >"$root/cores/picodrive_libretro.so"
 : >"$root/share/alsa/alsa.conf"
 : >"$rom_root/nes/test.nes"
 : >"$rom_root/gamegear/test.gg"
+: >"$rom_root/megadrive/test.md"
+: >"$rom_root/sega32x/test.32x"
 cat >"$root/bin/plumos-cpu-control" <<'EOF'
 #!/bin/sh
 case $1 in
@@ -78,21 +83,38 @@ set -e
 test "$invalid_swap_rc" -eq 2
 test ! -e "$tmp/invalid-swap.pid"
 
-# Gearsystem and PicoDrive both need byte-order correction before PicoArch's
-# 16-bit scaler. Device screenshots otherwise turn the blue SEGA screen green.
+# Gearsystem needs byte-order correction before PicoArch's 16-bit scaler.
 TEST_TRACE=$tmp/gearsystem PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
 PLUMOS_BIOS_ROOT=$tmp/bios PLUMOS_RUNTIME_ROOT=$runtime \
 PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=gamegear \
     "$root/bin/plumos-picoarch-launch" gearsystem "$rom_root/gamegear/test.gg"
 test "$(cat "$tmp/gearsystem.rgb565")" = 1
-grep -Fqx 'picoarch=video-format core=gearsystem pixel_format=rgb565 byte_order=byteswap rgb565_byteswap=1 evidence=device-ra-genesis-plus-gx-anchor-90f' \
+grep -Fqx 'picoarch=video-format system=gamegear core=gearsystem pixel_format=rgb565 byte_order=byteswap rgb565_byteswap=1 scope=core-default evidence=device-ra-genesis-plus-gx-anchor-90f' \
     "$root/logs/picoarch-gamegear-gearsystem.log"
 
+# PicoDrive changes byte order by emulated hardware. Game Gear needs the
+# correction while Mega Drive and 32X are already native RGB565.
 TEST_TRACE=$tmp/picodrive PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
 PLUMOS_BIOS_ROOT=$tmp/bios PLUMOS_RUNTIME_ROOT=$runtime \
 PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=gamegear \
     "$root/bin/plumos-picoarch-launch" picodrive "$rom_root/gamegear/test.gg"
 test "$(cat "$tmp/picodrive.rgb565")" = 1
+grep -Fqx 'picoarch=video-format system=gamegear core=picodrive pixel_format=rgb565 byte_order=byteswap rgb565_byteswap=1 scope=system-override evidence=device-pengo-180f' \
+    "$root/logs/picoarch-gamegear-picodrive.log"
+
+TEST_TRACE=$tmp/picodrive-md PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
+PLUMOS_BIOS_ROOT=$tmp/bios PLUMOS_RUNTIME_ROOT=$runtime \
+PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=megadrive \
+    "$root/bin/plumos-picoarch-launch" picodrive "$rom_root/megadrive/test.md"
+test "$(cat "$tmp/picodrive-md.rgb565")" = 0
+grep -Fqx 'picoarch=video-format system=megadrive core=picodrive pixel_format=rgb565 byte_order=native rgb565_byteswap=0 scope=system-override evidence=device-bare-knuckle-180f' \
+    "$root/logs/picoarch-megadrive-picodrive.log"
+
+TEST_TRACE=$tmp/picodrive-32x PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
+PLUMOS_BIOS_ROOT=$tmp/bios PLUMOS_RUNTIME_ROOT=$runtime \
+PLUMOS_BUSYBOX=/bin/busybox PLUMOS_PICOARCH_SYSTEM=sega32x \
+    "$root/bin/plumos-picoarch-launch" picodrive "$rom_root/sega32x/test.32x"
+test "$(cat "$tmp/picodrive-32x.rgb565")" = 0
 
 # The normal FE exposes content through /storage/user/Roms while the legacy
 # compatibility root is /storage/Roms -> user/Roms.  Both names must resolve to

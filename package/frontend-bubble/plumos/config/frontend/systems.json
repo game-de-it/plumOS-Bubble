@@ -1,5 +1,12 @@
 {
   "version": 1,
+  "scan_excluded_directories": [
+    "save",
+    "saves",
+    "state",
+    "states",
+    "cache"
+  ],
   "systems": [
     {
       "id": "nes",

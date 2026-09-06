@@ -23,6 +23,7 @@
 #define MAX_ARTWORK_LOOKUPS 16
 #define MAX_PROFILES 16
 #define MAX_SCANNED_DIRS 1024
+#define MAX_SCAN_EXCLUDED_DIRS 32
 
 struct alias_def {
   char name[64];
@@ -134,6 +135,9 @@ struct scan_ctx {
   size_t files_seen;
   size_t files_matched;
   size_t thumbnails_found;
+  char scan_excluded_directories[MAX_SCAN_EXCLUDED_DIRS][64];
+  size_t scan_excluded_directory_count;
+  size_t directories_excluded;
   long long load_ms;
   long long scan_ms;
   long long sort_ms;
@@ -686,6 +690,50 @@ static void lower_string(char *s) {
   }
 }
 
+static int load_scan_excluded_directories(const char *path, struct scan_ctx *ctx) {
+  char *json;
+  char values[MAX_SCAN_EXCLUDED_DIRS][128];
+  size_t json_size;
+  size_t count;
+  size_t i;
+
+  json = read_file(path, &json_size);
+  if (!json) {
+    return 0;
+  }
+  count = parse_string_array(json, json + json_size, "scan_excluded_directories", values,
+                             MAX_SCAN_EXCLUDED_DIRS);
+  for (i = 0; i < count; i++) {
+    const char *name = values[i];
+    if (!name[0] || strcmp(name, ".") == 0 || strcmp(name, "..") == 0 ||
+        strchr(name, '/')) {
+      fprintf(stderr, "error: invalid scan-excluded directory: %s\n", name);
+      free(json);
+      return 0;
+    }
+    if (!copy_string(ctx->scan_excluded_directories[ctx->scan_excluded_directory_count],
+                     sizeof(ctx->scan_excluded_directories[0]), name)) {
+      fprintf(stderr, "error: scan-excluded directory is too long: %s\n", name);
+      free(json);
+      return 0;
+    }
+    lower_string(ctx->scan_excluded_directories[ctx->scan_excluded_directory_count]);
+    ctx->scan_excluded_directory_count++;
+  }
+  free(json);
+  return 1;
+}
+
+static int scan_directory_is_excluded(const struct scan_ctx *ctx, const char *name) {
+  size_t i;
+  for (i = 0; i < ctx->scan_excluded_directory_count; i++) {
+    if (strcasecmp(ctx->scan_excluded_directories[i], name) == 0) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 static size_t parse_extensions(const char *json, const char *end, struct system_def *system) {
   char values[MAX_EXTENSIONS][128];
   size_t count;
@@ -1195,6 +1243,10 @@ static void scan_dir_recursive(struct scan_ctx *ctx, size_t system_index, const 
     }
 
     if (is_directory(child_path)) {
+      if (scan_directory_is_excluded(ctx, name)) {
+        ctx->directories_excluded++;
+        continue;
+      }
       if (system->scan_directories && !rel_dir[0]) {
         add_rom_entry(ctx, system_index, alias_name, child_path, child_rel);
         continue;
@@ -1493,6 +1545,7 @@ static int write_library_index(const struct scan_ctx *ctx, const char *output_pa
   fprintf(f, "    \"system_count\": %zu,\n", ctx->system_count);
   fprintf(f, "    \"alias_dirs_found\": %zu,\n", ctx->alias_dirs_found);
   fprintf(f, "    \"files_seen\": %zu,\n", ctx->files_seen);
+  fprintf(f, "    \"directories_excluded\": %zu,\n", ctx->directories_excluded);
   fprintf(f, "    \"files_matched\": %zu,\n", ctx->files_matched);
   fprintf(f, "    \"rom_count\": %zu,\n", ctx->roms.count);
   fprintf(f, "    \"thumbnail_count\": %zu,\n", ctx->thumbnails_found);
@@ -1725,10 +1778,14 @@ int main(int argc, char **argv) {
   if (!load_systems(systems_path, systems, &ctx.system_count)) {
     return 1;
   }
+  if (!load_scan_excluded_directories(systems_path, &ctx)) {
+    return 1;
+  }
   loaded_ms = now_ms();
 
   printf("plumOS library scan\n");
   printf("systems: %s loaded=%zu\n", systems_path, ctx.system_count);
+  printf("scan_excluded_directories: %zu\n", ctx.scan_excluded_directory_count);
   printf("sdcard_root: %s\n", ctx.sdcard_root);
   printf("plumos_root: %s\n", ctx.plumos_root);
   if (system_filter) {

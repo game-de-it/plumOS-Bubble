@@ -31,6 +31,7 @@ BUBBLE_FRAME_PROBE_PATCH="$ROOT_DIR/package/picoarch-bubble/patches/picoarch-bub
 BUBBLE_FBDEV_RENDERER_HEADER="$ROOT_DIR/src/frontend/plumos_fbdev_renderer.h"
 BUBBLE_PICOARCH_LAUNCHER="$ROOT_DIR/package/picoarch-bubble/plumos/bin/plumos-picoarch-launch"
 BUBBLE_RGB565_BYTE_ORDER_TABLE="$ROOT_DIR/package/picoarch-bubble/plumos/share/picoarch/rgb565-byte-order.tsv"
+BUBBLE_RGB565_ROUTE_OVERRIDE_TABLE="$ROOT_DIR/package/picoarch-bubble/plumos/share/picoarch/rgb565-route-overrides.tsv"
 SDL_VERSION="2.32.0"
 SDL_SHA256="f5c2b52498785858f3de1e2996eba3c1b805d08fe168a47ea527c7fc339072d0"
 SDL_ARCHIVE="$ROOT_DIR/build/downloads/SDL2-$SDL_VERSION.tar.gz"
@@ -94,6 +95,7 @@ BUBBLE_FBDEV_STAGED_COPY_PATCH_SHA256="$(sha256sum "$BUBBLE_FBDEV_STAGED_COPY_PA
 BUBBLE_FRAME_PROBE_PATCH_SHA256="$(sha256sum "$BUBBLE_FRAME_PROBE_PATCH" | awk '{print $1}')"
 BUBBLE_PICOARCH_LAUNCHER_SHA256="$(sha256sum "$BUBBLE_PICOARCH_LAUNCHER" | awk '{print $1}')"
 BUBBLE_RGB565_BYTE_ORDER_TABLE_SHA256="$(sha256sum "$BUBBLE_RGB565_BYTE_ORDER_TABLE" | awk '{print $1}')"
+BUBBLE_RGB565_ROUTE_OVERRIDE_TABLE_SHA256="$(sha256sum "$BUBBLE_RGB565_ROUTE_OVERRIDE_TABLE" | awk '{print $1}')"
 
 if [ ! -d "$VENDOR_ROOT/.git" ]; then
     rm -rf "$VENDOR_ROOT"
@@ -244,6 +246,8 @@ install -m 0644 \
     "$PLUMOS_DIR/factory-defaults/picoarch/config/standalone/picoarch.env"
 install -m 0644 "$BUBBLE_RGB565_BYTE_ORDER_TABLE" \
     "$PLUMOS_DIR/share/picoarch/rgb565-byte-order.tsv"
+install -m 0644 "$BUBBLE_RGB565_ROUTE_OVERRIDE_TABLE" \
+    "$PLUMOS_DIR/share/picoarch/rgb565-route-overrides.tsv"
 install -m 0644 "$V90S_OUT/licenses/picoarch-LICENSE" \
     "$PLUMOS_DIR/licenses/picoarch-LICENSE"
 install -m 0644 "$V90S_OUT/licenses/sdl12-compat-LICENSE.txt" \
@@ -255,8 +259,8 @@ cat >"$PLUMOS_DIR/components/picoarch/manifest.json" <<EOF
 {
   "name": "plumOS Bubble PicoArch",
   "device": "bubble",
-  "source_ref": "picoarch:802047c276a5a931b0bf837c4ea4b8e238bdeabe v90s-build:$V90S_REF sdl2:$SDL_VERSION:$SDL_SHA256 bubble-audio-status:$BUBBLE_AUDIO_STATUS_PATCH_SHA256 bubble-rgb565-byteswap:$BUBBLE_RGB565_BYTESWAP_PATCH_SHA256 bubble-vfs-seek:$BUBBLE_VFS_SEEK_PATCH_SHA256 bubble-physical-input:$BUBBLE_PHYSICAL_INPUT_PATCH_SHA256 bubble-evdev-hotplug:$BUBBLE_EVDEV_HOTPLUG_PATCH_SHA256 bubble-fbdev-staged-copy:$BUBBLE_FBDEV_STAGED_COPY_PATCH_SHA256 bubble-frame-probe:$BUBBLE_FRAME_PROBE_PATCH_SHA256 bubble-rgb565-table:$BUBBLE_RGB565_BYTE_ORDER_TABLE_SHA256 bubble-launcher:$BUBBLE_PICOARCH_LAUNCHER_SHA256",
-  "render_contract": "cpu-drm-pageflip-rgb565-to-bgra8888 with per-core RGB565 byte-order correction and staged-fbdev fallback",
+  "source_ref": "picoarch:802047c276a5a931b0bf837c4ea4b8e238bdeabe v90s-build:$V90S_REF sdl2:$SDL_VERSION:$SDL_SHA256 bubble-audio-status:$BUBBLE_AUDIO_STATUS_PATCH_SHA256 bubble-rgb565-byteswap:$BUBBLE_RGB565_BYTESWAP_PATCH_SHA256 bubble-vfs-seek:$BUBBLE_VFS_SEEK_PATCH_SHA256 bubble-physical-input:$BUBBLE_PHYSICAL_INPUT_PATCH_SHA256 bubble-evdev-hotplug:$BUBBLE_EVDEV_HOTPLUG_PATCH_SHA256 bubble-fbdev-staged-copy:$BUBBLE_FBDEV_STAGED_COPY_PATCH_SHA256 bubble-frame-probe:$BUBBLE_FRAME_PROBE_PATCH_SHA256 bubble-rgb565-table:$BUBBLE_RGB565_BYTE_ORDER_TABLE_SHA256 bubble-rgb565-routes:$BUBBLE_RGB565_ROUTE_OVERRIDE_TABLE_SHA256 bubble-launcher:$BUBBLE_PICOARCH_LAUNCHER_SHA256",
+  "render_contract": "cpu-drm-pageflip-rgb565-to-bgra8888 with per-core defaults and per-system RGB565 byte-order overrides plus staged-fbdev fallback",
   "input_contract": "plumOS Bubble Controller physical labels, digital L2/R2, dual analog, L3/R3 and F1/F2 menu",
   "core_route": "cores/*_libretro.so"
 }

@@ -263,8 +263,8 @@ diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
 +      _drmvars->panel_rotation = settings
 +         ? (settings->uints.video_rotation & 3) : 0;
 +      _drmvars->rotation = (_drmvars->panel_rotation + 4 - core_rotation) & 3;
-+      if ((_drmvars->rotation & 1) && _drmvars->current_aspect > 0.0f)
-+         _drmvars->current_aspect = 1.0f / _drmvars->current_aspect;
++      /* video_driver_get_aspect_ratio() already returns the core aspect
++       * after RetroArch has applied the requested content rotation. */
 +      fprintf(stderr, "[DRM] Bubble rotations panel=%u core=%u content=%u.\n",
 +            _drmvars->panel_rotation, core_rotation, _drmvars->rotation);
 +   }
@@ -272,7 +272,7 @@ diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
     _drmvars->main_surface     = NULL;
     _drmvars->menu_surface     = NULL;
  
-@@ -1324,12 +1466,53 @@
+@@ -1324,12 +1466,51 @@
        drm_plane_setup(_drmvars->main_surface);
  }
  
@@ -319,14 +319,12 @@ diff --git a/gfx/drivers/drm_gfx.c b/gfx/drivers/drm_gfx.c
     /* Here we obtain the new aspect ratio. */
     float new_aspect = aspectratio_lut[aspect_ratio_idx].value;
  
-+   if (aspect_ratio_idx == ASPECT_RATIO_CORE && _drmvars &&
-+       (_drmvars->rotation & 1) && new_aspect > 0.0f)
-+      new_aspect = 1.0f / new_aspect;
-+
++   /* aspectratio_lut[ASPECT_RATIO_CORE] is already post-rotation. Inverting
++    * it again turns a 3:4 vertical core into 4:3 and fills the panel. */
     if (_drmvars && _drmvars->current_aspect != new_aspect)
     {
        _drmvars->current_aspect = new_aspect;
-@@ -1435,7 +1618,7 @@
+@@ -1435,7 +1616,7 @@
     drm_gfx_free,
     "drm",
     NULL, /* set_viewport */

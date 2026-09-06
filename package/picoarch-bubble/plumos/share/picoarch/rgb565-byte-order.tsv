@@ -12,7 +12,7 @@ mednafen_supafaust	rgb565	byteswap	frontend	device-ra-snes-anchor-90f
 mednafen_supergrafx	rgb565	byteswap	frontend	device-ra-mednafen-pce-fast-anchor-720f
 mgba	rgb565	native	frontend	device-ra-gpsp-anchor-90f
 nestopia	xrgb8888	native	frontend	device-set-pixel-format-1
-picodrive	rgb565	byteswap	frontend	device-ra-genesis-plus-gx-anchor-90f
+picodrive	rgb565	native	frontend	device-system-scoped-picodrive-180f
 quicknes	rgb565	native	frontend	device-ra-quicknes-90f
 snes9x	rgb565	native	frontend	device-ra-snes9x-90f
 snes9x2002	rgb565	native	frontend	device-ra-snes9x-anchor-90f

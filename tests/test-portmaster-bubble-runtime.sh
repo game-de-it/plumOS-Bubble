@@ -60,6 +60,16 @@ grep -q 'SDL_VIDEO_EGL_DRIVER="$MALI_LIBRARY"' "$PORT_LAUNCH"
 grep -q 'SDL_VIDEO_GL_DRIVER="$MALI_LIBRARY"' "$PORT_LAUNCH"
 grep -q 'rejected unmanaged DRM share library' "$PORT_LAUNCH"
 grep -q 'plumos-portmaster-session-cleanup' "$PORT_LAUNCH"
+grep -q 'SESSION_CLEANUP="${PLUMOS_ROOT}/bin/plumos-portmaster-session-cleanup"' "$GUI_LAUNCH"
+grep -q 'gui_session_id="bubble-gui-$(date +%s)-$$"' "$GUI_LAUNCH"
+grep -q 'export PLUMOS_PORTMASTER_SESSION_ID="$gui_session_id"' "$GUI_LAUNCH"
+cleanup_body="$(sed -n '/^cleanup() {/,/^}/p' "$GUI_LAUNCH")"
+printf '%s\n' "$cleanup_body" | grep -q '"$BB" sh "$SESSION_CLEANUP"'
+session_cleanup_line=$(printf '%s\n' "$cleanup_body" | grep -n '"$BB" sh "$SESSION_CLEANUP"' | cut -d: -f1)
+mount_cleanup_line=$(printf '%s\n' "$cleanup_body" | grep -n '"$BB" sh "$MOUNT_CLEANUP"' | cut -d: -f1)
+frontend_release_line=$(printf '%s\n' "$cleanup_body" | grep -n '"$BB" sh "$FRONTEND_CONTROL" release' | cut -d: -f1)
+[ "$session_cleanup_line" -lt "$mount_cleanup_line" ]
+[ "$session_cleanup_line" -lt "$frontend_release_line" ]
 grep -q 'unset LD_PRELOAD LD_LIBRARY_PATH PLUMOS_PORTMASTER_REQUIRED_LD_PRELOAD' "$PORT_LAUNCH"
 grep -q '${PLUMOS_ROOT}/emulator/lib:${PLUMOS_ROOT}/apps/pyxel/lib' "$PORT_LAUNCH"
 grep -q 'plumos_portmaster_exec_guard.c' "$BUILDER"
@@ -222,5 +232,5 @@ grep -q "target=/usr/lib/compat" "$work/umount.log"
 grep -q "target=$pm_dir/config" "$work/umount.log"
 ! grep -q 'target=/$' "$work/umount.log"
 
-printf 'portmaster_bubble_runtime=result-ok adapter=%s command_runtime=busybox-all exec_guard=1 session_cleanup=1 xz_tar=1 gui_preflight=1 mali_preload=1 pgrep=1 frontend_handoff=1 frontend_restore=1 restart=1 mount_recovery=1\n' \
+printf 'portmaster_bubble_runtime=result-ok adapter=%s command_runtime=busybox-all exec_guard=1 session_cleanup=1 gui_session_cleanup=before-frontend-release xz_tar=1 gui_preflight=1 mali_preload=1 pgrep=1 frontend_handoff=1 frontend_restore=1 restart=1 mount_recovery=1\n' \
     "$builder_version"

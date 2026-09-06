@@ -25,7 +25,9 @@ PID_FILE="${RUN_ROOT}/portmaster.pid"
 MOUNTS_FILE="${RUN_ROOT}/state.mounts"
 MOUNT_CLEANUP="${PLUMOS_ROOT}/bin/plumos-portmaster-mount-cleanup"
 FRONTEND_CONTROL="${PLUMOS_ROOT}/bin/plumos-portmaster-frontend-control"
+SESSION_CLEANUP="${PLUMOS_ROOT}/bin/plumos-portmaster-session-cleanup"
 child_pid=""
+gui_session_id=""
 restore_frontend=0
 cleanup_done=0
 [ -x "$BB" ] || BB=/bin/busybox
@@ -59,6 +61,15 @@ is_mounted() {
 cleanup() {
   [ "$cleanup_done" -eq 0 ] || return 0
   cleanup_done=1
+  # The Python GUI can leave a KMS/DRM-owning descendant alive after its
+  # immediate bootstrap process exits or is interrupted. Reap the complete
+  # owned session before unmounting its runtime and before returning display
+  # ownership to the frontend.
+  if [ -n "$gui_session_id" ] && [ -x "$SESSION_CLEANUP" ]; then
+    PLUMOS_PORTMASTER_SESSION_ID="$gui_session_id" \
+    PLUMOS_PORTMASTER_SESSION_LOG="$LOG_FILE" \
+      "$BB" sh "$SESSION_CLEANUP" >> "$LOG_FILE" 2>&1 || true
+  fi
   if [ -x "$MOUNT_CLEANUP" ]; then
     "$BB" sh "$MOUNT_CLEANUP" "$MOUNTS_FILE" \
       "${PM_DIR}/pugwash.txt" \
@@ -246,6 +257,8 @@ case "$restart_limit" in
     ;;
 esac
 restart_count=0
+gui_session_id="bubble-gui-$(date +%s)-$$"
+export PLUMOS_PORTMASTER_SESSION_ID="$gui_session_id"
 
 while :; do
   "$BB" sh "${PLUMOS_ROOT}/bin/plumos-python-bubble" \

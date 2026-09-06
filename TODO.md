@@ -360,6 +360,8 @@
   - clean imageで明示scanした結果、Mega Driveの正当な`.bin`対応が
     `megadrive/EDMD/SAVE/*.BIN`までgameとして再帰収録することを確認。拡張子を削らず、
     save/cache directoryを機械可読な除外規則へ追加する。
+    `systems.json`の`scan_excluded_directories`をscannerが大小文字を無視して適用し、
+    root/通常subdirectoryの`.bin`は収録したまま`SAVE`以下だけを除外するhost fixtureを追加済み。
 - [ ] `BUB-P6-06` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。
   - MF/V90S/Pixel2のPortMaster履歴を再監査し、GUI restart marker、component-owned
     Bash/patcher/LOVE、font/cairo/audio/transitive DSO、`pgrep -f`、GPTokeYB所有権付き停止、
@@ -374,6 +376,9 @@
     tagged process/mount/holdが0、FE 1 processへ復帰、mutable `installed.json` hash不変。
     実機にあるport scriptはApotris 1件のみのため、物理LCD/input/audioのFE導線確認と、
     将来追加される異なるruntime種別の代表試験を残す。
+  - clean image再試験でPortMaster GUI launcherへTERMした際、bootstrapの子がDRMを保持した
+    ままFEをreleaseする競合を検出。GUIにも所有session IDを付与し、全tagged processの
+    TERM/KILL・回収をmount解除とFE releaseより先に行う契約へ修正した。実機再試験を残す。
   - 通常FE導線のApotrisで音声のみ進み画面が出ない状態を再現。port launcherだけcanonical
     `libmali.so.1`とFE DRM broker共有DSOを継承せず、EGL/GLES/GBM別名のmega-DSOを分離map
     していた。adapter 29でmanaged DRM share、canonical Mali、SDL EGL/GL driverを同じ
@@ -479,6 +484,9 @@
     RetroArch出力をNES/SNES/GB/GBA/GG/PCEの基準にした。18 coreはRGB565、FCEUmm/Nestopiaは
     XRGB8888。Gambatte/Gearboy/Gearsystem/Supafaust/SuperGrafx/PicoDrive/VBA-Mの7 coreを
     byte-swap対象とする機械可読表へ固定し、`systems.json`との全件一致をrelease gateへ追加した。
+    その後PicoDriveはcore内でもsystemによりbyte orderが異なることを実機同一180 frameで確認。
+    Game Gearだけbyte-swap、Mega Drive/Master System/32Xはnativeとし、core既定に加えて
+    `system_id + core_id`の上書き表を導入した。Sega CDは実機BIOS不在のため再確認を残す。
   - 起動168導線のrendererを再監査し、Mali 128、GL非使用CPU framebuffer 40、意図しない
     llvmpipe/softpipe/swrast mapping 0。geometryを出す123導線はhorizontal 112、vertical 11。
     VarthでArcade/CPS1 9導線を再試験し全起動、geometry出力8導線は3:4・360x480中央配置。
@@ -558,6 +566,8 @@
     MAME2003+ Varthはcoreが3:4/quarter-turnを返すが、DRMはrotation 3のまま
     `640x480` full viewportを確保し4:3へ伸長する。以前の`360x480+140+0`契約へ戻し、
     fresh factory configを含むruntime testで固定する。
+    RetroArch自身がCore Provided aspectへcore rotationを反映済みなのにDRM backendが再度
+    reciprocalを取る二重反転を除去し、source/build contractへ固定済み。実機再試験を残す。
 - [ ] GGFE（Game Gear専用フロントエンド）を実装する。カートリッジをCPU software 3Dで描画し、
   GLもEGLも`/dev/mali0`も使わず、RetroArchとGPU/DRM masterを奪い合わない構成とする。
   - `plumos_cart3d.h`（3Dラスタライザ）、`plumos_ggfe_model.h`（実物採寸のカート/ケース形状）、
