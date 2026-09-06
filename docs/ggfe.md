@@ -125,6 +125,16 @@ by the same chain inside `plumos-text-ui` from `systems.json` and
 `core-overrides.json`. A value here would silently override what the user set
 in the stock frontend.
 
+## Remembered view options
+
+`state/frontend/ggfe-state.json` holds GGFE's own view state - currently just
+whether the cases are shown. It is written when the toggle is pressed, through
+a temporary and a rename so a power cut leaves the previous file rather than a
+truncated one.
+
+It is deliberately separate from the launch overrides and from anything the
+stock frontend owns, so the three cannot corrupt one another.
+
 ## Artwork resolution
 
 Two schemes run side by side. The first hit wins.

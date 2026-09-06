@@ -106,6 +106,20 @@ expect_line "Beta (Japan)                             retroarch:genesis_plus_gx 
 # chain continues instead of failing.
 expect_line "Gamma (Japan)                            retroarch:gearsystem           plumos system override" "$tmp/out.txt"
 
+# The case toggle is remembered across runs, in GGFE's own state file.
+rm -f "$root/state/frontend/ggfe-state.json"
+"$tmp/ggfe-host" "$root" "$card" "$tmp" >"$tmp/state0.txt" 2>&1 || true
+expect_line "show_cases=1" "$tmp/state0.txt"
+GGFE_SET_CASES=0 "$tmp/ggfe-host" "$root" "$card" "$tmp" >/dev/null 2>&1 || true
+if [ ! -f "$root/state/frontend/ggfe-state.json" ]; then
+    fail "the case toggle was not persisted"
+fi
+"$tmp/ggfe-host" "$root" "$card" "$tmp" >"$tmp/state1.txt" 2>&1 || true
+expect_line "show_cases=0" "$tmp/state1.txt"
+GGFE_SET_CASES=1 "$tmp/ggfe-host" "$root" "$card" "$tmp" >/dev/null 2>&1 || true
+"$tmp/ggfe-host" "$root" "$card" "$tmp" >"$tmp/state2.txt" 2>&1 || true
+expect_line "show_cases=1" "$tmp/state2.txt"
+
 # GGFE must never write plumOS's override file.
 before=$(cksum <"$root/state/frontend/core-overrides.json")
 "$tmp/ggfe-host" "$root" "$card" "$tmp" >/dev/null 2>&1 || true
@@ -114,4 +128,4 @@ if [ "$before" != "$after" ]; then
     fail "GGFE modified the plumOS core-overrides file"
 fi
 
-printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 threads=1,4 identical=6\n'
+printf 'bubble_ggfe_launch_resolution=result-ok profiles=6 available=4 roms=3 case_state=persisted threads=1,4 identical=6\n'

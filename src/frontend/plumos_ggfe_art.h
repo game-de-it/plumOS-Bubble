@@ -78,6 +78,7 @@ struct ggfe_config {
   char launch_system[64];     /* systems.json id, e.g. gamegear */
   char launch_profile[128];   /* GGFE system-scope choice, may be empty */
   char systems_path[160];
+  char ui_state[160];         /* remembered view options */
   char ggfe_overrides[160];   /* GGFE writes only this one */
   char plumos_overrides[160]; /* read as a reference, never written */
   int use_plumos_overrides;
@@ -128,6 +129,8 @@ static void ggfe_config_defaults(struct ggfe_config *cfg) {
   copy_string(cfg->launch_system, sizeof(cfg->launch_system), "gamegear");
   copy_string(cfg->systems_path, sizeof(cfg->systems_path),
               "config/frontend/systems.json");
+  copy_string(cfg->ui_state, sizeof(cfg->ui_state),
+              "state/frontend/ggfe-state.json");
   copy_string(cfg->ggfe_overrides, sizeof(cfg->ggfe_overrides),
               "state/frontend/ggfe-overrides.json");
   copy_string(cfg->plumos_overrides, sizeof(cfg->plumos_overrides),
@@ -237,6 +240,7 @@ static int ggfe_config_load(struct ggfe_config *cfg, const char *path) {
   end = text + len;
 
   json_get_string(text, end, "system", cfg->system, sizeof(cfg->system));
+  json_get_string(text, end, "state", cfg->ui_state, sizeof(cfg->ui_state));
   n = ggfe_read_string_array(text, end, "rom_dirs", cfg->rom_dirs[0],
                              GGFE_MAX_ROM_DIRS, sizeof(cfg->rom_dirs[0]));
   if (n > 0) {

@@ -438,6 +438,25 @@ static void ggfe_draw_parallel(struct ggfe_pool *p, struct cart3d_target *t,
   ggfe_pool_run(p);
 }
 
+/* One diagnostic line.  Defined here because the state and launch paths
+ * both need it, and a no-op in the host build where log_fd stays -1. */
+static void ggfe_log(struct ggfe_app *app, const char *fmt, ...) {
+  char line[512];
+  va_list ap;
+  int n;
+
+  if (app->log_fd < 0) {
+    return;
+  }
+  va_start(ap, fmt);
+  n = vsnprintf(line, sizeof(line), fmt, ap);
+  va_end(ap);
+  if (n > 0) {
+    ssize_t written = write(app->log_fd, line, (size_t)n);
+    (void)written;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* image helpers                                                      */
 /* ------------------------------------------------------------------ */
@@ -543,14 +562,21 @@ static void ggfe_scale_rgb(const unsigned char *src, int sw, int sh,
  * The GAME GEAR strip is printed only for title-aspect artwork.  Box-art scans
  * already carry the logo on the box, and printing it again would duplicate it.
  */
-static void ggfe_label_backdrop(const struct ggfe_image *art,
-                                unsigned char *dst, int dw, int dh) {
-  unsigned char small[10 * 7 * 3];
-  int i;
-  ggfe_scale_rgb(art->rgb, art->width, art->height, small, 10, 7, 0);
-  ggfe_scale_rgb(small, 10, 7, dst, dw, dh, 0);
-  for (i = 0; i < dw * dh * 3; i++) {
-    dst[i] = (unsigned char)((float)dst[i] * 0.26f);
+/*
+ * Fill the aperture margin with the shell's own colour.
+ *
+ * It used to hold a heavily darkened copy of the artwork, which filled the
+ * space attractively but bled the picture's colour into the bars beside it
+ * and competed with the artwork for attention.  Matching the surrounding
+ * plastic reads as part of the cartridge instead, and portrait box art now
+ * sits in a recess rather than in a coloured smear.
+ */
+static void ggfe_label_backdrop(unsigned char *dst, int dw, int dh) {
+  long i, n = (long)dw * dh;
+  for (i = 0; i < n; i++) {
+    dst[i * 3 + 0] = ggfe_shell[0];
+    dst[i * 3 + 1] = ggfe_shell[1];
+    dst[i * 3 + 2] = ggfe_shell[2];
   }
 }
 
@@ -585,7 +611,7 @@ static void ggfe_label_build(struct ggfe_app *app, const struct ggfe_image *art,
 
   back = (unsigned char *)malloc((size_t)aw * ah * 3);
   if (back) {
-    ggfe_label_backdrop(art, back, aw, ah);
+    ggfe_label_backdrop(back, aw, ah);
     for (y = 0; y < ah; y++) {
       memcpy(out + ((size_t)y * GGFE_LABEL_TEX_W + ax) * 3,
              back + ((size_t)y * aw) * 3, (size_t)aw * 3);
@@ -1137,7 +1163,13 @@ static void ggfe_cart_matrix(float out[16], float x, float y, float z, float rx,
  * invisible; a fully open lid does not fit 480 px, so it dissolves once it is
  * edge-on.
  */
-static void ggfe_launch_frame(float t, float pos, struct ggfe_frame *f) {
+/* Where the launch sequence starts when the cases are hidden.  The first
+ * third of the timeline is the lid swinging open; entering at zero with no
+ * case to open would look like the frontend had simply stalled. */
+#define GGFE_LAUNCH_NO_CASE_START 0.30f
+
+static void ggfe_launch_frame(float t, float pos, int show_cases,
+                              struct ggfe_frame *f) {
   const float deg = 3.14159265358979f / 180.0f;
   float y = GGFE_Y_IDLE, sx = 1.0f, sy = 1.0f, dz = GGFE_CASE_Z;
   float rx = 7.0f * deg, ry = -14.0f * deg;
@@ -1145,7 +1177,7 @@ static void ggfe_launch_frame(float t, float pos, struct ggfe_frame *f) {
 
   memset(f, 0, sizeof(*f));
   f->pos = pos;
-  f->cased = 1;
+  f->cased = show_cases;
 
   lid = -96.0f * ggfe_ease_out(ggfe_seg(t, 0.02f, 0.30f));
   lid += 6.0f * sinf(3.14159265f * ggfe_seg(t, 0.30f, 0.44f));
@@ -1518,6 +1550,68 @@ static void ggfe_compose(struct ggfe_app *app, const struct ggfe_frame *f,
 }
 
 /* ------------------------------------------------------------------ */
+/* remembered view options                                            */
+/*                                                                    */
+/* Only GGFE's own view state lives here.  It is deliberately a        */
+/* separate file from the launch overrides and from anything the stock */
+/* frontend owns, so the three cannot corrupt one another.             */
+/* ------------------------------------------------------------------ */
+
+static int ggfe_state_path(const struct ggfe_app *app, char *out,
+                           size_t out_size) {
+  return join_path(out, out_size, app->plumos_root, app->cfg.ui_state);
+}
+
+static int ggfe_state_load(struct ggfe_app *app, int default_cases) {
+  char path[PATH_MAX];
+  char *text = NULL;
+  size_t len = 0;
+  int value = default_cases;
+
+  if (ggfe_state_path(app, path, sizeof(path)) &&
+      ggfe_read_file(path, &text, &len)) {
+    value = json_get_bool(text, text + len, "show_cases", default_cases);
+    free(text);
+  }
+  return value ? 1 : 0;
+}
+
+/* Written through a temporary and renamed, so a power cut during the write
+ * leaves the previous file rather than a truncated one. */
+static void ggfe_state_save(struct ggfe_app *app, int show_cases) {
+  char path[PATH_MAX];
+  char tmp[PATH_MAX];
+  char dir[PATH_MAX];
+  FILE *f;
+
+  if (!ggfe_state_path(app, path, sizeof(path))) {
+    return;
+  }
+  if (path_parent(dir, sizeof(dir), path)) {
+    (void)mkdir(dir, 0755);
+  }
+  if ((size_t)snprintf(tmp, sizeof(tmp), "%s.next", path) >= sizeof(tmp)) {
+    return;
+  }
+  f = fopen(tmp, "wb");
+  if (!f) {
+    ggfe_log(app, "ggfe_state=write-failed path=%s errno=%d\n", tmp, errno);
+    return;
+  }
+  fprintf(f, "{\n  \"version\": 1,\n  \"show_cases\": %s\n}\n",
+          show_cases ? "true" : "false");
+  fflush(f);
+  fsync(fileno(f));
+  fclose(f);
+  if (rename(tmp, path) != 0) {
+    ggfe_log(app, "ggfe_state=rename-failed path=%s errno=%d\n", path, errno);
+    (void)unlink(tmp);
+    return;
+  }
+  ggfe_log(app, "ggfe_state=saved show_cases=%d\n", show_cases);
+}
+
+/* ------------------------------------------------------------------ */
 /* setup                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -1727,22 +1821,6 @@ static int ggfe_open_input(void) {
   return -1;
 }
 
-static void ggfe_log(struct ggfe_app *app, const char *fmt, ...) {
-  char line[512];
-  va_list ap;
-  int n;
-
-  if (app->log_fd < 0) {
-    return;
-  }
-  va_start(ap, fmt);
-  n = vsnprintf(line, sizeof(line), fmt, ap);
-  va_end(ap);
-  if (n > 0) {
-    ssize_t written = write(app->log_fd, line, (size_t)n);
-    (void)written;
-  }
-}
 
 static void ggfe_terminate_group(pid_t pgid) {
   int attempt;
@@ -1954,7 +2032,7 @@ int main(int argc, char **argv) {
   int input_fd;
   struct ggfe_scroll_state scroll;
   float launch_t = -1.0f;
-  int show_cases = 1;
+  int show_cases;
   long long last_ms;
   long long last_present_ms;
   long long stats_start_ms;
@@ -1984,7 +2062,9 @@ int main(int argc, char **argv) {
   if (join_path(log_path, sizeof(log_path), plumos_root, "logs/ggfe.log")) {
     app.log_fd = open(log_path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
   }
-  ggfe_log(&app, "ggfe_start=ok roms=%d\n", app.entry_count);
+  show_cases = ggfe_state_load(&app, 1);
+  ggfe_log(&app, "ggfe_start=ok roms=%d show_cases=%d\n", app.entry_count,
+           show_cases);
   if (app.entry_count == 0) {
     ggfe_log(&app, "ggfe_start=no-roms root=%s\n", app.roots.roms);
     ggfe_app_free(&app);
@@ -2073,7 +2153,7 @@ int main(int argc, char **argv) {
                      (unsigned int)ev.code, scroll.target);
             if (ggfe_can_launch(&app, &app.entries[scroll.target], why,
                                 sizeof(why))) {
-              launch_t = 0.0f;
+              launch_t = show_cases ? 0.0f : GGFE_LAUNCH_NO_CASE_START;
             } else {
               ggfe_log(&app, "ggfe_launch=unavailable rom=%s reason=%s\n",
                        app.entries[scroll.target].rel, why);
@@ -2084,6 +2164,7 @@ int main(int argc, char **argv) {
             show_cases = !show_cases;
             ggfe_log(&app, "ggfe_input=case-toggle code=%u visible=%d\n",
                      (unsigned int)ev.code, show_cases);
+            ggfe_state_save(&app, show_cases);
             break;
           case BTN_SOUTH: /* physical B on Bubble */
           case BTN_START:
@@ -2101,7 +2182,7 @@ int main(int argc, char **argv) {
     pos = ggfe_scroll_position(&app, &scroll, ggfe_now_ms());
 
     if (launch_t >= 0.0f) {
-      ggfe_launch_frame(launch_t, (float)scroll.target, &frame);
+      ggfe_launch_frame(launch_t, (float)scroll.target, show_cases, &frame);
       launch_t += dt;
     } else {
       ggfe_browse_frame(pos, show_cases, &frame);
@@ -2290,6 +2371,15 @@ int main(int argc, char **argv) {
     fprintf(stderr, "ggfe: init failed\n");
     return 1;
   }
+  /* The state round trip is exercised here so a shell test can drive it:
+   * GGFE_SET_CASES writes the file, and every run reports what it read. */
+  {
+    const char *set = getenv("GGFE_SET_CASES");
+    if (set && set[0]) {
+      ggfe_state_save(&app, set[0] != '0');
+    }
+    printf("show_cases=%d\n", ggfe_state_load(&app, 1));
+  }
   printf("scanned %d ROMs, cartridge %d tris, label tri %d/%d\n",
          app.entry_count, app.cart.count, app.label_tri[0], app.label_tri[1]);
   for (i = 0; i < app.entry_count; i++) {
@@ -2328,7 +2418,7 @@ int main(int argc, char **argv) {
     if (shots[s].t < 0.0f) {
       ggfe_browse_frame(pos, 1, &frame);
     } else {
-      ggfe_launch_frame(shots[s].t, pos, &frame);
+      ggfe_launch_frame(shots[s].t, pos, 1, &frame);
     }
     ggfe_compose(&app, &frame, background);
     snprintf(path, sizeof(path), "%s/%s.png", out_dir, shots[s].name);
