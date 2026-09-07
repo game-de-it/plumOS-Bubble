@@ -104,6 +104,48 @@ for its aspect ratio nor on how RetroArch rounds. A port to a different
 display should work out its own largest integer scale rather than reuse these
 numbers.
 
+## Colour: the blue filter is the weak one
+
+Matched against a photograph of the hardware showing Sonic 2's title screen,
+sampling by source colour so like is compared with like. The picture from the
+real panel is not simply less saturated than this filter's - it is selective:
+
+| Source colour | Device chroma | Filter chroma, before |
+|---|---:|---:|
+| background, a pure blue in the ROM | 0.15 | 0.86 |
+| the light blue of the letters | 0.03 | 0.60 |
+| the red of the banner | 0.60 | 0.45 |
+
+Blue arrives all but neutral while red arrives *more* saturated than the
+filter was drawing it. No global saturation does that; turning it down to grey
+out the background takes the banner with it. Over the same region of the
+screen, the device's mean hue is R:G:B 0.944 : 0.999 : 1.000 - very nearly
+neutral - against 0.635 : 0.683 : 1.000 here.
+
+So `Weak blue filter` washes blue content specifically. Two models were
+measured against the photograph and only one fits:
+
+- adding light for blue, as a leaky filter would: matching the background's
+  chroma at 0.15 needs a strength that lifts it to within 1.5x of white, and
+  on the real screen "PRESS START BUTTON" stays plainly legible against that
+  background. Rejected.
+- washing the colour out while putting the luminance back: chroma 0.16
+  against the measured 0.15, brightness 0.32 against 0.35, white-to-background
+  contrast 2.6 against 2.4. Adopted.
+
+The lamp's colour was measured too, rather than assumed. White on the real
+panel photographs at R:G:B 0.92 : 1.00 : 0.95 - a faint green, which is what
+an STN over a CCFL looks like. This shader had a blue cast, the wrong
+direction, and part of why its blue was so much stronger than the device's.
+
+Caveats worth keeping in mind: this is one unit, and a faulty one - the right
+two thirds of its screen wash out, so only the left third was sampled - and
+the camera's white balance cannot be pinned down. The chroma findings survive
+all of that, because they are ratios within a single frame. The absolute
+brightness does not: the same source colour measures anywhere from 0.27 to
+0.45 across that screen, so the tone curve was left where the eye had put it
+rather than fitted to a number.
+
 ## Element visibility and the tone curve
 
 Two settings fought each other here, and the device settled it.
@@ -226,10 +268,11 @@ Adjustable from RetroArch's shader parameters menu.
 | Element gap | 0.00 | separation between the strips themselves; needs a triad wider than one cell to do anything |
 | Black level | 0.14 | how far the backlight lifts black |
 | White level | 0.97 | how far short of white the panel stops |
-| Saturation | 0.55 | |
+| Saturation | 0.55 |
+| Weak blue filter | 0.30 | how far blue content loses its colour without losing its brightness | |
 | Panel gamma | 1.35 | |
 | Backlight unevenness | 0.28 | falloff away from the lamp |
-| Blue cast | 0.55 | how far towards blue-cyan the panel sits |
+| Panel cast | 0.55 | the lamp's own colour, a faint green |
 | Brightness | 2.60 | backlight saturation constant, not a multiplier |
 
 ## Installing and using it

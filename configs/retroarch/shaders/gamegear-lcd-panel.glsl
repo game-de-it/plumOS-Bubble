@@ -35,9 +35,10 @@
 #pragma parameter gg_black      "Black level"           0.14 0.00 0.40 0.005
 #pragma parameter gg_white      "White level"           0.97 0.60 1.10 0.01
 #pragma parameter gg_sat        "Saturation"            0.55 0.20 1.20 0.02
+#pragma parameter gg_blueweak   "Weak blue filter"      0.30 0.00 0.80 0.02
 #pragma parameter gg_gamma      "Panel gamma"           1.35 0.60 2.20 0.05
 #pragma parameter gg_backlight  "Backlight unevenness"  0.28 0.00 1.00 0.02
-#pragma parameter gg_tint       "Blue cast"             0.55 0.00 1.00 0.05
+#pragma parameter gg_tint       "Panel cast"            0.55 0.00 1.00 0.05
 #pragma parameter gg_bright     "Brightness"            2.60 0.50 5.00 0.05
 
 #if defined(VERTEX)
@@ -85,6 +86,7 @@ uniform float gg_elemgap;
 uniform float gg_black;
 uniform float gg_white;
 uniform float gg_sat;
+uniform float gg_blueweak;
 uniform float gg_gamma;
 uniform float gg_backlight;
 uniform float gg_tint;
@@ -102,6 +104,7 @@ uniform float gg_bright;
 #define gg_black     0.14
 #define gg_white     0.97
 #define gg_sat       0.55
+#define gg_blueweak  0.30
 #define gg_gamma     1.35
 #define gg_backlight 0.28
 #define gg_tint      0.55
@@ -175,6 +178,29 @@ void main(void) {
       (texture2D(Texture, vTex + vec2(-texel.x,  texel.y)).rgb * cl +
        texture2D(Texture, vTex + vec2(     0.0,  texel.y)).rgb * cc +
        texture2D(Texture, vTex + vec2( texel.x,  texel.y)).rgb * cr) * wy.z;
+
+   /*
+    * The blue filter is the weakest layer on an STN panel.  It separates blue
+    * from the rest of the backlight poorly, so blue content arrives with its
+    * colour washed out - but not its brightness, which is why this puts the
+    * light back rather than simply desaturating.
+    *
+    * Measured against a photograph of the hardware showing Sonic 2's title:
+    * the background, a pure blue in the ROM, comes off the real panel at a
+    * chroma of 0.15 - all but neutral - while the red of the banner keeps
+    * 0.60.  A global saturation cannot do that; it would take the banner down
+    * with the background.  Nor can a model that adds light for blue: matching
+    * the background's chroma that way lifts it to within 1.5x of white, and
+    * on the real screen "PRESS START BUTTON" stays legible against it.
+    * Preserving the luminance satisfies both at once - chroma 0.16 against
+    * the measured 0.15, brightness 0.32 against 0.35.
+    */
+   if (gg_blueweak > 0.001) {
+      const vec3 LUMA = vec3(0.299, 0.587, 0.114);
+      float before = dot(rgb, LUMA);
+      vec3 washed = rgb + gg_blueweak * rgb.b * vec3(0.90, 1.00, 0.0);
+      rgb = washed * (before / max(dot(washed, LUMA), 1e-5));
+   }
 
    /* STN gamut.  The panel is washed out rather than dark: the floor lifts
     * because the backlight leaks through, and the ceiling never reaches white.
@@ -265,7 +291,12 @@ void main(void) {
    /* The Game Gear's cast is not subtle.  Between the CCFL and the STN stack
     * the whole panel sits blue-cyan: light greys come out pale blue and never
     * white, which is the first thing you notice in a photograph of one. */
-   vec3 lamp = mix(vec3(1.0), vec3(0.53, 0.76, 1.00), gg_tint);
+   /* The lamp's own colour, measured off the hardware rather than assumed.
+    * White on the real panel photographs at R:G:B 0.92 : 1.00 : 0.95 - a
+    * faint green, which is what an STN over a CCFL looks like.  This used to
+    * be a blue cast, which was the wrong direction and part of why the blue
+    * came out so much stronger here than on the device. */
+   vec3 lamp = mix(vec3(1.0), vec3(0.90, 1.00, 0.94), gg_tint);
 
    vec3 outc = rgb * stripe * grid * lamp * backlight(vTex);
 

@@ -34,6 +34,7 @@ P = {
     "black": 0.14,
     "white": 0.97,
     "sat": 0.55,
+    "blueweak": 0.30,
     "gamma": 1.35,
     "backlight": 0.28,
     "tint": 0.55,
@@ -89,6 +90,15 @@ def panel(src):
     phase_x = (u * sw) % 1.0
     phase_y = (v * sh) % 1.0
 
+    # The blue filter is the weakest layer on an STN panel: it separates blue
+    # from the rest of the backlight poorly, so blue content arrives washed
+    # out in colour but not in brightness - hence the luminance is put back.
+    if P["blueweak"] > 1e-3:
+        L = np.array([0.299, 0.587, 0.114], np.float32)
+        before = rgb @ L
+        washed = rgb + P["blueweak"] * rgb[..., 2:3] * np.array([0.90, 1.0, 0.0], np.float32)
+        rgb = washed * (before / np.maximum(washed @ L, 1e-5))[..., None]
+
     luma = rgb @ np.array([0.299, 0.587, 0.114], np.float32)
     rgb = luma[..., None] + (rgb - luma[..., None]) * P["sat"]
     rgb = np.clip(rgb, 0.0, 1.0) ** P["gamma"]
@@ -125,7 +135,7 @@ def panel(src):
     back = 1.0 + (radial * edge - 1.0) * P["backlight"]
 
     lamp = np.array([1.0, 1.0, 1.0], np.float32) + (
-        np.array([0.53, 0.76, 1.00], np.float32) - 1.0) * P["tint"]
+        np.array([0.90, 1.00, 0.94], np.float32) - 1.0) * P["tint"]
 
     out = rgb * stripe * grid[..., None] * lamp * back[..., None]
     out = 1.0 - np.exp(-P["bright"] * np.maximum(out, 0.0))
