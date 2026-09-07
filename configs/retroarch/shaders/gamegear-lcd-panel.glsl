@@ -15,14 +15,15 @@
  *     the panel, which is why a real Game Gear photograph is never evenly lit.
  */
 
-#pragma parameter gg_subpixel   "Subpixel strength"     0.00 0.00 1.00 0.02
-#pragma parameter gg_gap        "Cell gap"              0.35 0.00 1.00 0.05
-#pragma parameter gg_black      "Black level"           0.085 0.00 0.25 0.005
-#pragma parameter gg_white      "White level"           0.92 0.60 1.00 0.01
-#pragma parameter gg_sat        "Saturation"            0.88 0.40 1.20 0.02
-#pragma parameter gg_gamma      "Panel gamma"           0.92 0.60 1.60 0.02
+#pragma parameter gg_subpixel   "Subpixel strength"     0.55 0.00 1.00 0.02
+#pragma parameter gg_rowgap     "Row gap"               0.55 0.00 1.00 0.05
+#pragma parameter gg_colgap     "Column gap"            0.18 0.00 1.00 0.05
+#pragma parameter gg_black      "Black level"           0.10 0.00 0.25 0.005
+#pragma parameter gg_white      "White level"           0.90 0.60 1.00 0.01
+#pragma parameter gg_sat        "Saturation"            0.82 0.40 1.20 0.02
+#pragma parameter gg_gamma      "Panel gamma"           0.90 0.60 1.60 0.02
 #pragma parameter gg_backlight  "Backlight unevenness"  0.28 0.00 1.00 0.02
-#pragma parameter gg_tint       "Backlight tint"        0.30 0.00 1.00 0.05
+#pragma parameter gg_tint       "Blue cast"             0.55 0.00 1.00 0.05
 
 #if defined(VERTEX)
 
@@ -50,7 +51,8 @@ uniform vec2 OutputSize;
 
 #ifdef PARAMETER_UNIFORM
 uniform float gg_subpixel;
-uniform float gg_gap;
+uniform float gg_rowgap;
+uniform float gg_colgap;
 uniform float gg_black;
 uniform float gg_white;
 uniform float gg_sat;
@@ -58,14 +60,15 @@ uniform float gg_gamma;
 uniform float gg_backlight;
 uniform float gg_tint;
 #else
-#define gg_subpixel  0.00
-#define gg_gap       0.35
-#define gg_black     0.085
-#define gg_white     0.92
-#define gg_sat       0.88
-#define gg_gamma     0.92
+#define gg_subpixel  0.55
+#define gg_rowgap    0.55
+#define gg_colgap    0.18
+#define gg_black     0.10
+#define gg_white     0.90
+#define gg_sat       0.82
+#define gg_gamma     0.90
 #define gg_backlight 0.28
-#define gg_tint      0.30
+#define gg_tint      0.55
 #endif
 
 /* The lamp sat along one edge, so the light falls away from it and the far
@@ -94,10 +97,16 @@ void main(void) {
 
    /* RGB stripe, as three cosines a third of a cell apart.  Cosines rather
     * than the obvious triangles because three of them at 120 degrees sum to a
-    * constant: the stripe then shifts colour across the cell without also
-    * rippling the brightness, and its mean is one whatever the strength. */
+    * constant: the stripe shifts colour across the cell without also rippling
+    * the brightness, its mean is one whatever the strength, and the overlap
+    * between neighbours stands in for the diffuser over a real panel.
+    *
+    * The centres sit at 1/6, 1/2 and 5/6 rather than 0, 1/3 and 2/3 so that at
+    * an exact 3x - which is how 160x144 lands on this 640x480 panel - a pixel
+    * centre falls on each channel's peak and the three output pixels of a cell
+    * really are red, green and blue. */
    const float TAU = 6.2831853;
-   vec3 mask = 0.5 + 0.5 * cos(TAU * (phase.x - vec3(0.0, 1.0, 2.0) / 3.0));
+   vec3 mask = 0.5 + 0.5 * cos(TAU * (phase.x - vec3(1.0, 3.0, 5.0) / 6.0));
    vec3 stripe = mix(vec3(1.0), 2.0 * mask, gg_subpixel);
 
    /* Cell structure.  A hard border does not survive this scale: at an exact
@@ -106,10 +115,21 @@ void main(void) {
     * smooth falloff from the centre of the cell instead, which is closer to
     * how a real cell looks anyway and still reads as a grid at 3x. */
    vec2 edge = abs(phase - 0.5) * 2.0;
-   float grid = 1.0 - gg_gap * 0.5 * dot(edge, edge);
+   /* The row gap dominates.  On a real panel the gap between rows is a whole
+    * cell boundary while the columns are split by subpixels, so the screen
+    * reads as fine horizontal lines with colour texture between them - which
+    * is what a photograph of one shows. */
+   /* Normalised to unit mean, like the stripe.  Without this the gaps are a
+    * brightness cut rather than a structure, and the panel simply goes dark
+    * as the grid is turned up.  Over a cell the mean of edge squared is a
+    * third, so that is what has to be divided out. */
+   float grid = (1.0 - gg_rowgap * edge.y * edge.y - gg_colgap * edge.x * edge.x) /
+                (1.0 - (gg_rowgap + gg_colgap) / 3.0);
 
-   /* The backlight is not white; it pushes the panel slightly green-blue. */
-   vec3 lamp = mix(vec3(1.0), vec3(0.94, 1.0, 0.99), gg_tint);
+   /* The Game Gear's cast is not subtle.  Between the CCFL and the STN stack
+    * the whole panel sits blue-cyan: light greys come out pale blue and never
+    * white, which is the first thing you notice in a photograph of one. */
+   vec3 lamp = mix(vec3(1.0), vec3(0.58, 0.84, 1.10), gg_tint);
 
    vec3 outc = rgb * stripe * grid * lamp * backlight(vTex);
    gl_FragColor = vec4(clamp(outc, 0.0, 1.0), 1.0);

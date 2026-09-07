@@ -33,10 +33,25 @@ three output pixels, so pixel centres only ever land at 1/6, 1/2 and 5/6 of
 it, and a narrow edge band is never sampled at all. The falloff is also closer
 to how a real cell looks.
 
+The row gap is much stronger than the column gap, because that is what a
+photograph of a real panel shows: the gap between rows is a whole cell
+boundary, while the columns are split by subpixels. The screen reads as fine
+horizontal lines with colour texture between them.
+
+Both the grid and the stripe are normalised to unit mean. Without that they
+are a brightness cut rather than a structure, and turning the grid up simply
+makes the panel dark.
+
 **STN gamut.** The panel is washed out rather than dark. The floor lifts
 because the backlight leaks through and the ceiling never reaches white, so
 this is applied as a contrast range rather than a gamma curve, with a little
 desaturation on top.
+
+**The blue cast, which is not subtle.** Between the CCFL and the STN stack the
+whole panel sits blue-cyan: light greys come out pale blue and never white.
+It is the first thing you notice in a photograph of a real Game Gear, and
+leaving it out is what makes an LCD filter look generic. A source white ends
+up around R:G:B of 1 : 1.1 : 1.3.
 
 **Backlight.** The CCFL sat along one edge, so the light falls away from it
 and the far corners are dimmest. A real Game Gear photograph is never evenly
@@ -44,15 +59,20 @@ lit. Kept gentle - the point is only that it is not flat.
 
 ## Subpixels
 
-The shader can draw the RGB stripe, but **it is off by default**, because at
-the scale this device presents Game Gear content it does more harm than good.
 160x144 at 3x gives three output pixels per cell, which is exactly one per
-subpixel, so any strength at all produces hard vertical colour fringing rather
-than the impression of subpixels. On a real panel your eye integrates them;
-at 3x there is nothing to integrate.
+subpixel, so the stripe can be drawn honestly here - and on a real panel it is
+plainly visible, so it is on.
 
-Raise `Subpixel strength` if you are running at a much larger scale, where it
-starts to behave.
+Two details make it read as subpixels rather than as colour fringing. The
+channel peaks sit at 1/6, 1/2 and 5/6 of the cell rather than 0, 1/3 and 2/3,
+so at an exact 3x a pixel centre lands on each peak and the three pixels of a
+cell really are red, green and blue. And the masks are cosines rather than
+triangles: three cosines at 120 degrees sum to a constant, so the stripe
+shifts colour across the cell without also rippling the brightness, and their
+overlap stands in for the diffuser over a real panel.
+
+Turn `Subpixel strength` down if the source is being scaled by something other
+than an exact 3x, where the phase no longer lines up.
 
 ## Parameters
 
@@ -62,14 +82,15 @@ Adjustable from RetroArch's shader parameters menu.
 |---|---:|---|
 | LCD rise speed | 0.62 | how fast a cell brightens; lower smears more |
 | LCD fall speed | 0.34 | how fast it darkens; the asymmetry is the trail |
-| Subpixel strength | 0.00 | RGB stripe; see above |
-| Cell gap | 0.35 | how strongly the cell matrix shows |
-| Black level | 0.085 | how far the backlight lifts black |
-| White level | 0.92 | how far short of white the panel stops |
-| Saturation | 0.88 | |
-| Panel gamma | 0.92 | |
+| Subpixel strength | 0.55 | RGB stripe; see above |
+| Row gap | 0.55 | the horizontal lines, the dominant structure |
+| Column gap | 0.18 | the vertical cell boundary, much weaker |
+| Black level | 0.10 | how far the backlight lifts black |
+| White level | 0.90 | how far short of white the panel stops |
+| Saturation | 0.82 | |
+| Panel gamma | 0.90 | |
 | Backlight unevenness | 0.28 | falloff away from the lamp |
-| Backlight tint | 0.30 | the light is not white |
+| Blue cast | 0.55 | how far towards blue-cyan the panel sits |
 
 ## Installing and using it
 
