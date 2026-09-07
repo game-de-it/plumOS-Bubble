@@ -201,12 +201,15 @@ if [ -n "$shader_preset" ]; then
     # A custom viewport rather than square-pixel-plus-integer-scaling: this
     # panel is 640x480 and nothing else, so the exact rectangle is worth more
     # than portability, and it does not depend on what the core reports for
-    # its aspect ratio or on how RetroArch rounds.
+    # its aspect ratio or on how RetroArch rounds. RetroArch adds x/y to the
+    # viewport-bias placement; with the default 0.5 bias, zero centres this
+    # 480x432 rectangle at the required physical x=80/y=24. Supplying 80/24
+    # here double-applies the centring offset and moves it right and down.
     printf '%s\n' 'aspect_ratio_index = "23"' >>"$append_config"
     printf '%s\n' 'custom_viewport_width = "480"' >>"$append_config"
     printf '%s\n' 'custom_viewport_height = "432"' >>"$append_config"
-    printf '%s\n' 'custom_viewport_x = "80"' >>"$append_config"
-    printf '%s\n' 'custom_viewport_y = "24"' >>"$append_config"
+    printf '%s\n' 'custom_viewport_x = "0"' >>"$append_config"
+    printf '%s\n' 'custom_viewport_y = "0"' >>"$append_config"
     printf '%s\n' 'video_scale_integer = "false"' >>"$append_config"
 fi
 # The shared cfg keeps the V90S-compatible factory baseline, while Bubble may

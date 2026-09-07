@@ -75,6 +75,12 @@ that fits both axes is three: 480x432, centred, leaving an 80px border either
 side and 24px above and below. `plumos-retroarch-launch` pins that with a
 custom viewport for the Game Gear launch only.
 
+RetroArch treats `custom_viewport_x/y` as offsets from the placement selected
+by `video_viewport_bias_x/y`, not as absolute screen coordinates. With the
+default 0.5 biases, `x=0, y=0` centres this rectangle at physical x=80/y=24.
+Writing 80/24 into the custom fields applies the centring twice and shifts the
+picture right and down.
+
 Letting RetroArch fit the picture instead is visibly wrong rather than subtly
 so. On a flat grey field, measured through the reference implementation:
 
