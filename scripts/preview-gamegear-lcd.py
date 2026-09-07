@@ -18,15 +18,17 @@ OUT_W, OUT_H = 640, 480
 SCALE = 3  # 160x144 * 3 = 480x432, how RetroArch presents this on the panel
 
 P = {
-    "subpixel": 0.55,
+    "subpixel": 0.62,
+    "subcells": 2.0,
     "rowgap": 0.55,
     "colgap": 0.18,
-    "black": 0.10,
-    "white": 0.90,
+    "black": 0.17,
+    "white": 0.97,
     "sat": 0.82,
     "gamma": 0.90,
     "backlight": 0.28,
     "tint": 0.55,
+    "bright": 2.30,
     "rise": 0.62,
     "fall": 0.34,
 }
@@ -64,7 +66,9 @@ def panel(src):
 
     tau = 2.0 * np.pi
     centres = np.array([1.0, 3.0, 5.0], np.float32) / 6.0
-    mask = 0.5 + 0.5 * np.cos(tau * (phase_x[..., None] - centres))
+    sub_phase = ((u * sw) / P["subcells"]) % 1.0
+    band = (np.floor(sub_phase * 3.0) + 0.5) / 3.0
+    mask = 0.5 + 0.5 * np.cos(tau * (band[..., None] - centres))
     stripe = 1.0 + (2.0 * mask - 1.0) * P["subpixel"]
 
     ex = np.abs(phase_x - 0.5) * 2.0
@@ -79,9 +83,10 @@ def panel(src):
     back = 1.0 + (radial * edge - 1.0) * P["backlight"]
 
     lamp = np.array([1.0, 1.0, 1.0], np.float32) + (
-        np.array([0.58, 0.84, 1.10], np.float32) - 1.0) * P["tint"]
+        np.array([0.53, 0.76, 1.00], np.float32) - 1.0) * P["tint"]
 
     out = rgb * stripe * grid[..., None] * lamp * back[..., None]
+    out = 1.0 - np.exp(-P["bright"] * np.maximum(out, 0.0))
     return np.clip(out, 0.0, 1.0)
 
 

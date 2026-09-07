@@ -38,9 +38,16 @@ photograph of a real panel shows: the gap between rows is a whole cell
 boundary, while the columns are split by subpixels. The screen reads as fine
 horizontal lines with colour texture between them.
 
-Both the grid and the stripe are normalised to unit mean. Without that they
-are a brightness cut rather than a structure, and turning the grid up simply
-makes the panel dark.
+Both the grid and the stripe are normalised to unit mean, so structure costs
+contrast rather than light. That pushes peaks above one, which the backlight
+saturation below absorbs.
+
+**Backlight saturation.** The output is passed through `1 - exp(-k*x)` rather
+than being clamped. A cell cannot pass more light than there is behind it, so
+the response rolls off. This is also the brightness control: it lifts the
+average, which is what the structure takes away, while the peaks approach one
+instead of being cut flat there. Clamping instead flattened all three channels
+together, which cost the highlights their blue cast as well as their detail.
 
 **STN gamut.** The panel is washed out rather than dark. The floor lifts
 because the backlight leaks through and the ceiling never reaches white, so
@@ -71,6 +78,14 @@ triangles: three cosines at 120 degrees sum to a constant, so the stripe
 shifts colour across the cell without also rippling the brightness, and their
 overlap stands in for the diffuser over a real panel.
 
+The triad can be made wider than one cell with `Subpixel size`, which is how
+to see the elements clearly at this scale. The phase is quantised to the three
+bands of the triad before the cosine is taken, so a triad is always three flat
+colours however wide it is - sampling the cosine continuously gives a rainbow
+once a triad is more than three pixels across, which is not what a panel looks
+like. At one cell on a 3x output the quantisation changes nothing, because the
+pixel centres already land on the band centres.
+
 Turn `Subpixel strength` down if the source is being scaled by something other
 than an exact 3x, where the phase no longer lines up.
 
@@ -82,15 +97,17 @@ Adjustable from RetroArch's shader parameters menu.
 |---|---:|---|
 | LCD rise speed | 0.62 | how fast a cell brightens; lower smears more |
 | LCD fall speed | 0.34 | how fast it darkens; the asymmetry is the trail |
-| Subpixel strength | 0.55 | RGB stripe; see above |
+| Subpixel strength | 0.62 | RGB stripe; see above |
+| Subpixel size (cells) | 2 | cells per RGB triad; 1 is the physical layout, larger is easier to see |
 | Row gap | 0.55 | the horizontal lines, the dominant structure |
 | Column gap | 0.18 | the vertical cell boundary, much weaker |
-| Black level | 0.10 | how far the backlight lifts black |
-| White level | 0.90 | how far short of white the panel stops |
+| Black level | 0.17 | how far the backlight lifts black |
+| White level | 0.97 | how far short of white the panel stops |
 | Saturation | 0.82 | |
 | Panel gamma | 0.90 | |
 | Backlight unevenness | 0.28 | falloff away from the lamp |
 | Blue cast | 0.55 | how far towards blue-cyan the panel sits |
+| Brightness | 2.30 | backlight saturation constant, not a multiplier |
 
 ## Installing and using it
 
