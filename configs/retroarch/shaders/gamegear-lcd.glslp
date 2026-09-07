@@ -20,8 +20,12 @@ filter_linear0 = "false"
 scale_type0 = "source"
 scale0 = "1.0"
 float_framebuffer0 = "false"
+# The panel pass reads one texel either side of centre for its diffusion, so
+# the frame's own border must repeat rather than fall off into black.
+wrap_mode0 = "clamp_to_edge"
 
 shader1 = "gamegear-lcd-panel.glsl"
 filter_linear1 = "false"
 scale_type1 = "viewport"
 scale1 = "1.0"
+wrap_mode1 = "clamp_to_edge"

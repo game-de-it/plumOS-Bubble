@@ -1,7 +1,7 @@
 /*
  * Game Gear LCD, pass 2: the panel itself.
  *
- * Four things separate this screen from a generic LCD filter:
+ * Six things separate this screen from a generic LCD filter:
  *
  *   - RGB stripe subpixels.  The Game Gear's cells are large enough that at
  *     any honest magnification you see the three vertical strips, not a solid
@@ -13,15 +13,27 @@
  *     and the top end compresses rather than clipping.
  *   - A CCFL edge light.  It is brighter near the lamp and falls away across
  *     the panel, which is why a real Game Gear photograph is never evenly lit.
+ *   - Diffusion.  A photograph of the real panel is soft: the polariser and
+ *     the front plastic spread each cell's light into its neighbours, so
+ *     edges bleed and small text half dissolves.  Without this the filter
+ *     looks like a clean grid laid over a sharp picture, which is the one
+ *     thing a real Game Gear never looks like.
+ *   - Element offset.  Each channel is read from where its own strip
+ *     physically sits - red left of the cell centre, blue right of it - so
+ *     edges pick up the colour fringes a real panel shows.
  */
 
+#pragma parameter gg_bleed_x    "Diffusion across"      1.00 0.00 1.50 0.05
+#pragma parameter gg_bleed_y    "Diffusion down"        0.60 0.00 1.50 0.05
+#pragma parameter gg_fringe     "Element offset"        0.33 0.00 0.60 0.03
 #pragma parameter gg_subpixel   "Subpixel strength"     0.62 0.00 1.00 0.02
-#pragma parameter gg_subcells   "Subpixel size (cells)" 2.00 1.00 4.00 1.00
-#pragma parameter gg_rowgap     "Row gap"               0.55 0.00 1.00 0.05
-#pragma parameter gg_colgap     "Column gap"            0.18 0.00 1.00 0.05
-#pragma parameter gg_black      "Black level"           0.17 0.00 0.35 0.005
+#pragma parameter gg_subcells   "Subpixel size (cells)" 1.00 1.00 4.00 1.00
+#pragma parameter gg_rowgap     "Row gap"               0.80 0.00 1.00 0.05
+#pragma parameter gg_colgap     "Column gap"            0.35 0.00 1.00 0.05
+#pragma parameter gg_elemgap    "Element gap"           0.00 0.00 1.00 0.05
+#pragma parameter gg_black      "Black level"           0.28 0.00 0.40 0.005
 #pragma parameter gg_white      "White level"           0.97 0.60 1.10 0.01
-#pragma parameter gg_sat        "Saturation"            0.82 0.40 1.20 0.02
+#pragma parameter gg_sat        "Saturation"            0.60 0.20 1.20 0.02
 #pragma parameter gg_gamma      "Panel gamma"           0.90 0.60 1.60 0.02
 #pragma parameter gg_backlight  "Backlight unevenness"  0.28 0.00 1.00 0.02
 #pragma parameter gg_tint       "Blue cast"             0.55 0.00 1.00 0.05
@@ -60,10 +72,14 @@ uniform vec2 InputSize;
 uniform vec2 OutputSize;
 
 #ifdef PARAMETER_UNIFORM
+uniform float gg_bleed_x;
+uniform float gg_bleed_y;
+uniform float gg_fringe;
 uniform float gg_subpixel;
 uniform float gg_subcells;
 uniform float gg_rowgap;
 uniform float gg_colgap;
+uniform float gg_elemgap;
 uniform float gg_black;
 uniform float gg_white;
 uniform float gg_sat;
@@ -72,13 +88,17 @@ uniform float gg_backlight;
 uniform float gg_tint;
 uniform float gg_bright;
 #else
+#define gg_bleed_x   1.00
+#define gg_bleed_y   0.60
+#define gg_fringe    0.33
 #define gg_subpixel  0.62
-#define gg_subcells  2.00
-#define gg_rowgap    0.55
-#define gg_colgap    0.18
-#define gg_black     0.17
+#define gg_subcells  1.00
+#define gg_rowgap    0.80
+#define gg_colgap    0.35
+#define gg_elemgap   0.00
+#define gg_black     0.28
 #define gg_white     0.97
-#define gg_sat       0.82
+#define gg_sat       0.60
 #define gg_gamma     0.90
 #define gg_backlight 0.28
 #define gg_tint      0.55
@@ -87,6 +107,16 @@ uniform float gg_bright;
 
 /* The lamp sat along one edge, so the light falls away from it and the far
  * corners are dimmest.  Kept gentle: the point is that it is never flat. */
+/* Three tap weights at -1, 0 and +1 source pixels, for a Gaussian of width
+ * `sigma` whose centre has been moved to `shift`.  Three taps carry a narrow
+ * Gaussian well enough - at sigma 0.6 the tails outside them are about five
+ * percent - and three is what keeps the whole thing to nine fetches. */
+vec3 taps(float sigma, float shift) {
+   vec3 d = vec3(-1.0, 0.0, 1.0) - vec3(shift);
+   vec3 w = exp(-0.5 * d * d / max(sigma * sigma, 1e-4));
+   return w / max(w.x + w.y + w.z, 1e-6);
+}
+
 float backlight(vec2 uv) {
    vec2 c = uv - vec2(0.5, 0.42);
    float radial = 1.0 - dot(c, c) * 0.85;
@@ -99,7 +129,49 @@ void main(void) {
    vec2 cell = vTex * TextureSize;
    vec2 phase = fract(cell);
 
-   vec3 rgb = texture2D(Texture, vTex).rgb;
+   /*
+    * Diffusion, and the offset between the three elements, in one 3x3 read.
+    *
+    * A photograph of the real panel is soft.  The polariser and the front
+    * plastic sit above the cells and spread their light, so edges bleed by
+    * about a pixel and small text half dissolves.  Sampled sharply the filter
+    * reads as a clean grid over a clean picture, which is the one thing the
+    * real screen never looks like.
+    *
+    * The channels also do not share a position: red's strip sits left of the
+    * cell centre and blue's right of it, roughly a third of a cell either
+    * way, which is what puts warm and cool fringes on the edges of sprites
+    * and text.  That is a sub-pixel shift, so rather than fetching each
+    * channel from its own place - which would triple the reads - it is folded
+    * into the horizontal weights, one set per channel over the same taps.
+    *
+    * Nine fetches, from a 160x144 texture that stays entirely in cache.
+    */
+   vec2 texel = 1.0 / TextureSize;
+   vec3 wxr = taps(gg_bleed_x, -gg_fringe);
+   vec3 wxg = taps(gg_bleed_x,  0.0);
+   vec3 wxb = taps(gg_bleed_x,  gg_fringe);
+   vec3 wy  = taps(gg_bleed_y,  0.0);
+
+   /* One column of horizontal weights, one entry per channel. */
+   vec3 cl = vec3(wxr.x, wxg.x, wxb.x);
+   vec3 cc = vec3(wxr.y, wxg.y, wxb.y);
+   vec3 cr = vec3(wxr.z, wxg.z, wxb.z);
+
+   /* Unrolled rather than looped: the weights differ per channel and per tap,
+    * and picking them out inside a loop needs either dynamic indexing, which
+    * GLSL ES 1.00 does not promise, or a chain of comparisons that costs more
+    * than the nine lines it saves. */
+   vec3 rgb =
+      (texture2D(Texture, vTex + vec2(-texel.x, -texel.y)).rgb * cl +
+       texture2D(Texture, vTex + vec2(     0.0, -texel.y)).rgb * cc +
+       texture2D(Texture, vTex + vec2( texel.x, -texel.y)).rgb * cr) * wy.x +
+      (texture2D(Texture, vTex + vec2(-texel.x,      0.0)).rgb * cl +
+       texture2D(Texture, vTex                                ).rgb * cc +
+       texture2D(Texture, vTex + vec2( texel.x,      0.0)).rgb * cr) * wy.y +
+      (texture2D(Texture, vTex + vec2(-texel.x,  texel.y)).rgb * cl +
+       texture2D(Texture, vTex + vec2(     0.0,  texel.y)).rgb * cc +
+       texture2D(Texture, vTex + vec2( texel.x,  texel.y)).rgb * cr) * wy.z;
 
    /* STN gamut.  The panel is washed out rather than dark: the floor lifts
     * because the backlight leaks through, and the ceiling never reaches white.
@@ -153,6 +225,18 @@ void main(void) {
     * rather than banded, so this is also the honest behaviour.
     */
    stripe /= dot(stripe, vec3(0.299, 0.587, 0.114));
+
+   /* An optional dark line between the elements themselves rather than
+    * between cells.  It does nothing at one cell per triad, where an element
+    * is exactly one output pixel at 3x and there is no room inside it for a
+    * gap - widen the triad first, and this is what then separates the strips.
+    * Left off by default: the column gap below already reads as the black
+    * frame around each cell, and at the panel's true element pitch that is
+    * the only separation the eye can actually resolve. */
+   if (gg_elemgap > 0.001) {
+      float ep = abs(fract(cell.x * 3.0 / gg_subcells) - 0.5) * 2.0;
+      stripe *= (1.0 - gg_elemgap * ep * ep) / (1.0 - gg_elemgap / 3.0);
+   }
 
    /* Cell structure.  A hard border does not survive this scale: at an exact
     * 3x a cell is three pixels, so pixel centres only ever land at 1/6, 1/2

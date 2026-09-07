@@ -16,3 +16,6 @@ shader0 = "gamegear-lcd-panel.glsl"
 filter_linear0 = "false"
 scale_type0 = "viewport"
 scale0 = "1.0"
+# The diffusion reads one texel either side of centre; repeat the border
+# rather than letting it sample black.
+wrap_mode0 = "clamp_to_edge"

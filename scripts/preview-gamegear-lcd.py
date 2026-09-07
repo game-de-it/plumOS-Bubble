@@ -18,13 +18,17 @@ OUT_W, OUT_H = 640, 480
 SCALE = 3  # 160x144 * 3 = 480x432, how RetroArch presents this on the panel
 
 P = {
+    "bleed_x": 1.00,
+    "bleed_y": 0.60,
+    "fringe": 0.33,
     "subpixel": 0.62,
-    "subcells": 2.0,
-    "rowgap": 0.55,
-    "colgap": 0.18,
-    "black": 0.17,
+    "subcells": 1.0,
+    "rowgap": 0.80,
+    "colgap": 0.35,
+    "elemgap": 0.00,
+    "black": 0.28,
     "white": 0.97,
-    "sat": 0.82,
+    "sat": 0.60,
     "gamma": 0.90,
     "backlight": 0.28,
     "tint": 0.55,
@@ -44,6 +48,13 @@ def response(frames):
     return history + (cur - history) * speed
 
 
+def taps(sigma, shift):
+    """Three weights at -1, 0, +1 source pixels, centred at `shift`."""
+    d = np.array([-1.0, 0.0, 1.0], np.float32) - shift
+    w = np.exp(-0.5 * d * d / max(sigma * sigma, 1e-4))
+    return w / max(w.sum(), 1e-6)
+
+
 def panel(src):
     """Pass 2.  src is linear 0..1, shape (h, w, 3) at source resolution."""
     sh, sw = src.shape[:2]
@@ -54,7 +65,21 @@ def panel(src):
     v = (ys + 0.5) / oh
     cx = np.clip((u * sw).astype(np.int32), 0, sw - 1)
     cy = np.clip((v * sh).astype(np.int32), 0, sh - 1)
-    rgb = src[cy, cx].astype(np.float32)
+
+    # Diffusion and the offset between the three elements, in one 3x3 read.
+    # The channels do not share a position - red's strip sits left of the cell
+    # centre and blue's right of it - and that sub-pixel shift is folded into
+    # the horizontal weights rather than into extra fetches.
+    wx = np.stack([taps(P["bleed_x"], -P["fringe"]),
+                   taps(P["bleed_x"], 0.0),
+                   taps(P["bleed_x"], P["fringe"])], axis=1)   # (tap, channel)
+    wy = taps(P["bleed_y"], 0.0)
+    rgb = np.zeros((oh, ow, 3), np.float32)
+    for j in range(3):
+        yy = np.clip(cy + j - 1, 0, sh - 1)
+        for i in range(3):
+            xx = np.clip(cx + i - 1, 0, sw - 1)
+            rgb += src[yy, xx] * wx[i] * wy[j]
 
     phase_x = (u * sw) % 1.0
     phase_y = (v * sh) % 1.0
@@ -71,6 +96,11 @@ def panel(src):
     mask = 0.5 + 0.5 * np.cos(tau * (band[..., None] - centres))
     stripe = 1.0 + (2.0 * mask - 1.0) * P["subpixel"]
     stripe = stripe / (stripe @ np.array([0.299, 0.587, 0.114], np.float32))[..., None]
+
+    if P["elemgap"] > 1e-3:
+        ep = np.abs(((u * sw) * 3.0 / P["subcells"]) % 1.0 - 0.5) * 2.0
+        stripe = stripe * ((1.0 - P["elemgap"] * ep * ep) /
+                           (1.0 - P["elemgap"] / 3.0))[..., None]
 
     ex = np.abs(phase_x - 0.5) * 2.0
     ey = np.abs(phase_y - 0.5) * 2.0

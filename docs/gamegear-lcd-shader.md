@@ -64,6 +64,32 @@ up around R:G:B of 1 : 1.1 : 1.3.
 and the far corners are dimmest. A real Game Gear photograph is never evenly
 lit. Kept gentle - the point is only that it is not flat.
 
+## Diffusion
+
+A photograph of the real panel is soft. The polariser and the front plastic
+sit above the cells and spread their light, so edges bleed by about a pixel
+and small text half dissolves - on a real Game Gear, "PRESS START" is barely
+legible. Sampled sharply the filter reads as a clean grid laid over a clean
+picture, which is the one thing the real screen never looks like. This turned
+out to be the largest single difference between the filter and a photograph
+of the hardware, larger than any amount of tuning the structure.
+
+The three channels also do not share a position. Red's strip sits left of the
+cell centre and blue's right of it, about a third of a cell either way, which
+is what puts warm and cool fringes on the edges of sprites and text.
+
+Both are one 3x3 read. The channel offset is a sub-pixel shift, so rather than
+fetching each channel from its own place - which would triple the reads - it
+is folded into the horizontal weights, one set of three per channel over the
+same nine taps. Three taps carry a Gaussian this narrow to within about five
+percent, and the source texture is 160x144, so all nine fetches come out of
+cache. The presets set `wrap_mode` to `clamp_to_edge` because the taps reach
+one texel beyond the frame at its border.
+
+Diffusion is deliberately wider across than down. The row gaps are the
+structure the eye reads first on the real panel, and blurring vertically as
+hard as horizontally dissolves them.
+
 ## Subpixels
 
 160x144 at 3x gives three output pixels per cell, which is exactly one per
@@ -96,8 +122,14 @@ swing from 24% to 7%, and what remains is the column gap of the cell grid
 rather than the stripe. A real panel is built to look white rather than
 banded, so this is also the more faithful behaviour.
 
-The triad can be made wider than one cell with `Subpixel size`, which is how
-to see the elements clearly at this scale. The phase is quantised to the three
+The triad can be made wider than one cell with `Subpixel size`. That is not
+the way to make the elements read, though - it was tried, and it makes the
+picture coarse and unlike the hardware, because the strips stop matching the
+panel's real pitch. What makes them read is the black frame around each cell
+(`Column gap`) organising them into a grid. `Element gap` will separate the
+strips within a triad, but only once a triad is wider than one cell: at the
+true pitch an element is exactly one output pixel at 3x and there is no room
+inside it for a gap. The phase is quantised to the three
 bands of the triad before the cosine is taken, so a triad is always three flat
 colours however wide it is - sampling the cosine continuously gives a rainbow
 once a triad is more than three pixels across, which is not what a panel looks
@@ -115,13 +147,17 @@ Adjustable from RetroArch's shader parameters menu.
 |---|---:|---|
 | LCD rise speed | 0.62 | how fast a cell brightens; lower smears more |
 | LCD fall speed | 0.34 | how fast it darkens; the asymmetry is the trail |
+| Diffusion across | 1.00 | how far a cell's light spreads sideways, in source pixels |
+| Diffusion down | 0.60 | the same downwards; smaller, so the row lines survive it |
+| Element offset | 0.33 | how far red and blue sit either side of the cell centre |
 | Subpixel strength | 0.62 | RGB stripe; see above |
-| Subpixel size (cells) | 2 | cells per RGB triad; 1 is the physical layout, larger is easier to see |
-| Row gap | 0.55 | the horizontal lines, the dominant structure |
-| Column gap | 0.18 | the vertical cell boundary, much weaker |
-| Black level | 0.17 | how far the backlight lifts black |
+| Subpixel size (cells) | 1 | cells per RGB triad; 1 is the physical layout, larger is easier to see |
+| Row gap | 0.80 | the horizontal lines, the dominant structure |
+| Column gap | 0.35 | the black frame down the side of each cell |
+| Element gap | 0.00 | separation between the strips themselves; needs a triad wider than one cell to do anything |
+| Black level | 0.28 | how far the backlight lifts black |
 | White level | 0.97 | how far short of white the panel stops |
-| Saturation | 0.82 | |
+| Saturation | 0.60 | |
 | Panel gamma | 0.90 | |
 | Backlight unevenness | 0.28 | falloff away from the lamp |
 | Blue cast | 0.55 | how far towards blue-cyan the panel sits |
