@@ -70,6 +70,7 @@ def panel(src):
     band = (np.floor(sub_phase * 3.0) + 0.5) / 3.0
     mask = 0.5 + 0.5 * np.cos(tau * (band[..., None] - centres))
     stripe = 1.0 + (2.0 * mask - 1.0) * P["subpixel"]
+    stripe = stripe / (stripe @ np.array([0.299, 0.587, 0.114], np.float32))[..., None]
 
     ex = np.abs(phase_x - 0.5) * 2.0
     ey = np.abs(phase_y - 0.5) * 2.0

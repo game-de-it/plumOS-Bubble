@@ -111,9 +111,10 @@ void main(void) {
 
    /* RGB stripe, as three cosines a third of a cell apart.  Cosines rather
     * than the obvious triangles because three of them at 120 degrees sum to a
-    * constant: the stripe shifts colour across the cell without also rippling
-    * the brightness, its mean is one whatever the strength, and the overlap
-    * between neighbours stands in for the diffuser over a real panel.
+    * constant, so the stripe shifts colour across the cell without changing
+    * how much light leaves it, and the overlap between neighbours stands in
+    * for the diffuser over a real panel.  A constant sum is not the same as a
+    * constant brightness, though - see the balancing step below.
     *
     * The centres sit at 1/6, 1/2 and 5/6 rather than 0, 1/3 and 2/3 so that at
     * an exact 3x - which is how 160x144 lands on this 640x480 panel - a pixel
@@ -134,6 +135,24 @@ void main(void) {
    float band = (floor(sub_phase * 3.0) + 0.5) / 3.0;
    vec3 mask = 0.5 + 0.5 * cos(TAU * (band - vec3(1.0, 3.0, 5.0) / 6.0));
    vec3 stripe = mix(vec3(1.0), 2.0 * mask, gg_subpixel);
+   /*
+    * Equalise the bands' luminance.
+    *
+    * Green carries most of the luminance and blue almost none, so a plain
+    * stripe makes the green band far brighter than the blue one - 55% apart
+    * at this strength.  On grey content, where all three channels are equal
+    * and nothing else varies, that ripple is the only structure present and
+    * it reads as vertical lines: worst on the instrument panels of a game
+    * like G-LOC.  Widening the triad made it worse rather than better,
+    * because a six pixel period is well inside what the eye resolves while a
+    * three pixel one is not.
+    *
+    * Dividing the luminance out leaves the bands differing in hue alone,
+    * which the eye integrates far more readily - its colour acuity is about a
+    * third of its luminance acuity.  A real panel is built to look white
+    * rather than banded, so this is also the honest behaviour.
+    */
+   stripe /= dot(stripe, vec3(0.299, 0.587, 0.114));
 
    /* Cell structure.  A hard border does not survive this scale: at an exact
     * 3x a cell is three pixels, so pixel centres only ever land at 1/6, 1/2
@@ -145,9 +164,9 @@ void main(void) {
     * cell boundary while the columns are split by subpixels, so the screen
     * reads as fine horizontal lines with colour texture between them - which
     * is what a photograph of one shows. */
-   /* Both the grid and the stripe carry unit mean, so structure costs
-    * contrast rather than light.  That does push peaks above one, which the
-    * saturation below absorbs - clipping them instead would flatten the
+   /* The grid carries unit mean and the stripe unit luminance, so structure
+    * costs contrast rather than light.  That does push peaks above one, which
+    * the saturation below absorbs - clipping them instead would flatten the
     * highlights and cost them their blue cast. */
    float grid = (1.0 - gg_rowgap * edge.y * edge.y - gg_colgap * edge.x * edge.x) /
                 (1.0 - (gg_rowgap + gg_colgap) / 3.0);

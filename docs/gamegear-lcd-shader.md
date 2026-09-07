@@ -38,9 +38,9 @@ photograph of a real panel shows: the gap between rows is a whole cell
 boundary, while the columns are split by subpixels. The screen reads as fine
 horizontal lines with colour texture between them.
 
-Both the grid and the stripe are normalised to unit mean, so structure costs
-contrast rather than light. That pushes peaks above one, which the backlight
-saturation below absorbs.
+The grid is normalised to unit mean and the stripe to unit luminance, so
+structure costs contrast rather than light. That pushes peaks above one, which
+the backlight saturation below absorbs.
 
 **Backlight saturation.** The output is passed through `1 - exp(-k*x)` rather
 than being clamped. A cell cannot pass more light than there is behind it, so
@@ -75,8 +75,26 @@ channel peaks sit at 1/6, 1/2 and 5/6 of the cell rather than 0, 1/3 and 2/3,
 so at an exact 3x a pixel centre lands on each peak and the three pixels of a
 cell really are red, green and blue. And the masks are cosines rather than
 triangles: three cosines at 120 degrees sum to a constant, so the stripe
-shifts colour across the cell without also rippling the brightness, and their
-overlap stands in for the diffuser over a real panel.
+shifts colour across the cell without changing how much light leaves it, and
+their overlap stands in for the diffuser over a real panel.
+
+A constant sum is not a constant brightness, though, and the difference is
+what made the stripe visible as vertical lines. Green carries most of the
+luminance and blue almost none, so the raw green band came out 55% brighter
+than the blue one. Grey content is where that shows: all three channels are
+equal, nothing else in the picture varies, and the ripple is the only
+structure left - the instrument panels in G-LOC were the clearest case.
+Widening the triad made it worse rather than better, because a six pixel
+period is well inside what the eye resolves while a three pixel one is not.
+
+So the stripe is divided by its own luminance before use. The bands then
+differ in hue alone, which the eye integrates far more readily - colour acuity
+is roughly a third of luminance acuity - and the elements stay just as
+colourful: 93% chroma spread within a band, with every band at exactly unit
+luminance. On a flat grey patch this takes the column-to-column luminance
+swing from 24% to 7%, and what remains is the column gap of the cell grid
+rather than the stripe. A real panel is built to look white rather than
+banded, so this is also the more faithful behaviour.
 
 The triad can be made wider than one cell with `Subpixel size`, which is how
 to see the elements clearly at this scale. The phase is quantised to the three
