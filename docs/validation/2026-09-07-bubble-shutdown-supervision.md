@@ -40,6 +40,11 @@ image also contains the PID 1 corrections and normally never needs it.
 
 Host contracts cover hold continuation, restart-budget preservation,
 recovery-console request monitoring, exclusive finalizer claim, action mismatch
-rejection, and the explicit-E81 PortMaster fallback. Physical acceptance still
-requires Reboot and Shutdown from both a normally supervised frontend and an
-intentionally forced E81 recovery frontend.
+rejection, and the explicit-E81 PortMaster fallback.
+
+The user confirmed that Shutdown from the normally supervised frontend on
+source `0334535` powered the device off. This closes the normal Shutdown visual
+and physical-power boundary. The following boot must still attribute the
+winning finalizer from persistent logs and confirm `previous_shutdown=clean`.
+Physical Reboot and both terminal actions from an intentionally forced E81
+recovery frontend remain open.

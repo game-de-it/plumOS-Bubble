@@ -18,7 +18,7 @@ grep -q 'menu_ctx_ozone menu_ctx_xmb' "$build"
 grep -q '"menu_drivers": \["rgui", "xmb", "ozone"\]' "$build"
 grep -qx 'assets_directory = "/storage/plumos/retroarch/assets"' "$factory"
 grep -qx 'menu_driver = "rgui"' "$factory"
-grep -q '\*:xmb|\*:ozone' "$game_launcher"
+grep -q '\*:\*:xmb|\*:\*:ozone' "$game_launcher"
 grep -q 'xmb|ozone)' "$menu_launcher"
 grep -q 'video_driver = "gl"' "$menu_launcher"
 

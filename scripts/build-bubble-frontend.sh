@@ -210,6 +210,15 @@ cat >"$component/manifest.json" <<EOF
     "drm_share": "frontend/lib/libplumos-drm-share.so",
     "drm_control": "bin/plumos-drm-master"
   },
+  "gamegear_lcd_shader_policy": {
+    "launcher": "bin/plumos-retroarch-launch",
+    "launch_scope": "system-gamegear-only",
+    "default_preset": "full",
+    "diagnostic_presets": ["panel-only", "off"],
+    "video_driver": "gl",
+    "video_context_driver": "kms",
+    "persistent_retroarch_config_modified": false
+  },
   "library_scope": "frontend/lib",
   "scraper_http_client": "bin/curl",
   "scraper_runtime": "scraper/lib",

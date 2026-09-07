@@ -100,11 +100,17 @@ missing into `config/shaders`, which is where `video_shader_dir` points. They
 are copied rather than linked and never overwritten, so an edited preset
 survives an update.
 
-`video_shader_enable` is `false` in the shipped config, so nothing changes
-until it is asked for. In a running game: **RetroArch menu > Shaders > Load
-Preset > gamegear-lcd.glslp**, then *Apply*. `auto_shaders_enable` is on, so
-saving the preset as a core or content preset from that menu will bring it
-back automatically next time.
+`video_shader_enable` remains `false` in the persistent shipped config.
+`plumos-retroarch-launch` enables the shader and selects the KMS/EGL/GLES path
+for `system=gamegear` only, then passes `gamegear-lcd.glslp` with RetroArch's
+`--set-shader` option. Other systems retain their existing rendering route and
+the user's persistent configuration is not rewritten.
+
+Do not save this as a core preset. Genesis Plus GX and PicoDrive also run
+Master System, Mega Drive and Sega CD content, so a core preset would leak the
+Game Gear panel into those systems. For device diagnosis only,
+`PLUMOS_GAMEGEAR_LCD_PRESET=panel-only` selects the one-pass preset and
+`PLUMOS_GAMEGEAR_LCD_PRESET=off` restores the unshaded route for that launch.
 
 ## Verifying it
 

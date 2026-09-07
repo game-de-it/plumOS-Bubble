@@ -15,7 +15,9 @@ root=$tmp/plumos
 rom_root=$tmp/roms
 runtime=$tmp/run
 mkdir -p "$root/bin" "$root/cores" \
-    "$root/factory-defaults/retroarch" "$rom_root/nes" "$rom_root/n64" \
+    "$root/factory-defaults/retroarch" "$root/factory-defaults/shaders" \
+    "$rom_root/nes" "$rom_root/n64" "$rom_root/gamegear" \
+    "$rom_root/megadrive" \
     "$rom_root/easyrpg/ValidGame" "$rom_root/easyrpg/InvalidGame" "$runtime"
 cp package/frontend-bubble/plumos/bin/plumos-retroarch-launch \
     "$root/bin/plumos-retroarch-launch"
@@ -23,11 +25,19 @@ cp package/frontend-bubble/plumos/bin/plumos-retroarch-config-merge \
     "$root/bin/plumos-retroarch-config-merge"
 cp configs/retroarch/bubble-software-drm.cfg \
     "$root/factory-defaults/retroarch/retroarch-bubble.cfg"
+cp configs/retroarch/shaders/gamegear-lcd.glslp \
+    configs/retroarch/shaders/gamegear-lcd-panel-only.glslp \
+    configs/retroarch/shaders/gamegear-lcd-response.glsl \
+    configs/retroarch/shaders/gamegear-lcd-panel.glsl \
+    "$root/factory-defaults/shaders/"
 : >"$root/cores/quicknes_libretro.so"
 : >"$root/cores/parallel_n64_libretro.so"
 : >"$root/cores/easyrpg_libretro.so"
+: >"$root/cores/genesis_plus_gx_libretro.so"
 : >"$rom_root/nes/test.nes"
 : >"$rom_root/n64/test.z64"
+: >"$rom_root/gamegear/test.gg"
+: >"$rom_root/megadrive/test.md"
 : >"$rom_root/easyrpg/ValidGame/RPG_RT.ldb"
 
 cat >"$root/bin/retroarch" <<'EOF'
@@ -90,7 +100,69 @@ grep -qx "savefile_directory = \"$root/saves\"" "$tmp/software.append"
 grep -qx "savestate_directory = \"$root/states\"" "$tmp/software.append"
 grep -qx 'audio_device = "plumos_output"' "$tmp/software.append"
 ! grep -q '^config_save_on_exit = ' "$tmp/software.append"
+! grep -qx -- --set-shader "$tmp/software.args"
 ! find "$runtime/retroarch" -type f -name 'launch.*.cfg' -print -quit | grep -q .
+
+# Game Gear owns a system-specific GLSL preset. It must select KMS/EGL/GLES
+# even with the software core and RGUI, without turning shaders on globally or
+# creating a Genesis Plus GX core preset that would leak into other systems.
+mkdir -p "$root/config/shaders"
+printf '%s\n' 'user-edited-panel' >"$root/config/shaders/gamegear-lcd-panel.glsl"
+run_launcher "$tmp/gamegear-full" --system gamegear \
+    --core "$root/cores/genesis_plus_gx_libretro.so" \
+    --rom "$rom_root/gamegear/test.gg"
+grep -qx 'video_driver = "gl"' "$tmp/gamegear-full.append"
+grep -qx 'video_context_driver = "kms"' "$tmp/gamegear-full.append"
+grep -qx 'video_shader_enable = "true"' "$tmp/gamegear-full.append"
+grep -qx -- --set-shader "$tmp/gamegear-full.args"
+grep -qx "$root/config/shaders/gamegear-lcd.glslp" \
+    "$tmp/gamegear-full.args"
+grep -qx 'user-edited-panel' "$root/config/shaders/gamegear-lcd-panel.glsl"
+test -f "$root/config/shaders/gamegear-lcd-response.glsl"
+test -f "$root/config/shaders/gamegear-lcd-panel-only.glslp"
+
+TEST_TRACE=$tmp/gamegear-panel \
+PLUMOS_GAMEGEAR_LCD_PRESET=panel-only \
+PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
+PLUMOS_RUNTIME_ROOT=$runtime PLUMOS_BUSYBOX=/bin/busybox \
+    "$root/bin/plumos-retroarch-launch" --system gamegear \
+    --core "$root/cores/genesis_plus_gx_libretro.so" \
+    --rom "$rom_root/gamegear/test.gg"
+grep -qx "$root/config/shaders/gamegear-lcd-panel-only.glslp" \
+    "$tmp/gamegear-panel.args"
+
+TEST_TRACE=$tmp/gamegear-off \
+PLUMOS_GAMEGEAR_LCD_PRESET=off \
+PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
+PLUMOS_RUNTIME_ROOT=$runtime PLUMOS_BUSYBOX=/bin/busybox \
+    "$root/bin/plumos-retroarch-launch" --system gamegear \
+    --core "$root/cores/genesis_plus_gx_libretro.so" \
+    --rom "$rom_root/gamegear/test.gg"
+grep -qx 'video_driver = "drm"' "$tmp/gamegear-off.append"
+! grep -q '^video_shader_enable = ' "$tmp/gamegear-off.append"
+! grep -qx -- --set-shader "$tmp/gamegear-off.args"
+
+set +e
+TEST_TRACE=$tmp/gamegear-invalid \
+PLUMOS_GAMEGEAR_LCD_PRESET=unknown \
+PLUMOS_ROOT=$root PLUMOS_ROM_ROOT=$rom_root \
+PLUMOS_RUNTIME_ROOT=$runtime PLUMOS_BUSYBOX=/bin/busybox \
+    "$root/bin/plumos-retroarch-launch" --system gamegear \
+    --core "$root/cores/genesis_plus_gx_libretro.so" \
+    --rom "$rom_root/gamegear/test.gg" \
+    >"$tmp/gamegear-invalid.log" 2>&1
+gamegear_invalid_rc=$?
+set -e
+test "$gamegear_invalid_rc" -eq 2
+grep -q 'invalid Game Gear LCD preset' "$tmp/gamegear-invalid.log"
+test ! -e "$tmp/gamegear-invalid.args"
+
+run_launcher "$tmp/megadrive-same-core" --system megadrive \
+    --core "$root/cores/genesis_plus_gx_libretro.so" \
+    --rom "$rom_root/megadrive/test.md"
+grep -qx 'video_driver = "drm"' "$tmp/megadrive-same-core.append"
+! grep -q '^video_shader_enable = ' "$tmp/megadrive-same-core.append"
+! grep -qx -- --set-shader "$tmp/megadrive-same-core.args"
 
 # Bubble exposes SD2 through /storage/Roms -> /storage/user/Roms while the
 # scanner records the resolved /storage/user/Roms path.  Both names identify

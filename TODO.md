@@ -627,6 +627,11 @@
   - 過去フレームのuniform名が違ってもコンパイルは通り「暗くなる」だけなので、
     パス2のみと本体の明るさを比較して判定する。
   - 実機で決めたパラメータ値は`#pragma parameter`の既定値へ反映する。
+  - host側でGame Gear限定の自動適用を実装。永続cfgは変更せず、起動単位で
+    KMS/EGL/GLESへ切替し、RetroArch `--set-shader`へfull presetを渡す。
+    同じcoreを使う他systemには波及しない。`panel-only`/`off`の切り分け経路も持つ。
+    frontendとretroarchの両componentを整合させて実機deployし、panel-only、full、
+    通常FE経路、終了復帰を順に確認するところから再開する。
 - [ ] GGFEのコア選択UIを実装する。解決結果と各profileの`未対応`理由は既に取得できるので、
   カート上のオーバーレイで選ばせ、`state/frontend/ggfe-overrides.json`へ書き戻す。
   plumOS側の`core-overrides.json`へは書かない（参照のみ）。

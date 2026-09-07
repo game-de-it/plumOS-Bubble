@@ -183,6 +183,14 @@ cat >"$component/manifest.json" <<EOF
   "menu_assets_commit": "$resolved_assets",
   "menu_languages": "libretro-language-catalog-with-Japanese",
   "rendering": "software-plain-drm-and-hardware-kms-egl-gles",
+  "gamegear_lcd_shader": {
+    "preset": "factory-defaults/shaders/gamegear-lcd.glslp",
+    "diagnostic_preset": "factory-defaults/shaders/gamegear-lcd-panel-only.glslp",
+    "format": "glsl",
+    "launch_scope": "system-gamegear-only",
+    "video_driver": "gl",
+    "video_context_driver": "kms"
+  },
   "gpu_runtime_required": false,
   "hardware_core_gpu_runtime_required": true,
   "external_gpu_runtime": ["emulator/lib/libEGL.so.1", "emulator/lib/libGLESv2.so.2", "emulator/lib/libgbm.so.1", "emulator/lib/libmali.so.1", "/dev/mali0"],

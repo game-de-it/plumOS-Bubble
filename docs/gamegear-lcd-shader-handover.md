@@ -31,9 +31,13 @@ GLSL以外の形式を書いても動かない。
 
 ### ホスト側で検証済み
 
-- RetroArchビルドが通り、3ファイルが `factory-defaults/shaders` へ入りchecksumに載る
+- RetroArchビルドが通り、4ファイルが `factory-defaults/shaders` へ入りchecksumに載る
 - `plumos-retroarch-launch` が `config/shaders` へ**上書きせず**seedする
-- RetroArch関連4テスト通過
+- `system=gamegear`だけがKMS/EGL/GLESへ切り替わり、2パス版を
+  `--set-shader`で読むlauncher contractが通る
+- NESなどの非Game Gear経路はplain DRMのままで、同じGenesis Plus GXを使う
+  Master System/Mega Driveにも波及しない
+- 切り分け用の`panel-only`と緊急回避用の`off`、不正値拒否がhost testを通る
 - **見た目**は `scripts/preview-gamegear-lcd.py` によるnumpy再実装で確認済み。
   既定値はこれでスイープして決めた
 
@@ -50,15 +54,23 @@ GLSL以外の形式を書いても動かない。
 
 ## 3. デプロイ
 
-**retroarchコンポーネントごと入れ替える。** checksums/manifestの整合が必要。
+**retroarchとfrontendの2コンポーネントを同じapp-layer更新単位で入れ替える。**
+シェーダー本体はretroarch、Game Gearだけへ限定する起動契約はfrontendが所有する。
+checksums/manifestの整合が必要。
 
 ```
 ./scripts/build-bubble-retroarch.sh
-# 出力: output/retroarch/bubble/plumos/
+./scripts/build-bubble-frontend.sh
+./scripts/build-bubble-app-layer.sh --assemble-only
 ```
 
-`video_shader_enable` は出荷時 `false` なので、**入れただけでは何も変わらない**。
-明示的にプリセットを読むまで従来どおり動作する。安全側に倒してある。
+永続cfgの`video_shader_enable`は`false`のままにする。Game GearのRetroArch起動時だけ
+launch append cfgで有効にし、`gamegear-lcd.glslp`を指定する。これにより他systemは
+従来どおりで、ユーザーのRetroArch設定も書き換えない。
+
+GGFEでPicoArch profileを選んだ場合はRetroArchシェーダーを利用できない。
+`retroarch:genesis_plus_gx`、`retroarch:picodrive`、`retroarch:gearsystem`のいずれかを
+選んだ場合に適用される。
 
 ## 4. 動作確認手順
 
@@ -66,17 +78,20 @@ GLSL以外の形式を書いても動かない。
 
 いきなり本体を読むと、失敗したときにパス1とパス2のどちらが原因か分からない。
 
-```
-RetroArch menu > Shaders > Load Preset > gamegear-lcd-panel-only.glslp > Apply
-```
+validation holdでFEの停止を確認してから、通常launcherへ
+`PLUMOS_GAMEGEAR_LCD_PRESET=panel-only`を渡してGame Gearを起動する。
+RetroArchメニューから手動ロードする場合は
+`Shaders > Load Preset > gamegear-lcd-panel-only.glslp > Apply`でもよい。
 
 **ここで色味とセル構造が出れば、パス2は正常。** 出なければパス2の問題。
 
 ### 4.2 本体を読む
 
-```
-RetroArch menu > Shaders > Load Preset > gamegear-lcd.glslp > Apply
-```
+`PLUMOS_GAMEGEAR_LCD_PRESET`を付けない通常FE経路で起動する。既定はfullであり、
+`gamegear-lcd.glslp`が自動適用される。切り分け時だけ明示的に`full`を渡してもよい。
+
+シェーダーが起動不能または著しい性能低下を起こす場合に限り、切り分け用として
+`PLUMOS_GAMEGEAR_LCD_PRESET=off`を使える。これは永続設定を変更しない。
 
 ### 4.3 確認項目
 
@@ -151,11 +166,10 @@ RetroArchのシェーダーパラメータメニューから調整できる。�
   位相が合わず色縞になる。その場合は `Subpixel strength` を下げる。
 - **静止画では残像が出ない。** 履歴と現在値が一致するため、パス1は素通しになる。
 
-## 8. 有効化を既定にする場合
+## 8. 自動適用の境界
 
-現状は手動ロードのみ。既定で当てたい場合は `auto_shaders_enable` が既に `true` なので、
-RetroArchのシェーダーメニューから「コア別プリセット」または「コンテンツ別プリセット」
-として保存すれば次回から自動適用される。
+既定でGame Gearへ適用するが、`video_shader_enable = true`を出荷cfgへは入れない。
+system idを見られる`plumos-retroarch-launch`が起動単位で適用する。
 
-**`video_shader_enable = true` を出荷設定に入れるのは避けたほうがよい。**
-Game Gear以外のシステムにも当たってしまう。
+コア別プリセットとして保存してはならない。Genesis Plus GXやPicoDriveはGame Gear以外も
+実行するため、Master System、Mega Drive、Sega CDへ誤適用される。

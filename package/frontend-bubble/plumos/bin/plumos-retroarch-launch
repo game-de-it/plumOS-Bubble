@@ -86,6 +86,24 @@ if [ -d "$shader_factory" ]; then
         [ -e "$shader_dst" ] || $BB cp "$shader_src" "$shader_dst"
     done
 fi
+shader_preset=
+shader_mode=off
+if [ "$system" = gamegear ]; then
+    shader_mode=${PLUMOS_GAMEGEAR_LCD_PRESET:-full}
+    case "$shader_mode" in
+        full) shader_preset=$shader_dir/gamegear-lcd.glslp ;;
+        panel-only) shader_preset=$shader_dir/gamegear-lcd-panel-only.glslp ;;
+        off) ;;
+        *)
+            echo 'invalid Game Gear LCD preset (expected full, panel-only, or off)' >&2
+            exit 2
+            ;;
+    esac
+    if [ -n "$shader_preset" ] && [ ! -f "$shader_preset" ]; then
+        echo "Game Gear LCD preset is missing: $shader_preset" >&2
+        exit 1
+    fi
+fi
 
 config=$PLUMOS_ROOT/config/retroarch/retroarch-bubble.cfg
 factory=$PLUMOS_ROOT/factory-defaults/retroarch/retroarch-bubble.cfg
@@ -138,10 +156,10 @@ else
     echo 'CPU policy control unavailable' >&2
     exit 1
 fi
-case "$core_id:$menu_driver" in
-    *:xmb|*:ozone|\
-    flycast:*|flycast_xtreme:*|km_duckswanstation_xtreme_amped:*|\
-    mupen64plus_next:*|parallel_n64:*|yabasanshiro:*)
+case "$shader_preset:$core_id:$menu_driver" in
+    ?*:*:*|*:*:xmb|*:*:ozone|\
+    *:flycast:*|*:flycast_xtreme:*|*:km_duckswanstation_xtreme_amped:*|\
+    *:mupen64plus_next:*|*:parallel_n64:*|*:yabasanshiro:*)
         {
             printf '%s\n' 'video_driver = "gl"'
             printf '%s\n' 'video_context_driver = "kms"'
@@ -159,6 +177,12 @@ case "$core_id:$menu_driver" in
         } >"$append_config"
         ;;
 esac
+if [ -n "$shader_preset" ]; then
+    # GLSL is unavailable on the plain-DRM video driver. Keep the persistent
+    # cfg unchanged and enable it only for this Game Gear launch; sharing a
+    # core preset would also affect Master System and Mega Drive content.
+    printf '%s\n' 'video_shader_enable = "true"' >>"$append_config"
+fi
 # The shared cfg keeps the V90S-compatible factory baseline, while Bubble may
 # own BIOS on SD2. Resolve that active media root per launch without rewriting
 # the user's persistent RetroArch configuration.
@@ -224,10 +248,12 @@ trap cleanup EXIT
 trap 'terminate_retroarch 129' HUP
 trap 'terminate_retroarch 130' INT
 trap 'terminate_retroarch 143' TERM
-printf 'retroarch_game=stage-S70 system=%s core=%s\n' "$system" "$core_id" >>"$PLUMOS_ROOT/logs/session.log"
+printf 'retroarch_game=stage-S70 system=%s core=%s shader=%s\n' \
+    "$system" "$core_id" "$shader_mode" >>"$PLUMOS_ROOT/logs/session.log"
 set +e
 set -- "$PLUMOS_ROOT/bin/retroarch" -v -c "$config"
 [ -z "$append_config" ] || set -- "$@" --appendconfig "$append_config"
+[ -z "$shader_preset" ] || set -- "$@" --set-shader "$shader_preset"
 set -- "$@" -L "$core"
 [ "$no_content" -eq 1 ] || set -- "$@" "$rom"
 LD_PRELOAD="${PLUMOS_DRM_SHARE_LIBRARY:-}" \
