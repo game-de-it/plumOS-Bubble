@@ -1,0 +1,18 @@
+# Game Gear LCD, panel only.
+#
+# The same second pass without the response pass in front of it, for telling
+# the two apart on a device.  If the full preset looks wrong, load this one:
+#
+#   this looks right, the full preset does not  -> the response pass is at
+#       fault, most likely its previous-frame samplers are not bound and it is
+#       mixing in black
+#   both look wrong                             -> the panel pass is at fault
+#   this fails to load                          -> a GLSL compile error, and
+#       RetroArch's log names the line
+
+shaders = "1"
+
+shader0 = "gamegear-lcd-panel.glsl"
+filter_linear0 = "false"
+scale_type0 = "viewport"
+scale0 = "1.0"

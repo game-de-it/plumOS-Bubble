@@ -40,7 +40,15 @@ void main(void) {
 #elif defined(FRAGMENT)
 
 #ifdef GL_ES
+/* The cell phase comes from a source pixel index, which reaches 160 here.  In
+ * mediump that value has a resolution of about an eighth, so fract() of it
+ * would quantise the phase and band the stripe.  Ask for highp where the
+ * implementation has it. */
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 #endif
 
 varying vec2 vTex;
