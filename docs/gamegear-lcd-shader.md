@@ -104,6 +104,34 @@ for its aspect ratio nor on how RetroArch rounds. A port to a different
 display should work out its own largest integer scale rather than reuse these
 numbers.
 
+## Element visibility and the tone curve
+
+Two settings fought each other here, and the device settled it.
+
+The stripe's three bands do not carry equal luminance: green carries most of
+it and blue almost none, so the raw stripe is about 55% brighter on green than
+on blue. Dividing that out makes the bands differ in hue alone. That was added
+to stop grey areas banding when the triad was two cells wide, and at six
+pixels a period it was the right call.
+
+At the physical pitch it is the wrong one. An element is one output pixel at
+3x, so the ripple is three pixels - below what the eye separates into lines,
+and the only thing making the elements visible rather than a flat wash. With
+it on, the device showed no RGB structure at all. `Element luma balance`
+therefore defaults to 0 and should be raised only alongside `Subpixel size`.
+
+Colour alone does not carry it: measured on flat grey, balancing changes the
+chroma across a triad not at all (0.343 to 0.345) while more than halving the
+brightness variation (0.230 to 0.100). Chroma acuity is roughly a third of
+luminance acuity, so at this pitch the eye needs the brightness component.
+
+The tone curve was the other half. Black sat at 0.40 and white at 0.79, so the
+whole picture lived in 39% of the range and all of it in the upper half -
+which is what "too white" looks like from the front. Black level down to 0.14,
+gamma up to 1.35 and brightness up to 2.60 puts black at 0.26 and white at
+0.81, spanning 56%. Still a washed-out panel, which an STN is, but no longer
+one with everything crushed against the top.
+
 ## Diffusion
 
 A photograph of the real panel is soft. The polariser and the front plastic
@@ -191,17 +219,18 @@ Adjustable from RetroArch's shader parameters menu.
 | Diffusion down | 0.60 | the same downwards; smaller, so the row lines survive it |
 | Element offset | 0.33 | how far red and blue sit either side of the cell centre |
 | Subpixel strength | 0.62 | RGB stripe; see above |
+| Element luma balance | 0.00 | flattens the stripe's brightness ripple; off at the physical pitch, raise it with `Subpixel size` |
 | Subpixel size (cells) | 1 | cells per RGB triad; 1 is the physical layout, larger is easier to see |
 | Row gap | 0.80 | the horizontal lines, the dominant structure |
 | Column gap | 0.35 | the black frame down the side of each cell |
 | Element gap | 0.00 | separation between the strips themselves; needs a triad wider than one cell to do anything |
-| Black level | 0.28 | how far the backlight lifts black |
+| Black level | 0.14 | how far the backlight lifts black |
 | White level | 0.97 | how far short of white the panel stops |
-| Saturation | 0.60 | |
-| Panel gamma | 0.90 | |
+| Saturation | 0.55 | |
+| Panel gamma | 1.35 | |
 | Backlight unevenness | 0.28 | falloff away from the lamp |
 | Blue cast | 0.55 | how far towards blue-cyan the panel sits |
-| Brightness | 2.30 | backlight saturation constant, not a multiplier |
+| Brightness | 2.60 | backlight saturation constant, not a multiplier |
 
 ## Installing and using it
 

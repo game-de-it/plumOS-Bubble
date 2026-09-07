@@ -27,17 +27,18 @@
 #pragma parameter gg_bleed_y    "Diffusion down"        0.60 0.00 1.50 0.05
 #pragma parameter gg_fringe     "Element offset"        0.33 0.00 0.60 0.03
 #pragma parameter gg_subpixel   "Subpixel strength"     0.62 0.00 1.00 0.02
+#pragma parameter gg_balance    "Element luma balance"  0.00 0.00 1.00 0.05
 #pragma parameter gg_subcells   "Subpixel size (cells)" 1.00 1.00 4.00 1.00
 #pragma parameter gg_rowgap     "Row gap"               0.80 0.00 1.00 0.05
 #pragma parameter gg_colgap     "Column gap"            0.35 0.00 1.00 0.05
 #pragma parameter gg_elemgap    "Element gap"           0.00 0.00 1.00 0.05
-#pragma parameter gg_black      "Black level"           0.28 0.00 0.40 0.005
+#pragma parameter gg_black      "Black level"           0.14 0.00 0.40 0.005
 #pragma parameter gg_white      "White level"           0.97 0.60 1.10 0.01
-#pragma parameter gg_sat        "Saturation"            0.60 0.20 1.20 0.02
-#pragma parameter gg_gamma      "Panel gamma"           0.90 0.60 1.60 0.02
+#pragma parameter gg_sat        "Saturation"            0.55 0.20 1.20 0.02
+#pragma parameter gg_gamma      "Panel gamma"           1.35 0.60 2.20 0.05
 #pragma parameter gg_backlight  "Backlight unevenness"  0.28 0.00 1.00 0.02
 #pragma parameter gg_tint       "Blue cast"             0.55 0.00 1.00 0.05
-#pragma parameter gg_bright     "Brightness"            2.30 0.50 5.00 0.05
+#pragma parameter gg_bright     "Brightness"            2.60 0.50 5.00 0.05
 
 #if defined(VERTEX)
 
@@ -76,6 +77,7 @@ uniform float gg_bleed_x;
 uniform float gg_bleed_y;
 uniform float gg_fringe;
 uniform float gg_subpixel;
+uniform float gg_balance;
 uniform float gg_subcells;
 uniform float gg_rowgap;
 uniform float gg_colgap;
@@ -92,17 +94,18 @@ uniform float gg_bright;
 #define gg_bleed_y   0.60
 #define gg_fringe    0.33
 #define gg_subpixel  0.62
+#define gg_balance   0.00
 #define gg_subcells  1.00
 #define gg_rowgap    0.80
 #define gg_colgap    0.35
 #define gg_elemgap   0.00
-#define gg_black     0.28
+#define gg_black     0.14
 #define gg_white     0.97
-#define gg_sat       0.60
-#define gg_gamma     0.90
+#define gg_sat       0.55
+#define gg_gamma     1.35
 #define gg_backlight 0.28
 #define gg_tint      0.55
-#define gg_bright    2.30
+#define gg_bright    2.60
 #endif
 
 /* The lamp sat along one edge, so the light falls away from it and the far
@@ -208,23 +211,27 @@ void main(void) {
    vec3 mask = 0.5 + 0.5 * cos(TAU * (band - vec3(1.0, 3.0, 5.0) / 6.0));
    vec3 stripe = mix(vec3(1.0), 2.0 * mask, gg_subpixel);
    /*
-    * Equalise the bands' luminance.
+    * Optionally equalise the bands' luminance.
     *
-    * Green carries most of the luminance and blue almost none, so a plain
-    * stripe makes the green band far brighter than the blue one - 55% apart
-    * at this strength.  On grey content, where all three channels are equal
-    * and nothing else varies, that ripple is the only structure present and
-    * it reads as vertical lines: worst on the instrument panels of a game
-    * like G-LOC.  Widening the triad made it worse rather than better,
-    * because a six pixel period is well inside what the eye resolves while a
-    * three pixel one is not.
+    * Green carries most of the luminance and blue almost none, so the raw
+    * stripe makes the green band brighter than the blue one - 55% apart at
+    * this strength.  Dividing that out leaves the bands differing in hue
+    * alone, which the eye integrates far more readily, since its colour
+    * acuity is about a third of its luminance acuity.
     *
-    * Dividing the luminance out leaves the bands differing in hue alone,
-    * which the eye integrates far more readily - its colour acuity is about a
-    * third of its luminance acuity.  A real panel is built to look white
-    * rather than banded, so this is also the honest behaviour.
+    * Which is exactly why this is off by default.  At one cell per triad an
+    * element is one output pixel at 3x, so the imbalance is a three pixel
+    * ripple - below what the eye separates into lines, and the only thing
+    * that makes the elements visible at all rather than a flat wash.
+    * Balancing it away here left the panel looking like plain blurred pixels
+    * on the device.
+    *
+    * Turn it up when the triad is widened past one cell.  There the ripple
+    * lands at six pixels or more, which the eye does resolve, and it reads as
+    * vertical banding on grey - worst on something like G-LOC's instruments.
     */
-   stripe /= dot(stripe, vec3(0.299, 0.587, 0.114));
+   stripe = mix(stripe, stripe / dot(stripe, vec3(0.299, 0.587, 0.114)),
+                gg_balance);
 
    /* An optional dark line between the elements themselves rather than
     * between cells.  It does nothing at one cell per triad, where an element

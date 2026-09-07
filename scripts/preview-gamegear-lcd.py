@@ -26,17 +26,18 @@ P = {
     "bleed_y": 0.60,
     "fringe": 0.33,
     "subpixel": 0.62,
+    "balance": 0.00,
     "subcells": 1.0,
     "rowgap": 0.80,
     "colgap": 0.35,
     "elemgap": 0.00,
-    "black": 0.28,
+    "black": 0.14,
     "white": 0.97,
-    "sat": 0.60,
-    "gamma": 0.90,
+    "sat": 0.55,
+    "gamma": 1.35,
     "backlight": 0.28,
     "tint": 0.55,
-    "bright": 2.30,
+    "bright": 2.60,
     "rise": 0.62,
     "fall": 0.34,
 }
@@ -99,7 +100,13 @@ def panel(src):
     band = (np.floor(sub_phase * 3.0) + 0.5) / 3.0
     mask = 0.5 + 0.5 * np.cos(tau * (band[..., None] - centres))
     stripe = 1.0 + (2.0 * mask - 1.0) * P["subpixel"]
-    stripe = stripe / (stripe @ np.array([0.299, 0.587, 0.114], np.float32))[..., None]
+    # Off by default: at the physical element pitch the imbalance is a three
+    # pixel ripple, below what the eye separates into lines, and it is what
+    # makes the elements visible rather than a flat wash.  Raise it only when
+    # the triad is widened past one cell.
+    if P["balance"] > 1e-4:
+        lum_s = (stripe @ np.array([0.299, 0.587, 0.114], np.float32))[..., None]
+        stripe = stripe * ((1.0 - P["balance"]) + P["balance"] / lum_s)
 
     if P["elemgap"] > 1e-3:
         ep = np.abs(((u * sw) * 3.0 / P["subcells"]) % 1.0 - 0.5) * 2.0
