@@ -619,6 +619,11 @@
     `docs/validation/2026-09-06-bubble-ggfe-span-raster.md`。
 - [x] GGFEの操作説明と移植リファレンスを`docs/ggfe.md`へ書く。画面上のボタン凡例は置かず、
   ドキュメントで告知する方針。他plumOS機種へ移植する際もこの文書を起点にする。
+- [ ] Game Gear LCDシェーダーを実機で確認する。`docs/gamegear-lcd-shader.md`参照。
+  RetroArch menu > Shaders > Load Preset > gamegear-lcd.glslp。
+  ホストにGLSL validatorが無いためコンパイル検証は未実施で、失敗する場合は
+  RetroArchのlogに行番号付きで出る。見た目は`scripts/preview-gamegear-lcd.py`で
+  numpy再実装により確認済み。
 - [ ] GGFEのコア選択UIを実装する。解決結果と各profileの`未対応`理由は既に取得できるので、
   カート上のオーバーレイで選ばせ、`state/frontend/ggfe-overrides.json`へ書き戻す。
   plumOS側の`core-overrides.json`へは書かない（参照のみ）。

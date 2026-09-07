@@ -88,7 +88,8 @@ git -C "$assets_work" clean -fdx --quiet
 rm -rf "$out"
 mkdir -p "$bin" "$lib" "$component" "$root/licenses" \
     "$root/retroarch/assets" \
-    "$root/factory-defaults/retroarch/autoconfig/udev" "$root/share/alsa"
+    "$root/factory-defaults/retroarch/autoconfig/udev" \
+    "$root/factory-defaults/shaders" "$root/share/alsa"
 install -m 0755 "$work/retroarch" "$bin/retroarch"
 install -m 0755 /usr/bin/amixer "$bin/plumos-amixer"
 strip "$bin/retroarch" "$bin/plumos-amixer"
@@ -111,6 +112,11 @@ install -m 0644 "$repo_root/configs/retroarch/bubble-pre-v90s-expanded.cfg" \
     "$root/factory-defaults/retroarch/retroarch-bubble-pre-v90s.cfg"
 install -m 0644 "$repo_root/configs/retroarch/autoconfig/udev/gkd-bubble-retrogame-joypad.cfg" \
     "$root/factory-defaults/retroarch/autoconfig/udev/"
+# Shader presets are seeded into the user-writable shader directory by the
+# launcher, so a user edit survives an update.
+for shader in "$repo_root"/configs/retroarch/shaders/*; do
+    install -m 0644 "$shader" "$root/factory-defaults/shaders/"
+done
 cp -a /usr/share/alsa/. "$root/share/alsa/"
 install -m 0644 "$repo_root/configs/alsa/bubble-minimal.conf" \
     "$root/share/alsa/alsa.conf"

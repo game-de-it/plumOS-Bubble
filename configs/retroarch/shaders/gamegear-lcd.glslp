@@ -1,0 +1,27 @@
+# Game Gear LCD
+#
+# Reproduces the panel in a real Game Gear rather than a generic "LCD" look.
+# Two passes, because the two things that make that screen recognisable happen
+# at different rates:
+#
+#   1. response - the STN panel is slow, so movement smears, and it falls to
+#      dark more slowly than it rises to light.  Run at source resolution.
+#   2. panel    - RGB stripe subpixels, the gap between cells, the washed out
+#      contrast of an STN gamut, and the uneven CCFL edge light.  Run at the
+#      output resolution so the stripe lands on real pixels.
+#
+# GLSL rather than slang: this device's RetroArch is built --enable-opengles
+# --disable-opengl_core, so the slang path does not exist here.
+
+shaders = "2"
+
+shader0 = "gamegear-lcd-response.glsl"
+filter_linear0 = "false"
+scale_type0 = "source"
+scale0 = "1.0"
+float_framebuffer0 = "false"
+
+shader1 = "gamegear-lcd-panel.glsl"
+filter_linear1 = "false"
+scale_type1 = "viewport"
+scale1 = "1.0"

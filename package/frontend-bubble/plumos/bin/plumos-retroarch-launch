@@ -74,6 +74,19 @@ if [ "$no_content" -eq 0 ]; then
 fi
 [ -f "$core" ] || exit 1
 [ "$no_content" -eq 1 ] || [ -f "$rom" ] || exit 1
+# Seed the shader directory the cfg points at.  Copied rather than linked and
+# never overwritten, so a preset the user has edited survives an update.
+shader_dir=$PLUMOS_ROOT/config/shaders
+shader_factory=$PLUMOS_ROOT/factory-defaults/shaders
+if [ -d "$shader_factory" ]; then
+    $BB mkdir -p "$shader_dir"
+    for shader_src in "$shader_factory"/*; do
+        [ -f "$shader_src" ] || continue
+        shader_dst=$shader_dir/${shader_src##*/}
+        [ -e "$shader_dst" ] || $BB cp "$shader_src" "$shader_dst"
+    done
+fi
+
 config=$PLUMOS_ROOT/config/retroarch/retroarch-bubble.cfg
 factory=$PLUMOS_ROOT/factory-defaults/retroarch/retroarch-bubble.cfg
 $BB mkdir -p "$PLUMOS_ROOT/config/retroarch" "$PLUMOS_ROOT/logs" \
