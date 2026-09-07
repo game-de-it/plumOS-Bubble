@@ -114,6 +114,14 @@ run_launcher "$tmp/gamegear-full" --system gamegear \
 grep -qx 'video_driver = "gl"' "$tmp/gamegear-full.append"
 grep -qx 'video_context_driver = "kms"' "$tmp/gamegear-full.append"
 grep -qx 'video_shader_enable = "true"' "$tmp/gamegear-full.append"
+# The panel shader phases its cell grid and RGB stripe on the source pixel, so
+# it is only correct at a whole number of output pixels per source pixel.  The
+# largest that fits 160x144 into 640x480 is three: 480x432, centred.
+grep -qx 'aspect_ratio_index = "23"' "$tmp/gamegear-full.append"
+grep -qx 'custom_viewport_width = "480"' "$tmp/gamegear-full.append"
+grep -qx 'custom_viewport_height = "432"' "$tmp/gamegear-full.append"
+grep -qx 'custom_viewport_x = "80"' "$tmp/gamegear-full.append"
+grep -qx 'custom_viewport_y = "24"' "$tmp/gamegear-full.append"
 grep -qx -- --set-shader "$tmp/gamegear-full.args"
 grep -qx "$root/config/shaders/gamegear-lcd.glslp" \
     "$tmp/gamegear-full.args"
@@ -130,6 +138,8 @@ PLUMOS_RUNTIME_ROOT=$runtime PLUMOS_BUSYBOX=/bin/busybox \
     --rom "$rom_root/gamegear/test.gg"
 grep -qx "$root/config/shaders/gamegear-lcd-panel-only.glslp" \
     "$tmp/gamegear-panel.args"
+grep -qx 'custom_viewport_width = "480"' "$tmp/gamegear-panel.append"
+grep -qx 'custom_viewport_height = "432"' "$tmp/gamegear-panel.append"
 
 TEST_TRACE=$tmp/gamegear-off \
 PLUMOS_GAMEGEAR_LCD_PRESET=off \
@@ -140,6 +150,10 @@ PLUMOS_RUNTIME_ROOT=$runtime PLUMOS_BUSYBOX=/bin/busybox \
     --rom "$rom_root/gamegear/test.gg"
 grep -qx 'video_driver = "drm"' "$tmp/gamegear-off.append"
 ! grep -q '^video_shader_enable = ' "$tmp/gamegear-off.append"
+# Without the shader there is nothing to align, so the picture is left to fill
+# the screen as it does for every other system.
+! grep -q '^custom_viewport_width = ' "$tmp/gamegear-off.append"
+! grep -q '^aspect_ratio_index = ' "$tmp/gamegear-off.append"
 ! grep -qx -- --set-shader "$tmp/gamegear-off.args"
 
 set +e

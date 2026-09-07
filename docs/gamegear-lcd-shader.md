@@ -64,6 +64,40 @@ up around R:G:B of 1 : 1.1 : 1.3.
 and the far corners are dimmest. A real Game Gear photograph is never evenly
 lit. Kept gentle - the point is only that it is not flat.
 
+## Scaling: the picture must be an exact 3x
+
+This is a requirement, not a preference. The panel pass takes the phase of its
+cell grid and its RGB stripe from the source pixel, so it is only correct when
+a source pixel covers a whole number of output pixels.
+
+160x144 into 640x480 is 4.00x across but 3.33x down, so the largest integer
+that fits both axes is three: 480x432, centred, leaving an 80px border either
+side and 24px above and below. `plumos-retroarch-launch` pins that with a
+custom viewport for the Game Gear launch only.
+
+Letting RetroArch fit the picture instead is visibly wrong rather than subtly
+so. On a flat grey field, measured through the reference implementation:
+
+| Output | Scale | Column swing | Row swing | Mean R:G:B |
+|---|---|---:|---:|---|
+| 640x480 | 4.00x / 3.33x | 21% | 128% | 0.82 : 1.00 : 0.95 |
+| 576x432 | 3.60x / 3.00x | 38% | 34% | 0.92 : 1.00 : 1.05 |
+| 533x480 | 3.33x / 3.33x | 53% | 139% | 0.92 : 1.00 : 1.04 |
+| **480x432** | **3.00x / 3.00x** | **15%** | **33%** | 0.92 : 1.00 : 1.05 |
+
+At an exact 3x the remaining swing is the intended structure, regular and at a
+three pixel period. Off it, the row gaps beat against the output grid and
+march up the screen at more than four times that amplitude. At 640x480 the
+stripe must also fit three elements into four pixels, which cannot be done
+evenly: red comes out 18% low and tints the whole picture.
+
+A custom viewport rather than square-pixel aspect plus integer scaling,
+because this panel is 640x480 and nothing else, so an exact rectangle is worth
+more here than portability - and it depends on neither what the core reports
+for its aspect ratio nor on how RetroArch rounds. A port to a different
+display should work out its own largest integer scale rather than reuse these
+numbers.
+
 ## Diffusion
 
 A photograph of the real panel is soft. The polariser and the front plastic

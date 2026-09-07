@@ -182,6 +182,32 @@ if [ -n "$shader_preset" ]; then
     # cfg unchanged and enable it only for this Game Gear launch; sharing a
     # core preset would also affect Master System and Mega Drive content.
     printf '%s\n' 'video_shader_enable = "true"' >>"$append_config"
+
+    # Pin the picture to exactly three output pixels per source pixel.
+    #
+    # The panel shader takes the phase of its cell grid and its RGB stripe
+    # from the source pixel, so the whole thing only lands correctly when a
+    # source pixel covers a whole number of output pixels.  160x144 into
+    # 640x480 gives 4.00x across but only 3.33x down, and the largest integer
+    # that fits both axes is 3: 480x432, centred, with a border.
+    #
+    # Letting RetroArch fit the picture instead is visibly wrong rather than
+    # subtly so.  Measured on a flat grey field, the row structure swings 128%
+    # at 640x480 and 139% at 533x480, against 33% at an exact 3x - the gaps
+    # beat against the output grid and march up the screen.  At 640x480 the
+    # stripe also has to fit three elements into four pixels, which biases red
+    # 18% low and tints the whole picture.
+    #
+    # A custom viewport rather than square-pixel-plus-integer-scaling: this
+    # panel is 640x480 and nothing else, so the exact rectangle is worth more
+    # than portability, and it does not depend on what the core reports for
+    # its aspect ratio or on how RetroArch rounds.
+    printf '%s\n' 'aspect_ratio_index = "23"' >>"$append_config"
+    printf '%s\n' 'custom_viewport_width = "480"' >>"$append_config"
+    printf '%s\n' 'custom_viewport_height = "432"' >>"$append_config"
+    printf '%s\n' 'custom_viewport_x = "80"' >>"$append_config"
+    printf '%s\n' 'custom_viewport_y = "24"' >>"$append_config"
+    printf '%s\n' 'video_scale_integer = "false"' >>"$append_config"
 fi
 # The shared cfg keeps the V90S-compatible factory baseline, while Bubble may
 # own BIOS on SD2. Resolve that active media root per launch without rewriting

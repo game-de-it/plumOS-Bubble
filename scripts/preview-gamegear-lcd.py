@@ -15,7 +15,11 @@ import numpy as np
 from PIL import Image
 
 OUT_W, OUT_H = 640, 480
-SCALE = 3  # 160x144 * 3 = 480x432, how RetroArch presents this on the panel
+# 160x144 * 3 = 480x432, centred on the panel with a border.  Three is not a
+# choice: the shader phases its structure on the source pixel, so it needs a
+# whole number of output pixels per source pixel, and three is the largest that
+# fits 480 rows.  plumos-retroarch-launch pins this with a custom viewport.
+SCALE = 3
 
 P = {
     "bleed_x": 1.00,
