@@ -88,8 +88,10 @@ if [ -d "$shader_factory" ]; then
 fi
 shader_preset=
 shader_mode=off
+gamegear_geometry=off
 if [ "$system" = gamegear ]; then
     shader_mode=${PLUMOS_GAMEGEAR_LCD_PRESET:-full}
+    gamegear_geometry=${PLUMOS_GAMEGEAR_LCD_GEOMETRY:-sega43}
     case "$shader_mode" in
         full) shader_preset=$shader_dir/gamegear-lcd.glslp ;;
         panel-only) shader_preset=$shader_dir/gamegear-lcd-panel-only.glslp ;;
@@ -103,6 +105,13 @@ if [ "$system" = gamegear ]; then
         echo "Game Gear LCD preset is missing: $shader_preset" >&2
         exit 1
     fi
+    case "$gamegear_geometry" in
+        sega43|integer3x) ;;
+        *)
+            echo 'invalid Game Gear LCD geometry (expected sega43 or integer3x)' >&2
+            exit 2
+            ;;
+    esac
 fi
 
 config=$PLUMOS_ROOT/config/retroarch/retroarch-bubble.cfg
@@ -183,31 +192,20 @@ if [ -n "$shader_preset" ]; then
     # core preset would also affect Master System and Mega Drive content.
     printf '%s\n' 'video_shader_enable = "true"' >>"$append_config"
 
-    # Pin the picture to exactly three output pixels per source pixel.
-    #
-    # The panel shader takes the phase of its cell grid and its RGB stripe
-    # from the source pixel, so the whole thing only lands correctly when a
-    # source pixel covers a whole number of output pixels.  160x144 into
-    # 640x480 gives 4.00x across but only 3.33x down, and the largest integer
-    # that fits both axes is 3: 480x432, centred, with a border.
-    #
-    # Letting RetroArch fit the picture instead is visibly wrong rather than
-    # subtly so.  Measured on a flat grey field, the row structure swings 128%
-    # at 640x480 and 139% at 533x480, against 33% at an exact 3x - the gaps
-    # beat against the output grid and march up the screen.  At 640x480 the
-    # stripe also has to fit three elements into four pixels, which biases red
-    # 18% low and tints the whole picture.
-    #
-    # A custom viewport rather than square-pixel-plus-integer-scaling: this
-    # panel is 640x480 and nothing else, so the exact rectangle is worth more
-    # than portability, and it does not depend on what the core reports for
-    # its aspect ratio or on how RetroArch rounds. RetroArch adds x/y to the
-    # viewport-bias placement; with the default 0.5 bias, zero centres this
-    # 480x432 rectangle at the required physical x=80/y=24. Supplying 80/24
-    # here double-applies the centring offset and moves it right and down.
+    # The original panel displays 160x144 with non-square dots over a 4:3
+    # aperture. The shader integrates non-integer element and row coverage
+    # over each output pixel. Keep exact integer 3x as a diagnostic route.
     printf '%s\n' 'aspect_ratio_index = "23"' >>"$append_config"
-    printf '%s\n' 'custom_viewport_width = "480"' >>"$append_config"
-    printf '%s\n' 'custom_viewport_height = "432"' >>"$append_config"
+    case "$gamegear_geometry" in
+        sega43)
+            printf '%s\n' 'custom_viewport_width = "640"' >>"$append_config"
+            printf '%s\n' 'custom_viewport_height = "480"' >>"$append_config"
+            ;;
+        integer3x)
+            printf '%s\n' 'custom_viewport_width = "480"' >>"$append_config"
+            printf '%s\n' 'custom_viewport_height = "432"' >>"$append_config"
+            ;;
+    esac
     printf '%s\n' 'custom_viewport_x = "0"' >>"$append_config"
     printf '%s\n' 'custom_viewport_y = "0"' >>"$append_config"
     printf '%s\n' 'video_scale_integer = "false"' >>"$append_config"
@@ -277,8 +275,9 @@ trap cleanup EXIT
 trap 'terminate_retroarch 129' HUP
 trap 'terminate_retroarch 130' INT
 trap 'terminate_retroarch 143' TERM
-printf 'retroarch_game=stage-S70 system=%s core=%s shader=%s\n' \
-    "$system" "$core_id" "$shader_mode" >>"$PLUMOS_ROOT/logs/session.log"
+printf 'retroarch_game=stage-S70 system=%s core=%s shader=%s geometry=%s\n' \
+    "$system" "$core_id" "$shader_mode" "$gamegear_geometry" \
+    >>"$PLUMOS_ROOT/logs/session.log"
 set +e
 set -- "$PLUMOS_ROOT/bin/retroarch" -v -c "$config"
 [ -z "$append_config" ] || set -- "$@" --appendconfig "$append_config"

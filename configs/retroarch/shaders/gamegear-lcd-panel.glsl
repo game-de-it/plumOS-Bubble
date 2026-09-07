@@ -5,8 +5,9 @@
  *
  *   - RGB stripe subpixels.  The Game Gear's cells are large enough that at
  *     any honest magnification you see the three vertical strips, not a solid
- *     colour.  The phase is taken from the source pixel, so this works at any
- *     scale; at an exact 3x it lands one strip per output pixel.
+ *     colour.  The phase is taken from the source pixel.  When a strip does
+ *     not land on a whole output pixel, its area is integrated over that
+ *     output pixel so no channel wins merely because of the sampling phase.
  *   - The gap between cells, which is what makes it read as a grid rather
  *     than as scanlines.  It is a grid, not lines: this is not a CRT.
  *   - An STN gamut.  Black is a dark grey lit from behind, saturation is low,
@@ -23,19 +24,26 @@
  *     edges pick up the colour fringes a real panel shows.
  */
 
-#pragma parameter gg_bleed_x    "Diffusion across"      1.00 0.00 1.50 0.05
-#pragma parameter gg_bleed_y    "Diffusion down"        0.60 0.00 1.50 0.05
-#pragma parameter gg_fringe     "Element offset"        0.33 0.00 0.60 0.03
+#pragma parameter gg_bleed_x    "Colour bleed across"   0.85 0.00 1.50 0.05
+#pragma parameter gg_bleed_y    "Colour bleed down"     0.45 0.00 1.50 0.05
+#pragma parameter gg_fringe     "Element offset"        0.25 0.00 0.60 0.03
+#pragma parameter gg_lumableed  "Luma bleed"            0.18 0.00 1.00 0.02
+#pragma parameter gg_smear_up   "Upward colour trail"   0.18 0.00 0.60 0.02
+#pragma parameter gg_smear_luma "Centre bright invasion" 1.00 0.00 1.00 0.05
+#pragma parameter gg_center_dark "Centre dark invasion"   0.20 0.00 1.00 0.05
+#pragma parameter gg_dark_smear "Edge dark invasion"     0.75 0.00 1.00 0.05
 #pragma parameter gg_subpixel   "Subpixel strength"     0.62 0.00 1.00 0.02
+#pragma parameter gg_aperture   "4:3 aperture gap"      0.88 0.00 1.00 0.02
 #pragma parameter gg_balance    "Element luma balance"  0.00 0.00 1.00 0.05
 #pragma parameter gg_subcells   "Subpixel size (cells)" 1.00 1.00 4.00 1.00
 #pragma parameter gg_rowgap     "Row gap"               0.80 0.00 1.00 0.05
 #pragma parameter gg_colgap     "Column gap"            0.35 0.00 1.00 0.05
-#pragma parameter gg_elemgap    "Element gap"           0.00 0.00 1.00 0.05
+#pragma parameter gg_elemgap    "Element gap"           0.35 0.00 1.00 0.05
 #pragma parameter gg_black      "Black level"           0.14 0.00 0.40 0.005
 #pragma parameter gg_white      "White level"           0.97 0.60 1.10 0.01
 #pragma parameter gg_sat        "Saturation"            0.55 0.20 1.20 0.02
-#pragma parameter gg_blueweak   "Weak blue filter"      0.30 0.00 0.80 0.02
+#pragma parameter gg_bluesat    "SEGA blue saturation"  0.90 0.20 1.20 0.02
+#pragma parameter gg_blueweak   "Blue-to-green leak"    0.14 0.00 0.80 0.02
 #pragma parameter gg_gamma      "Panel gamma"           1.35 0.60 2.20 0.05
 #pragma parameter gg_backlight  "Backlight unevenness"  0.28 0.00 1.00 0.02
 #pragma parameter gg_tint       "Panel cast"            0.55 0.00 1.00 0.05
@@ -77,7 +85,13 @@ uniform vec2 OutputSize;
 uniform float gg_bleed_x;
 uniform float gg_bleed_y;
 uniform float gg_fringe;
+uniform float gg_lumableed;
+uniform float gg_smear_up;
+uniform float gg_smear_luma;
+uniform float gg_center_dark;
+uniform float gg_dark_smear;
 uniform float gg_subpixel;
+uniform float gg_aperture;
 uniform float gg_balance;
 uniform float gg_subcells;
 uniform float gg_rowgap;
@@ -86,33 +100,39 @@ uniform float gg_elemgap;
 uniform float gg_black;
 uniform float gg_white;
 uniform float gg_sat;
+uniform float gg_bluesat;
 uniform float gg_blueweak;
 uniform float gg_gamma;
 uniform float gg_backlight;
 uniform float gg_tint;
 uniform float gg_bright;
 #else
-#define gg_bleed_x   1.00
-#define gg_bleed_y   0.60
-#define gg_fringe    0.33
+#define gg_bleed_x   0.85
+#define gg_bleed_y   0.45
+#define gg_fringe    0.25
+#define gg_lumableed 0.18
+#define gg_smear_up  0.18
+#define gg_smear_luma 1.00
+#define gg_center_dark 0.20
+#define gg_dark_smear 0.75
 #define gg_subpixel  0.62
+#define gg_aperture  0.88
 #define gg_balance   0.00
 #define gg_subcells  1.00
 #define gg_rowgap    0.80
 #define gg_colgap    0.35
-#define gg_elemgap   0.00
+#define gg_elemgap   0.35
 #define gg_black     0.14
 #define gg_white     0.97
 #define gg_sat       0.55
-#define gg_blueweak  0.30
+#define gg_bluesat   0.90
+#define gg_blueweak  0.14
 #define gg_gamma     1.35
 #define gg_backlight 0.28
 #define gg_tint      0.55
 #define gg_bright    2.60
 #endif
 
-/* The lamp sat along one edge, so the light falls away from it and the far
- * corners are dimmest.  Kept gentle: the point is that it is never flat. */
 /* Three tap weights at -1, 0 and +1 source pixels, for a Gaussian of width
  * `sigma` whose centre has been moved to `shift`.  Three taps carry a narrow
  * Gaussian well enough - at sigma 0.6 the tails outside them are about five
@@ -123,16 +143,67 @@ vec3 taps(float sigma, float shift) {
    return w / max(w.x + w.y + w.z, 1e-6);
 }
 
+/* The original lamp is a horizontal CCFL tube behind a reflector, not a
+ * point source.  Distance to a horizontal line segment gives a capsule-shaped
+ * field: uniform along most of the tube, smoothly rounded only beyond its
+ * ends.  This avoids the false concentric rings produced by a radial field.
+ * X is converted to physical viewport distance because the Game Gear's
+ * logical pixels are stretched to a 4:3 aperture on Bubble. */
+float horizontal_tube_distance(vec2 uv) {
+   vec2 p = uv - vec2(0.5);
+   float beyond_end = max(abs(p.x) - 0.38, 0.0);
+   beyond_end *= OutputSize.x / OutputSize.y;
+   return length(vec2(beyond_end, p.y));
+}
+
+float tube_edge_response(vec2 uv) {
+   return smoothstep(0.0, 0.56, horizontal_tube_distance(uv));
+}
+
 float backlight(vec2 uv) {
-   vec2 c = uv - vec2(0.5, 0.42);
-   float radial = 1.0 - dot(c, c) * 0.85;
-   float edge = 1.0 - 0.18 * uv.y;
-   return mix(1.0, radial * edge, gg_backlight);
+   float away_from_tube = tube_edge_response(uv);
+   /* Preserve the previous model's measured output range (about 0.84..0.98
+    * after gg_backlight=0.28), so this changes the field's shape rather than
+    * silently making the entire panel brighter. */
+   float tube_light = 0.936 - 0.522 * away_from_tube;
+   return mix(1.0, tube_light, gg_backlight);
+}
+
+/* Analytic coverage avoids derivative instructions, which GLSL ES 1.00 does
+ * not guarantee on this hardware. */
+float periodic_box_integral(float x, float a, float b) {
+   float whole = floor(x);
+   return whole * (b - a) + clamp(fract(x) - a, 0.0, b - a);
+}
+
+float periodic_box_coverage(float centre, float width, float a, float b) {
+   float half_width = 0.5 * width;
+   return (periodic_box_integral(centre + half_width, a, b) -
+           periodic_box_integral(centre - half_width, a, b)) /
+          max(width, 1e-6);
+}
+
+/* Integral of (2*abs(fract(x)-0.5))^2. */
+float edge2_integral(float x) {
+   float whole = floor(x);
+   float p = fract(x) - 0.5;
+   return whole / 3.0 + (4.0 / 3.0) * p * p * p + 1.0 / 6.0;
+}
+
+float edge2_coverage(float centre, float width) {
+   float half_width = 0.5 * width;
+   return (edge2_integral(centre + half_width) -
+           edge2_integral(centre - half_width)) / max(width, 1e-6);
 }
 
 void main(void) {
-   /* Position inside the source pixel drives both the stripe and the gap. */
+   /* TextureSize is the backing FBO (256x256 on Bubble), while InputSize is
+    * the valid Game Gear picture (160x144).  `cell` deliberately uses the
+    * former because vTex addresses that backing texture; content_uv and every
+    * scale calculation must use the latter or the image centre is mistaken
+    * for the lower-right edge. */
    vec2 cell = vTex * TextureSize;
+   vec2 content_uv = cell / InputSize;
    vec2 phase = fract(cell);
 
    /*
@@ -157,7 +228,7 @@ void main(void) {
    vec3 wxr = taps(gg_bleed_x, -gg_fringe);
    vec3 wxg = taps(gg_bleed_x,  0.0);
    vec3 wxb = taps(gg_bleed_x,  gg_fringe);
-   vec3 wy  = taps(gg_bleed_y,  0.0);
+   vec3 wy  = taps(gg_bleed_y,  gg_smear_up);
 
    /* One column of horizontal weights, one entry per channel. */
    vec3 cl = vec3(wxr.x, wxg.x, wxb.x);
@@ -168,7 +239,7 @@ void main(void) {
     * and picking them out inside a loop needs either dynamic indexing, which
     * GLSL ES 1.00 does not promise, or a chain of comparisons that costs more
     * than the nine lines it saves. */
-   vec3 rgb =
+   vec3 diffused =
       (texture2D(Texture, vTex + vec2(-texel.x, -texel.y)).rgb * cl +
        texture2D(Texture, vTex + vec2(     0.0, -texel.y)).rgb * cc +
        texture2D(Texture, vTex + vec2( texel.x, -texel.y)).rgb * cr) * wy.x +
@@ -178,6 +249,54 @@ void main(void) {
       (texture2D(Texture, vTex + vec2(-texel.x,  texel.y)).rgb * cl +
        texture2D(Texture, vTex + vec2(     0.0,  texel.y)).rgb * cc +
        texture2D(Texture, vTex + vec2( texel.x,  texel.y)).rgb * cr) * wy.z;
+
+   /* A uniform RGB blur destroyed the tiny lettering.  The old panel looks
+    * out of focus mainly because colour crosses cell boundaries while the
+    * black matrix and dark one-dot shadows still define a luminance edge.
+    * Keep most luma from the centre texel, take chroma from the diffused
+    * sample, and admit only a small amount of diffused luma. */
+   const vec3 PANEL_LUMA = vec3(0.299, 0.587, 0.114);
+   vec3 centre_rgb = texture2D(Texture, vTex).rgb;
+   float centre_luma = dot(centre_rgb, PANEL_LUMA);
+   float diffused_luma = dot(diffused, PANEL_LUMA);
+   float preserved_luma = mix(centre_luma, diffused_luma, gg_lumableed);
+   /* Both reference panels carry the same one-source-row echo above bright
+    * detail.  Keep it directional: copying the row below upward joins the
+    * bars of one-dot lettering without applying a uniform soft-focus pass. */
+   vec3 rgb = diffused + vec3(preserved_luma - diffused_luma);
+   /* OpenGL texture Y grows upward, unlike the top-down numpy preview.  The
+    * row visually below this one is therefore -texel.y; using +texel.y copied
+    * the upper source row downward on the device. */
+   vec3 lower_rgb = texture2D(Texture,
+                              vTex - vec2(0.0, texel.y)).rgb;
+   /* Copy the source colour, not a neutral luminance echo.  Sonic 2's tiny
+    * footer glyphs intentionally mix white with two lavender palette steps;
+    * preserving those channel ratios is what lets the panel turn different
+    * letters into different-looking broken strokes. */
+   float current_row_luma = dot(rgb, PANEL_LUMA);
+   float lower_row_luma = dot(lower_rgb, PANEL_LUMA);
+   /* The photographed centre and footer cannot be matched by one global
+    * direction of row crosstalk.  Around the backlight's broad central field,
+    * lifted blacks and strong whites let either neighbour take over by the
+    * same response model used by the accepted upward-ghost preview.  Bright
+    * takeover is 100%, while dark takeover is held to 20%; increasing both
+    * together made the dark row below the tiny E win instead.
+    * Toward the panel
+    * edge, weak whites cease to invade while the denser dark state rises to
+    * 75% toward the outer edge, retaining the broken footer strokes without
+    * making the centre-to-edge weight change conspicuous in text-heavy games.
+    * This is a continuous optical/electrical field, not a title- or
+    * glyph-specific exception. */
+   /* Use the same horizontal-tube field for STN row response and illumination.
+    * A point-source radius made one-dot text cross visible circular response
+    * bands.  Distance from a line segment changes mainly from top to bottom,
+    * with only a smooth end falloff at the far left and right. */
+   float edge_response = tube_edge_response(content_uv);
+   float bright_row_mix = gg_smear_luma * (1.0 - edge_response);
+   float dark_row_mix = mix(gg_center_dark, gg_dark_smear, edge_response);
+   float row_mix = mix(bright_row_mix, dark_row_mix,
+                       step(lower_row_luma, current_row_luma));
+   rgb = mix(rgb, lower_rgb, row_mix);
 
    /*
     * The blue filter is the weakest layer on an STN panel.  It separates blue
@@ -198,7 +317,10 @@ void main(void) {
    if (gg_blueweak > 0.001) {
       const vec3 LUMA = vec3(0.299, 0.587, 0.114);
       float before = dot(rgb, LUMA);
-      vec3 washed = rgb + gg_blueweak * rgb.b * vec3(0.90, 1.00, 0.0);
+      /* The SEGA panel photograph shows blue leaking mainly toward green,
+       * not equally into red and green.  That keeps the characteristic cyan
+       * blue instead of turning it into neutral grey. */
+      vec3 washed = rgb + gg_blueweak * rgb.b * vec3(0.0, 1.00, 0.0);
       rgb = washed * (before / max(dot(washed, LUMA), 1e-5));
    }
 
@@ -206,9 +328,17 @@ void main(void) {
     * because the backlight leaks through, and the ceiling never reaches white.
     * That is a contrast range, not a gamma curve, so it is applied as one. */
    float luma = dot(rgb, vec3(0.299, 0.587, 0.114));
-   rgb = mix(vec3(luma), rgb, gg_sat);
+   float blue_dominance =
+      clamp((rgb.b - max(rgb.r, rgb.g)) / max(rgb.b, 1e-5), 0.0, 1.0);
+   float panel_sat = mix(gg_sat, gg_bluesat, blue_dominance);
+   rgb = mix(vec3(luma), rgb, panel_sat);
    rgb = pow(clamp(rgb, 0.0, 1.0), vec3(gg_gamma));
-   rgb = gg_black + rgb * (gg_white - gg_black);
+   /* The blue cell blocks considerably more red backlight than the old
+    * all-grey floor model allowed.  Keep the common floor for neutral and
+    * warm colours, but lower only its red component in blue-dominant areas. */
+   vec3 black_floor = gg_black *
+      vec3(mix(1.0, 0.55, blue_dominance), 1.0, 1.0);
+   rgb = black_floor + rgb * (gg_white - black_floor);
 
    /* RGB stripe, as three cosines a third of a cell apart.  Cosines rather
     * than the obvious triangles because three of them at 120 degrees sum to a
@@ -226,7 +356,8 @@ void main(void) {
     * larger makes the elements bigger and easier to see, at the cost of no
     * longer matching the panel one to one.  A whole number of cells keeps the
     * stripe in step with the grid - a fractional one would beat against it. */
-   float sub_phase = fract(cell.x / gg_subcells);
+   float sub_coord = cell.x / gg_subcells;
+   float sub_phase = fract(sub_coord);
    /* Quantised to the three bands of the triad before the cosine is taken, so
     * a triad is always three flat colours however wide it is.  Sampling the
     * cosine continuously instead gave a rainbow once a triad was more than
@@ -235,7 +366,50 @@ void main(void) {
     * pixel centres already land on the band centres. */
    float band = (floor(sub_phase * 3.0) + 0.5) / 3.0;
    vec3 mask = 0.5 + 0.5 * cos(TAU * (band - vec3(1.0, 3.0, 5.0) / 6.0));
-   vec3 stripe = mix(vec3(1.0), 2.0 * mask, gg_subpixel);
+   vec3 stripe_point = mix(vec3(1.0), 2.0 * mask, gg_subpixel);
+
+   /* At 4:3 one source cell is four output pixels wide, so each of its three
+    * elements is 4/3 pixels wide.  Centre sampling would favour one channel.
+    * Average the three flat bands over the output-pixel footprint instead.
+    * Exact 3x/6x paths retain their one-/two-pixel-per-element rendering. */
+   float sub_width = (InputSize.x / OutputSize.x) / gg_subcells;
+   float cov_r = periodic_box_coverage(sub_coord, sub_width, 0.0, 1.0 / 3.0);
+   float cov_g = periodic_box_coverage(sub_coord, sub_width, 1.0 / 3.0, 2.0 / 3.0);
+   float cov_b = periodic_box_coverage(sub_coord, sub_width, 2.0 / 3.0, 1.0);
+   vec3 integrated_mask =
+      cov_r * vec3(2.0, 0.5, 0.5) +
+      cov_g * vec3(0.5, 2.0, 0.5) +
+      cov_b * vec3(0.5, 0.5, 2.0);
+   vec3 stripe_integrated = mix(vec3(1.0), integrated_mask, gg_subpixel);
+   float element_pixels = (OutputSize.x / InputSize.x) * gg_subcells / 3.0;
+   float element_misalignment =
+      step(0.001, abs(element_pixels - floor(element_pixels + 0.5)));
+   vec3 stripe = mix(stripe_point, stripe_integrated, element_misalignment);
+
+   /* The 4:3 SEGA aperture gives exactly four output pixels to one source
+    * cell on Bubble.  The hardware close-up shows three colour apertures and
+    * a conspicuously dark boundary, rather than four blended colour samples.
+    * Model that as R/G/B/gap.  The gap is kept separate from subpixel colour
+    * strength because it is an aperture/black-matrix property. */
+   float scale_x = OutputSize.x / InputSize.x;
+   float four_pixel_cell =
+      (1.0 - step(0.001, abs(scale_x - 4.0))) *
+      (1.0 - step(0.001, abs(gg_subcells - 1.0)));
+   float quad_width = InputSize.x / OutputSize.x;
+   /* The black matrix is visibly thinner vertically than horizontally.  Give
+    * 90% of the cell to the three colour apertures and the final 10% to the
+    * vertical boundary.  Area coverage makes that 0.4 output pixels wide at
+    * 4x instead of the former, over-heavy full pixel. */
+   float q_r = periodic_box_coverage(cell.x, quad_width, 0.00, 0.30);
+   float q_g = periodic_box_coverage(cell.x, quad_width, 0.30, 0.60);
+   float q_b = periodic_box_coverage(cell.x, quad_width, 0.60, 0.90);
+   float q_gap = periodic_box_coverage(cell.x, quad_width, 0.90, 1.00);
+   vec3 stripe_quad =
+      q_r * mix(vec3(1.0), vec3(2.0, 0.5, 0.5), gg_subpixel) +
+      q_g * mix(vec3(1.0), vec3(0.5, 2.0, 0.5), gg_subpixel) +
+      q_b * mix(vec3(1.0), vec3(0.5, 0.5, 2.0), gg_subpixel) +
+      q_gap * vec3(1.0 - gg_aperture);
+   stripe = mix(stripe, stripe_quad, four_pixel_cell);
    /*
     * Optionally equalise the bands' luminance.
     *
@@ -285,7 +459,14 @@ void main(void) {
     * costs contrast rather than light.  That does push peaks above one, which
     * the saturation below absorbs - clipping them instead would flatten the
     * highlights and cost them their blue cast. */
-   float grid = (1.0 - gg_rowgap * edge.y * edge.y - gg_colgap * edge.x * edge.x) /
+   float source_rows_per_pixel = InputSize.y / OutputSize.y;
+   float vertical_scale = OutputSize.y / InputSize.y;
+   float vertical_misalignment =
+      step(0.001, abs(vertical_scale - floor(vertical_scale + 0.5)));
+   float row_edge2 = mix(edge.y * edge.y,
+                         edge2_coverage(cell.y, source_rows_per_pixel),
+                         vertical_misalignment);
+   float grid = (1.0 - gg_rowgap * row_edge2 - gg_colgap * edge.x * edge.x) /
                 (1.0 - (gg_rowgap + gg_colgap) / 3.0);
 
    /* The Game Gear's cast is not subtle.  Between the CCFL and the STN stack
@@ -298,7 +479,7 @@ void main(void) {
     * came out so much stronger here than on the device. */
    vec3 lamp = mix(vec3(1.0), vec3(0.90, 1.00, 0.94), gg_tint);
 
-   vec3 outc = rgb * stripe * grid * lamp * backlight(vTex);
+   vec3 outc = rgb * stripe * grid * lamp * backlight(content_uv);
 
    /* Backlight saturation.  A cell cannot pass more light than there is
     * behind it, so the response rolls off rather than clipping: this lifts the

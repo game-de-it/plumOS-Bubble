@@ -54,55 +54,34 @@ because the backlight leaks through and the ceiling never reaches white, so
 this is applied as a contrast range rather than a gamma curve, with a little
 desaturation on top.
 
-**The blue cast, which is not subtle.** Between the CCFL and the STN stack the
-whole panel sits blue-cyan: light greys come out pale blue and never white.
-It is the first thing you notice in a photograph of a real Game Gear, and
-leaving it out is what makes an LCD filter look generic. A source white ends
-up around R:G:B of 1 : 1.1 : 1.3.
+**SEGA panel colour.** Blue content is washed out selectively by the original
+STN colour stack, but it must remain recognisably blue. Whites retain a faint
+green-cyan cast from the lamp rather than becoming modern neutral white. The
+Majesco panel is a separate, warmer/yellower variant and is intentionally not
+folded into this first SEGA profile.
 
 **Backlight.** The CCFL sat along one edge, so the light falls away from it
 and the far corners are dimmest. A real Game Gear photograph is never evenly
 lit. Kept gentle - the point is only that it is not flat.
 
-## Scaling: the picture must be an exact 3x
+## Scaling: 4:3 non-square dots without moire
 
-This is a requirement, not a preference. The panel pass takes the phase of its
-cell grid and its RGB stripe from the source pixel, so it is only correct when
-a source pixel covers a whole number of output pixels.
+The SEGA profile maps the 160x144 image to the Bubble's full 640x480 aperture.
+One source dot is therefore 4.00 output pixels across and 3.33 pixels down: it
+is a horizontal rectangle, not a square.
 
-160x144 into 640x480 is 4.00x across but 3.33x down, so the largest integer
-that fits both axes is three: 480x432, centred, leaving an 80px border either
-side and 24px above and below. `plumos-retroarch-launch` pins that with a
-custom viewport for the Game Gear launch only.
+Point sampling the panel structure at this ratio is wrong. Three RGB elements
+cannot be assigned evenly to four output-pixel centres, and the 3.33x row
+period beats against the output grid. The panel pass instead integrates the
+coverage of each RGB element and the row-edge curve across the physical area
+of one output pixel. The RGB integral is analytic, so red, green and blue have
+equal total coverage. The row integral removes the slow interference pattern
+without deleting the intended fine horizontal structure.
 
-RetroArch treats `custom_viewport_x/y` as offsets from the placement selected
-by `video_viewport_bias_x/y`, not as absolute screen coordinates. With the
-default 0.5 biases, `x=0, y=0` centres this rectangle at physical x=80/y=24.
-Writing 80/24 into the custom fields applies the centring twice and shifts the
-picture right and down.
-
-Letting RetroArch fit the picture instead is visibly wrong rather than subtly
-so. On a flat grey field, measured through the reference implementation:
-
-| Output | Scale | Column swing | Row swing | Mean R:G:B |
-|---|---|---:|---:|---|
-| 640x480 | 4.00x / 3.33x | 21% | 128% | 0.82 : 1.00 : 0.95 |
-| 576x432 | 3.60x / 3.00x | 38% | 34% | 0.92 : 1.00 : 1.05 |
-| 533x480 | 3.33x / 3.33x | 53% | 139% | 0.92 : 1.00 : 1.04 |
-| **480x432** | **3.00x / 3.00x** | **15%** | **33%** | 0.92 : 1.00 : 1.05 |
-
-At an exact 3x the remaining swing is the intended structure, regular and at a
-three pixel period. Off it, the row gaps beat against the output grid and
-march up the screen at more than four times that amplitude. At 640x480 the
-stripe must also fit three elements into four pixels, which cannot be done
-evenly: red comes out 18% low and tints the whole picture.
-
-A custom viewport rather than square-pixel aspect plus integer scaling,
-because this panel is 640x480 and nothing else, so an exact rectangle is worth
-more here than portability - and it depends on neither what the core reports
-for its aspect ratio nor on how RetroArch rounds. A port to a different
-display should work out its own largest integer scale rather than reuse these
-numbers.
+The implementation avoids `fwidth`/derivatives because this device uses GLSL
+ES 1.00. Exact 3x remains available as a diagnostic comparison with
+`PLUMOS_GAMEGEAR_LCD_GEOMETRY=integer3x`; aligned 3x/6x element layouts retain
+the original point-sampled appearance.
 
 ## Colour: the blue filter is the weak one
 
@@ -156,11 +135,11 @@ on blue. Dividing that out makes the bands differ in hue alone. That was added
 to stop grey areas banding when the triad was two cells wide, and at six
 pixels a period it was the right call.
 
-At the physical pitch it is the wrong one. An element is one output pixel at
-3x, so the ripple is three pixels - below what the eye separates into lines,
-and the only thing making the elements visible rather than a flat wash. With
-it on, the device showed no RGB structure at all. `Element luma balance`
-therefore defaults to 0 and should be raised only alongside `Subpixel size`.
+At the physical pitch it is the wrong one. At exact 3x an element is one
+output pixel; at 4:3 the three elements share four output pixels through area
+coverage. In both cases the small luminance ripple is part of what makes the
+elements visible rather than a flat wash. `Element luma balance` therefore
+defaults to 0 and should be raised only alongside `Subpixel size`.
 
 Colour alone does not carry it: measured on flat grey, balancing changes the
 chroma across a triad not at all (0.343 to 0.345) while more than halving the
@@ -269,7 +248,8 @@ Adjustable from RetroArch's shader parameters menu.
 | Black level | 0.14 | how far the backlight lifts black |
 | White level | 0.97 | how far short of white the panel stops |
 | Saturation | 0.55 |
-| Weak blue filter | 0.30 | how far blue content loses its colour without losing its brightness | |
+| SEGA blue saturation | 0.90 | saturation used only where blue dominates; other hues keep the common saturation |
+| Blue-to-green leak | 0.06 | weak green leakage in blue content, without the former red leakage that turned blue grey |
 | Panel gamma | 1.35 | |
 | Backlight unevenness | 0.28 | falloff away from the lamp |
 | Panel cast | 0.55 | the lamp's own colour, a faint green |
@@ -294,6 +274,8 @@ Master System, Mega Drive and Sega CD content, so a core preset would leak the
 Game Gear panel into those systems. For device diagnosis only,
 `PLUMOS_GAMEGEAR_LCD_PRESET=panel-only` selects the one-pass preset and
 `PLUMOS_GAMEGEAR_LCD_PRESET=off` restores the unshaded route for that launch.
+`PLUMOS_GAMEGEAR_LCD_GEOMETRY=integer3x` selects the old 480x432 comparison;
+the default `sega43` route is 640x480.
 
 ## Verifying it
 

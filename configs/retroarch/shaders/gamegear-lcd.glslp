@@ -13,7 +13,7 @@
 # GLSL rather than slang: this device's RetroArch is built --enable-opengles
 # --disable-opengl_core, so the slang path does not exist here.
 
-shaders = "2"
+shaders = "3"
 
 shader0 = "gamegear-lcd-response.glsl"
 filter_linear0 = "false"
@@ -29,3 +29,9 @@ filter_linear1 = "false"
 scale_type1 = "viewport"
 scale1 = "1.0"
 wrap_mode1 = "clamp_to_edge"
+
+shader2 = "gamegear-lcd-optics.glsl"
+filter_linear2 = "false"
+scale_type2 = "viewport"
+scale2 = "1.0"
+wrap_mode2 = "clamp_to_edge"
