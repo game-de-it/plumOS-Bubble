@@ -35,7 +35,7 @@ P = {
     "elemgap": 0.35,
     "black": 0.12,
     "white": 0.97,
-    "sat": 0.55,
+    "sat": 0.85,
     "bluesat": 1.20,
     "blueweak": 0.15,
     "gamma": 1.35,
@@ -43,18 +43,30 @@ P = {
     "tint": 0.55,
     "bright": 2.60,
     "rise": 0.62,
-    "fall": 0.34,
+    "trail_frames": 12.0,
 }
 
 
-def response(frames):
-    """Pass 1.  frames[0] is current, then progressively older."""
-    cur = frames[0]
-    weights = [0.42, 0.28, 0.18, 0.12]
-    history = sum(w * f for w, f in zip(weights, frames[1:5]))
+def response(cur, history, previous_age):
+    """Pass 1. Finite feedback response; alpha is modelled as previous_age."""
+    falling_delta = np.max(history - cur, axis=2)
+    largest_delta = np.max(np.abs(history - cur), axis=2)
+    has_change = (largest_delta >= 2.0 / 255.0).astype(np.float32)
+    has_falling = ((falling_delta >= 2.0 / 255.0).astype(np.float32) *
+                   has_change)
+    frames = max(P["trail_frames"], 1.0)
+    next_age = np.minimum(previous_age + 1.0, frames) * has_falling
+    remaining = np.maximum(frames - previous_age, 1.0)
+    next_remaining = np.maximum(frames - next_age, 0.0)
+    retention = (next_remaining * next_remaining) / (remaining * remaining)
+    fall_speed = 1.0 - has_falling * retention
     rising = (cur >= history).astype(np.float32)
-    speed = P["fall"] + (P["rise"] - P["fall"]) * rising
-    return history + (cur - history) * speed
+    speed = fall_speed[..., None] + (
+        P["rise"] - fall_speed[..., None]) * rising
+    response_rgb = history + (cur - history) * speed
+    response_rgb = (cur * (1.0 - has_change[..., None]) +
+                    response_rgb * has_change[..., None])
+    return response_rgb, next_age
 
 
 def taps(sigma, shift):
@@ -303,11 +315,16 @@ def main():
     to_panel(optics(integer_panel)).save(
         "%s/lcd-on-integer3x.png" % out_dir)
 
-    # The response pass needs a history, so run a short motion sequence.
+    # The response pass feeds its preceding output back, so run the entire
+    # Twelve-frame motion sequence exactly as the preset does on the device.
     seq = [moving_square(i) for i in range(12)]
-    hist = [seq[-1 - i] for i in range(5)]
+    response_frame = seq[0]
+    response_age = np.zeros(seq[0].shape[:2], np.float32)
+    for current_frame in seq[1:]:
+        response_frame, response_age = response(
+            current_frame, response_frame, response_age)
     to_panel(optics(panel(seq[-1]))).save("%s/lcd-motion-off.png" % out_dir)
-    to_panel(optics(panel(response(hist)))).save("%s/lcd-motion-on.png" % out_dir)
+    to_panel(optics(panel(response_frame))).save("%s/lcd-motion-on.png" % out_dir)
 
     print("wrote 4:3 and integer3x LCD previews to", out_dir)
 

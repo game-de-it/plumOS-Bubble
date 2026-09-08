@@ -35,6 +35,21 @@ cp configs/retroarch/shaders/gamegear-lcd.glslp \
 # TextureSize is correct for texel addressing, but all content position and
 # output-scale decisions must use InputSize or host previews cannot match it.
 panel_shader=configs/retroarch/shaders/gamegear-lcd-panel.glsl
+response_shader=configs/retroarch/shaders/gamegear-lcd-response.glsl
+grep -Fq 'feedback_pass = "0"' configs/retroarch/shaders/gamegear-lcd.glslp
+grep -Fq 'uniform sampler2D FeedbackTexture;' "$response_shader"
+grep -Fq '#define gg_rise 0.62' "$response_shader"
+grep -Fq '#define gg_trail_frames 12.0' "$response_shader"
+grep -Fq 'float previous_age = floor(feedback.a * frames + 0.5);' "$response_shader"
+grep -Fq 'float settle_epsilon = 2.0 / 255.0;' "$response_shader"
+grep -Fq 'float has_change = step(settle_epsilon, largest_delta);' "$response_shader"
+grep -Fq 'float retention = (next_remaining * next_remaining) /' "$response_shader"
+grep -Fq 'float fall_speed = mix(1.0, 1.0 - retention, has_falling);' "$response_shader"
+grep -Fq 'gl_FragColor = vec4(response, next_age / frames);' "$response_shader"
+! grep -Fq 'gg_peak_hold' "$response_shader"
+grep -Fq '"rise": 0.62' scripts/preview-gamegear-lcd.py
+grep -Fq '"trail_frames": 12.0' scripts/preview-gamegear-lcd.py
+grep -Fq 'response_rgb * has_change[..., None])' scripts/preview-gamegear-lcd.py
 grep -Fq 'vec2 content_uv = cell / InputSize;' "$panel_shader"
 grep -Fq 'float horizontal_tube_distance(vec2 uv)' "$panel_shader"
 grep -Fq 'float edge_response = tube_edge_response(content_uv);' "$panel_shader"
@@ -60,6 +75,8 @@ grep -Fq '#define gg_bluesat   1.20' "$panel_shader"
 grep -Fq '"bluesat": 1.20' scripts/preview-gamegear-lcd.py
 grep -Fq '#define gg_blueweak  0.15' "$panel_shader"
 grep -Fq '"blueweak": 0.15' scripts/preview-gamegear-lcd.py
+grep -Fq '#define gg_sat       0.85' "$panel_shader"
+grep -Fq '"sat": 0.85' scripts/preview-gamegear-lcd.py
 grep -Fq '#define gg_aperture  1.00' "$panel_shader"
 grep -Fq '"aperture": 1.00' scripts/preview-gamegear-lcd.py
 grep -Fq 'const float B1_REFERENCE_MEAN = 0.912;' "$panel_shader"

@@ -88,3 +88,53 @@ Git tag: `shader-sega-hccfl-b2`
 - 現在の基準: `SEGA-HCCFL-B2`
 - B2から一要素を外す比較: `B2 - <補正名>`
 - B2へ一要素を加える比較: `B2 + <候補名>`
+
+## SEGA-HCCFL-B3
+
+正式呼称: **SEGA Horizontal CCFL Baseline 3**
+
+Git tag: `shader-sega-hccfl-b3`
+
+### この名前が示す状態
+
+- B2の4:3非スクエアピクセル、上方向侵食、横向きCCFL、`R/G/B/K`縦帯を維持
+- B2以降の実機比較で選択した一般彩度0.85
+- 黒レベル0.12、青領域彩度1.20、青→緑漏れ0.15を維持
+- pass 0の前回出力を`FeedbackTexture`として利用する有限時間応答
+- 明方向の立ち上がり0.62、暗方向は二次曲線で12フレーム目に完全消去
+- feedback alphaで画素ごとの残像経過フレーム数を保持
+- RGB565入力とRGBA8 feedbackの量子化差を`2/255`以内で静止と判定し、現在値へ収束
+- 動きのある場面で残像を確認し、静止後に残像が動き続けないことを実機で合格とした状態
+
+### 実機性能
+
+Game Gearを通常FE経路からRetroArch + Genesis Plus GXで実行中に10秒間測定した。
+
+- RetroArch CPU使用率: 平均10.9%、最大16%
+- CPU全体: 平均84% idle、I/O wait 0%
+- governor: `ondemand`
+- CPU周波数: 1.104〜1.992 GHz、平均1.565 GHz
+- SoC温度: 最大52.5℃
+- GPU温度: 最大54.4℃
+- thermal throttling / cpufreq error: なし
+
+### ファイル識別子
+
+```text
+0e834077aaf445a98a0afcb2d2e65888bdbe35da59e0d5e1de0cbaeda03c3e5a  configs/retroarch/shaders/gamegear-lcd.glslp
+2c1c82437767791933398b9fea8048f38e97b4487b3f2fbc7fea9b8dfef7fbfa  configs/retroarch/shaders/gamegear-lcd-response.glsl
+da933d082861d50291e27caa819f5c9eb25eb3b292cf7a51ff4dc2a704391b8b  configs/retroarch/shaders/gamegear-lcd-panel.glsl
+66df44db5c4dc95df72af0f77ea74b747c503c3c66d09d39391467c9a21c3a44  configs/retroarch/shaders/gamegear-lcd-optics.glsl
+31c243d52b5b085e7da5ed85e5b2f1f336879eb3a147c21382e76f636423c3f7  configs/retroarch/shaders/gamegear-lcd-panel-only.glslp
+452ade92ee29fa8e93dba78f1602fa3598c5b712676f10c08fb8b6f1452df18b  scripts/preview-gamegear-lcd.py
+4d5de4452eb0aad6a8550a38b9717219ab214b4cecca8f4062f19a9ae30a9d2e  package/frontend-bubble/plumos/bin/plumos-retroarch-launch
+```
+
+実機の5 shader/presetファイルは上記host hashへreadback一致済み。B2からB3までの
+中間版は実機上の`/storage/plumos/state/shader-backups/20260908-*`へ保存されている。
+
+### 比較時の呼び方
+
+- 現在の基準: `SEGA-HCCFL-B3`
+- B3から時間応答を外す比較: `B3 - temporal response`
+- B3から一要素を変更する比較: `B3 +/- <補正名>`

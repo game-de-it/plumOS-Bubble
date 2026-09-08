@@ -15,6 +15,11 @@
 
 shaders = "3"
 
+# Feed pass 0's previous output back into FeedbackTexture. This gives the STN
+# response a smooth twelve-frame decay without relying on RetroArch's shorter
+# raw PREV texture history.
+feedback_pass = "0"
+
 shader0 = "gamegear-lcd-response.glsl"
 filter_linear0 = "false"
 scale_type0 = "source"

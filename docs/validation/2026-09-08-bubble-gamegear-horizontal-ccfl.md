@@ -515,3 +515,294 @@ The incoming path was consumed by the atomic rename. The mutable shader is not
 covered by `/mnt/plumos/checksums.sha256`; no managed metadata or other
 frontend component was changed. No reboot was required. Physical copyright
 erosion, blue colour and vertical-separator acceptance remain pending.
+
+## B2 without general STN desaturation live experiment
+
+The complete preceding state was first committed as `117f7e0` and tagged
+`shader-sega-hccfl-b2`. The device copy of its panel shader was also backed up
+and hash-verified at:
+
+```
+/storage/plumos/state/shader-backups/20260908-sega-hccfl-b2/gamegear-lcd-panel.glsl.SEGA-HCCFL-B2.0744f57f
+0744f57ff36af4568490073bde1dbbd4f5cff45d728dcc1ebf77705abe92267f
+```
+
+For the requested experiment, only the general STN saturation factor
+`gg_sat` was changed from 0.55 to 1.00. The blue-specific
+`gg_bluesat=1.20` and `gg_blueweak=0.15`, temporal response, directional row
+invasion, CCFL field, RGBK apertures and optics pass all remain enabled.
+
+The launcher contract passed. The normal frontend was the sole display owner;
+no emulator, standalone application or GGFE process was running. Incoming,
+final and host readback hashes matched:
+
+```
+877cabde95adec59d1fb130b78a31f5e4fcbbd72a225184249fe0b69c4091172
+```
+
+The incoming path was consumed by the atomic rename. The mutable shader is not
+covered by `/mnt/plumos/checksums.sha256`; no managed metadata or other
+frontend component was changed. No reboot was required. Physical comparison
+against B2 remains pending.
+
+## B2 general saturation 0.85 live experiment
+
+After comparing B2 saturation 0.55, intermediate 0.85 and desaturation-off
+1.00 under the same source and geometry, the intermediate value was selected
+for physical inspection. Only `gg_sat` changed from 1.00 to 0.85; all other B2
+panel, colour, response and optics values remain unchanged.
+
+The preceding 1.00 device shader was backed up and hash-verified at:
+
+```
+/storage/plumos/state/shader-backups/20260908-b2-sat085/gamegear-lcd-panel.glsl.sat100.877cabde
+877cabde95adec59d1fb130b78a31f5e4fcbbd72a225184249fe0b69c4091172
+```
+
+The launcher contract passed. The normal frontend was the sole display owner;
+no emulator, standalone application or GGFE process was running. Incoming,
+final and host readback hashes matched:
+
+```
+da933d082861d50291e27caa819f5c9eb25eb3b292cf7a51ff4dc2a704391b8b
+```
+
+The incoming path was consumed by the atomic rename. The mutable shader is not
+covered by `/mnt/plumos/checksums.sha256`; no managed metadata or other
+frontend component was changed. No reboot was required. Physical comparison
+against B2 and saturation 1.00 remains pending.
+
+## B2 saturation 0.85 with extreme temporal ghost live experiment
+
+To make the temporal response unmistakable before tuning it downward, only
+the response speeds were changed: `gg_rise` from 0.62 to 0.20 and `gg_fall`
+from 0.34 to 0.05. This retains 80% of the four-frame history on a dark-to-
+light transition and 95% on a light-to-dark transition. The history weights
+remain 42/28/18/12 percent. The B2-derived panel shader, including saturation
+0.85, blue fit, RGBK separator and spatial row invasion, remains unchanged.
+
+The preceding B2 response shader was backed up and hash-verified at:
+
+```
+/storage/plumos/state/shader-backups/20260908-b2-extreme-ghost/gamegear-lcd-response.glsl.rise062-fall034.3cf9ec82
+3cf9ec8273ed49f106c94f0e104842449658b2faac9bf6c04fbf662bbeb5a6a6
+```
+
+The launcher contract passed. The normal frontend was the sole display owner;
+no emulator, standalone application or GGFE process was running. Incoming,
+final and host readback response-shader hashes matched:
+
+```
+7f1b9e4997ccc6cf3d8fb9f0cb365ffae484e51b29be37e5cdb09b16536fa8a1
+```
+
+The active panel shader remained the saturation 0.85 version with hash
+`da933d082861d50291e27caa819f5c9eb25eb3b292cf7a51ff4dc2a704391b8b`.
+No reboot was required. Physical motion acceptance remains pending.
+
+## B2 saturation 0.85 with 100% bright peak-hold live experiment
+
+The speed-only experiment above was visible but did not produce a sufficiently
+strong afterimage on the Bubble. For a deliberately destructive diagnostic,
+`gg_peak_hold=1.00` now preserves the brightest per-channel value found in the
+four-frame history whenever the current transition is light-to-dark. The
+asymmetric response remains extreme (`gg_rise=0.20`, `gg_fall=0.05`), so a
+moving bright object can leave up to four near-full-brightness silhouettes.
+This is intentionally an upper-bound experiment rather than a final STN fit.
+
+The preceding speed-only response shader was backed up and hash-verified at:
+
+```
+/storage/plumos/state/shader-backups/20260908-b2-peak-hold100/gamegear-lcd-response.glsl.speed-only.7f1b9e49
+7f1b9e4997ccc6cf3d8fb9f0cb365ffae484e51b29be37e5cdb09b16536fa8a1
+```
+
+The normal frontend was the sole display owner during deployment. Incoming,
+final and host readback response-shader hashes matched:
+
+```
+7e42fe55b3310563d78e3bdc93a33a1689fad55b39a254fcf82fcdf0b9bd63b3
+```
+
+The active panel shader remained unchanged at the B2-derived saturation 0.85
+hash `da933d082861d50291e27caa819f5c9eb25eb3b292cf7a51ff4dc2a704391b8b`.
+The incoming path was consumed by the atomic rename. No reboot was required.
+Physical motion acceptance remains pending.
+
+## B2 saturation 0.85 with smooth twelve-frame feedback experiment
+
+The four-frame 100% peak hold above looked like panel flicker and reduced the
+perceived trail. It was replaced with pass-0 feedback: the response pass now
+reads its own preceding output through `FeedbackTexture`, enabled by
+`feedback_pass = "0"` in the full preset. This is required because RetroArch's
+GLSL raw-input history only exposes `PREV` through `PREV6`, fewer than the
+requested twelve frames.
+
+Peak hold was removed and the B2 light-rise speed was restored to 0.62. A
+bright-to-dark transition now decays continuously to ten percent after twelve
+frames (about 200 ms at 60 Hz), with no fixed-frame cutoff. The host model
+measured 0.1212 remaining in each RGB channel at the oldest test position after
+eleven decay steps; the difference from exactly 0.10 is the sequence indexing,
+not a channel imbalance.
+
+The preceding peak-hold response and non-feedback preset were backed up and
+hash-verified at:
+
+```
+/storage/plumos/state/shader-backups/20260908-b2-feedback12/gamegear-lcd-response.glsl.peak-hold100.7e42fe55
+7e42fe55b3310563d78e3bdc93a33a1689fad55b39a254fcf82fcdf0b9bd63b3
+/storage/plumos/state/shader-backups/20260908-b2-feedback12/gamegear-lcd.glslp.no-feedback.4b259374
+4b25937456e7ebff6f6e586e097b138a4d4565c7c2ec30991e82a2a16347a3ac
+```
+
+Incoming, final and host readback hashes matched:
+
+```
+02485188f6eb1b15a48f8703d4d702e7c6a448b16d661ee8895cc1d69ca735b5  gamegear-lcd-response.glsl
+0e834077aaf445a98a0afcb2d2e65888bdbe35da59e0d5e1de0cbaeda03c3e5a  gamegear-lcd.glslp
+```
+
+The normal frontend was the sole display owner during deployment. The active
+panel shader remained unchanged at the B2-derived saturation 0.85 hash
+`da933d082861d50291e27caa819f5c9eb25eb3b292cf7a51ff4dc2a704391b8b`.
+No reboot was required. Device shader compilation and physical motion
+acceptance remain pending until a Game Gear title is launched by the normal
+frontend route.
+
+## B2 saturation 0.85 with smooth nine-frame feedback experiment
+
+The twelve-frame feedback experiment produced the intended visible trail and
+was shortened at the user's request without changing the response model. Only
+`gg_trail_frames` changed from 12.0 to 9.0. Peak hold remains disabled, rise
+speed remains 0.62, and a bright-to-dark transition now decays smoothly to ten
+percent after nine frames (about 150 ms at 60 Hz). The host model measured
+exactly 0.1000 remaining in every RGB channel after nine decay steps.
+
+The preceding twelve-frame response was backed up and hash-verified at:
+
+```
+/storage/plumos/state/shader-backups/20260908-b2-feedback9/gamegear-lcd-response.glsl.feedback12.02485188
+02485188f6eb1b15a48f8703d4d702e7c6a448b16d661ee8895cc1d69ca735b5
+```
+
+Incoming, final and host readback hashes matched:
+
+```
+8ea3e502a174aee22b1c4b7e02ad72f74aaae65c5abcbcd6c9d18171e31249a4
+```
+
+Only the response shader was deployed. The feedback preset remained at hash
+`0e834077aaf445a98a0afcb2d2e65888bdbe35da59e0d5e1de0cbaeda03c3e5a`
+and the B2-derived saturation 0.85 panel shader remained at hash
+`da933d082861d50291e27caa819f5c9eb25eb3b292cf7a51ff4dc2a704391b8b`.
+No reboot was required. Physical motion acceptance remains pending.
+
+## B2 saturation 0.85 with finite nine-frame feedback experiment
+
+The exponential nine-frame experiment could leave a visible remainder through
+long dark holds during scene transitions: nine frames meant ten percent raw
+response, not zero, and the panel brightness curve amplified that remainder.
+The response now stores each falling pixel's age in feedback alpha and uses a
+finite quadratic envelope `((N-n)/N)^2`. It retains 79.01, 60.49 and 44.44
+percent over the first three frames, then 1.23 percent at frame eight and
+exactly zero at frame nine. This keeps the early trail close to the preceding
+experiment while guaranteeing that no pixel survives beyond the requested
+nine-frame lifetime.
+
+The preceding unbounded nine-frame response was backed up and hash-verified at:
+
+```
+/storage/plumos/state/shader-backups/20260908-b2-feedback9-finite/gamegear-lcd-response.glsl.feedback9-infinite.8ea3e502
+8ea3e502a174aee22b1c4b7e02ad72f74aaae65c5abcbcd6c9d18171e31249a4
+```
+
+Incoming, final and host readback hashes matched:
+
+```
+31ef132698674e9c50c7c08508bbab39815838e034ccfedcd6fc65b41a581cfe
+```
+
+Only the response shader was deployed. The feedback preset and B2-derived
+saturation 0.85 panel shader remained unchanged. The normal frontend was the
+sole display owner during deployment. No reboot was required. Device shader
+compilation and physical scene-transition acceptance remain pending.
+
+## B2 saturation 0.85 with finite twelve-frame feedback experiment
+
+The finite quadratic feedback model was retained unchanged and only
+`gg_trail_frames` was increased from 9.0 to 12.0. Host simulation measured
+84.03, 69.44 and 56.25 percent retention over the first three frames, 0.69
+percent at frame eleven, and exactly zero at frame twelve. Unlike the earlier
+unbounded twelve-frame experiment, no recursive remainder survives beyond the
+configured lifetime.
+
+The preceding finite nine-frame response was backed up and hash-verified at:
+
+```
+/storage/plumos/state/shader-backups/20260908-b2-feedback12-finite/gamegear-lcd-response.glsl.feedback9-finite.31ef1326
+31ef132698674e9c50c7c08508bbab39815838e034ccfedcd6fc65b41a581cfe
+```
+
+Incoming, final and host readback hashes matched:
+
+```
+474731b8c6a4f81e2649705f72a5fa5c8e2001beb25daf35147bd2322ddcc66f
+```
+
+Only the response shader was deployed. The feedback preset and B2-derived
+saturation 0.85 panel shader remained unchanged. The normal frontend was the
+sole display owner during deployment. No reboot was required. Device shader
+compilation and physical scene-transition acceptance remain pending.
+
+## Finite twelve-frame static-settle correction
+
+Physical inspection found that a stationary image could continue to look as
+if its trail were moving. The cause was reproduced mechanically: pass 0 is an
+RGBA8 feedback target while the core commonly supplies RGB565. The former
+`1/1024` comparison threshold was smaller than the conversion error, falsely
+restarting the falling-age counter for 8 of 32 red/blue levels and 15 of 64
+green levels.
+
+The response now treats an absolute RGB difference below `2/255` as settled
+and snaps every channel to the current source value. Exhaustive host checks of
+all RGB565 channel levels found zero false restarts and zero settled residual.
+Real transitions retain the same finite quadratic curve and still reach
+exactly zero on frame twelve.
+
+The preceding finite twelve-frame response was backed up and hash-verified at:
+
+```
+/storage/plumos/state/shader-backups/20260908-b2-feedback12-settle/gamegear-lcd-response.glsl.feedback12-no-settle.474731b8
+474731b8c6a4f81e2649705f72a5fa5c8e2001beb25daf35147bd2322ddcc66f
+```
+
+Incoming, final and host readback hashes matched:
+
+```
+2c1c82437767791933398b9fea8048f38e97b4487b3f2fbc7fea9b8dfef7fbfa
+```
+
+Only the response shader was deployed. The normal frontend was the sole
+display owner at deployment time; the feedback preset and panel shader were
+unchanged. No reboot was required. Physical stationary-image acceptance
+remains pending.
+
+## SEGA-HCCFL-B3 final acceptance
+
+The user physically accepted the corrected finite twelve-frame response: the
+trail looked appropriate during motion and stopped after the picture became
+stationary. The five active device shader/preset files were read back and
+matched the host B3 hashes recorded in
+`docs/gamegear-lcd-shader-baselines.md`. The frontend was the sole DRM owner
+after the game returned.
+
+During ten seconds of normal FE-launched Game Gear play, RetroArch used 10.9%
+CPU on average and 16% at peak; the whole CPU remained 84% idle on average.
+The shared RK3566 CPU policy stayed on `ondemand` and moved between 1.104 and
+1.992 GHz, reaching its configured maximum under higher load. SoC temperature
+peaked at 52.5 C and GPU temperature at 54.4 C. I/O wait remained zero and the
+kernel log contained no thermal, overheating or cpufreq error. No performance
+governor override is required for this shader.
+
+This accepted state is named **SEGA-HCCFL-B3** and is fixed by the annotated
+Git tag `shader-sega-hccfl-b3`.

@@ -235,7 +235,12 @@ Adjustable from RetroArch's shader parameters menu.
 | Parameter | Default | What it does |
 |---|---:|---|
 | LCD rise speed | 0.62 | how fast a cell brightens; lower smears more |
-| LCD fall speed | 0.34 | how fast it darkens; the asymmetry is the trail |
+| LCD trail frames | 12 | finite lifetime of a bright-to-dark trail; feedback alpha tracks age and reaches the current frame exactly at this count |
+
+The response pass treats differences below `2/255` as framebuffer
+quantisation and snaps them to the current sample. This prevents an RGB565
+source and RGBA8 feedback buffer from repeatedly restarting the trail while
+the picture is stationary.
 | Diffusion across | 1.00 | how far a cell's light spreads sideways, in source pixels |
 | Diffusion down | 0.60 | the same downwards; smaller, so the row lines survive it |
 | Element offset | 0.33 | how far red and blue sit either side of the cell centre |

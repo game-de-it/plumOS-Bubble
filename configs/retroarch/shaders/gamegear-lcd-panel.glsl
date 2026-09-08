@@ -41,7 +41,7 @@
 #pragma parameter gg_elemgap    "Element gap"           0.35 0.00 1.00 0.05
 #pragma parameter gg_black      "Black level"           0.12 0.00 0.40 0.005
 #pragma parameter gg_white      "White level"           0.97 0.60 1.10 0.01
-#pragma parameter gg_sat        "Saturation"            0.55 0.20 1.20 0.02
+#pragma parameter gg_sat        "Saturation"            0.85 0.20 1.20 0.02
 #pragma parameter gg_bluesat    "SEGA blue saturation"  1.20 0.20 1.20 0.02
 #pragma parameter gg_blueweak   "Blue-to-green leak"    0.15 0.00 0.80 0.01
 #pragma parameter gg_gamma      "Panel gamma"           1.35 0.60 2.20 0.05
@@ -124,7 +124,7 @@ uniform float gg_bright;
 #define gg_elemgap   0.35
 #define gg_black     0.12
 #define gg_white     0.97
-#define gg_sat       0.55
+#define gg_sat       0.85
 #define gg_bluesat   1.20
 #define gg_blueweak  0.15
 #define gg_gamma     1.35

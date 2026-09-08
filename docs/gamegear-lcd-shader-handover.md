@@ -173,7 +173,7 @@ RetroArchのシェーダーパラメータメニューから調整できる。�
 | RGB素子が小さい／大きい | `Subpixel size (cells)`。1が実寸、2以上は強調 |
 | 色縞がうるさい | `Subpixel strength` を下げる |
 | 灰色部分に縦線が出る | 対策済み（下記「縦線について」）。なお残るなら `Column gap` を下げる |
-| 残像が長すぎる／足りない | `LCD fall speed`（下げると尾が伸びる） |
+| 残像が長すぎる／足りない | `LCD trail frames`（増やすと尾が伸びる） |
 
 調整結果が良ければ、その値を `gamegear-lcd-panel.glsl` の `#pragma parameter`
 既定値へ反映してコミットすること。実機で決めた値のほうが正しい。
