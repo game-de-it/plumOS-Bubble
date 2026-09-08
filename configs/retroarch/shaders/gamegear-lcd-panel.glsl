@@ -31,19 +31,19 @@
 #pragma parameter gg_smear_up   "Upward colour trail"   0.18 0.00 0.60 0.02
 #pragma parameter gg_smear_luma "Centre bright invasion" 1.00 0.00 1.00 0.05
 #pragma parameter gg_center_dark "Centre dark invasion"   0.20 0.00 1.00 0.05
-#pragma parameter gg_dark_smear "Edge dark invasion"     0.75 0.00 1.00 0.05
+#pragma parameter gg_dark_smear "Edge dark invasion"     0.90 0.00 1.00 0.05
 #pragma parameter gg_subpixel   "Subpixel strength"     0.62 0.00 1.00 0.02
-#pragma parameter gg_aperture   "4:3 aperture gap"      0.88 0.00 1.00 0.02
+#pragma parameter gg_aperture   "Major separator opacity" 1.00 0.00 1.00 0.02
 #pragma parameter gg_balance    "Element luma balance"  0.00 0.00 1.00 0.05
 #pragma parameter gg_subcells   "Subpixel size (cells)" 1.00 1.00 4.00 1.00
-#pragma parameter gg_rowgap     "Row gap"               0.80 0.00 1.00 0.05
+#pragma parameter gg_rowgap     "Row gap"               0.00 0.00 1.00 0.05
 #pragma parameter gg_colgap     "Column gap"            0.35 0.00 1.00 0.05
 #pragma parameter gg_elemgap    "Element gap"           0.35 0.00 1.00 0.05
-#pragma parameter gg_black      "Black level"           0.14 0.00 0.40 0.005
+#pragma parameter gg_black      "Black level"           0.12 0.00 0.40 0.005
 #pragma parameter gg_white      "White level"           0.97 0.60 1.10 0.01
 #pragma parameter gg_sat        "Saturation"            0.55 0.20 1.20 0.02
-#pragma parameter gg_bluesat    "SEGA blue saturation"  0.90 0.20 1.20 0.02
-#pragma parameter gg_blueweak   "Blue-to-green leak"    0.14 0.00 0.80 0.02
+#pragma parameter gg_bluesat    "SEGA blue saturation"  1.20 0.20 1.20 0.02
+#pragma parameter gg_blueweak   "Blue-to-green leak"    0.15 0.00 0.80 0.01
 #pragma parameter gg_gamma      "Panel gamma"           1.35 0.60 2.20 0.05
 #pragma parameter gg_backlight  "Backlight unevenness"  0.28 0.00 1.00 0.02
 #pragma parameter gg_tint       "Panel cast"            0.55 0.00 1.00 0.05
@@ -114,19 +114,19 @@ uniform float gg_bright;
 #define gg_smear_up  0.18
 #define gg_smear_luma 1.00
 #define gg_center_dark 0.20
-#define gg_dark_smear 0.75
+#define gg_dark_smear 0.90
 #define gg_subpixel  0.62
-#define gg_aperture  0.88
+#define gg_aperture  1.00
 #define gg_balance   0.00
 #define gg_subcells  1.00
-#define gg_rowgap    0.80
+#define gg_rowgap    0.00
 #define gg_colgap    0.35
 #define gg_elemgap   0.35
-#define gg_black     0.14
+#define gg_black     0.12
 #define gg_white     0.97
 #define gg_sat       0.55
-#define gg_bluesat   0.90
-#define gg_blueweak  0.14
+#define gg_bluesat   1.20
+#define gg_blueweak  0.15
 #define gg_gamma     1.35
 #define gg_backlight 0.28
 #define gg_tint      0.55
@@ -283,7 +283,7 @@ void main(void) {
     * together made the dark row below the tiny E win instead.
     * Toward the panel
     * edge, weak whites cease to invade while the denser dark state rises to
-    * 75% toward the outer edge, retaining the broken footer strokes without
+    * 90% toward the outer edge, retaining the broken footer strokes without
     * making the centre-to-edge weight change conspicuous in text-heavy games.
     * This is a continuous optical/electrical field, not a title- or
     * glyph-specific exception. */
@@ -396,19 +396,46 @@ void main(void) {
       (1.0 - step(0.001, abs(scale_x - 4.0))) *
       (1.0 - step(0.001, abs(gg_subcells - 1.0)));
    float quad_width = InputSize.x / OutputSize.x;
-   /* The black matrix is visibly thinner vertically than horizontally.  Give
-    * 90% of the cell to the three colour apertures and the final 10% to the
-    * vertical boundary.  Area coverage makes that 0.4 output pixels wide at
-    * 4x instead of the former, over-heavy full pixel. */
-   float q_r = periodic_box_coverage(cell.x, quad_width, 0.00, 0.30);
-   float q_g = periodic_box_coverage(cell.x, quad_width, 0.30, 0.60);
-   float q_b = periodic_box_coverage(cell.x, quad_width, 0.60, 0.90);
-   float q_gap = periodic_box_coverage(cell.x, quad_width, 0.90, 1.00);
-   vec3 stripe_quad =
-      q_r * mix(vec3(1.0), vec3(2.0, 0.5, 0.5), gg_subpixel) +
-      q_g * mix(vec3(1.0), vec3(0.5, 2.0, 0.5), gg_subpixel) +
-      q_b * mix(vec3(1.0), vec3(0.5, 0.5, 2.0), gg_subpixel) +
+   /* The panel photograph is best explained by four equal-width optical
+    * bands per colour dot: R, G, B, then a major black separator.  Fine
+    * separators between the colour filters remain in gg_elemgap and are
+    * largely filled by the optics pass; the low-luminance B filter and the
+    * adjacent black band consequently read as one broad dark trough.  At the
+    * Bubble's exact 4x scale each band maps to one output pixel. */
+   float q_r = periodic_box_coverage(cell.x, quad_width, 0.00, 0.25);
+   float q_g = periodic_box_coverage(cell.x, quad_width, 0.25, 0.50);
+   float q_b = periodic_box_coverage(cell.x, quad_width, 0.50, 0.75);
+   float q_gap = periodic_box_coverage(cell.x, quad_width, 0.75, 1.00);
+   /* Deliberately darken the complete B aperture, rather than reducing the
+    * blue channel across the picture.  At exact 4x this turns the B output
+    * pixel plus the adjacent K pixel into the photographed two-pixel dark
+    * trough while R and G remain colour-bearing apertures. */
+   const float B_BAND_TRANSMISSION = 0.25;
+   const float RG_BAND_TRANSMISSION = 0.85;
+   vec3 stripe_quad_raw =
+      q_r * mix(vec3(1.0), vec3(2.0, 0.5, 0.5), gg_subpixel) *
+         RG_BAND_TRANSMISSION +
+      q_g * mix(vec3(1.0), vec3(0.5, 2.0, 0.5), gg_subpixel) *
+         RG_BAND_TRANSMISSION +
+      q_b * mix(vec3(1.0), vec3(0.5, 0.5, 2.0), gg_subpixel) *
+         B_BAND_TRANSMISSION +
       q_gap * vec3(1.0 - gg_aperture);
+   /* Match B1's 30/30/30/10 mean transmission.  Without this scalar the
+    * wider separator would make the comparison about global brightness. */
+   /* Historical B1 used 30/30/30/10 with 88% separator opacity. */
+   const float B1_REFERENCE_MEAN = 0.912;
+   /* Deliberately leave RG attenuation out of this historical comparison
+    * normaliser.  The user prefers to recover absolute brightness with the
+    * Bubble backlight; compensating here would make R/G prominent again. */
+   float rgbk_mean =
+      0.25 * (2.0 + B_BAND_TRANSMISSION) +
+      0.25 * (1.0 - gg_aperture);
+   /* The later exponential light-output curve is nonlinear, so equal input
+    * transmission still rendered about 8% darker.  This measured scalar
+    * matches the final Sonic reference luminance to B1 for visual comparison. */
+   const float B1_OUTPUT_MATCH = 1.523;
+   vec3 stripe_quad =
+      stripe_quad_raw * (B1_REFERENCE_MEAN / rgbk_mean) * B1_OUTPUT_MATCH;
    stripe = mix(stripe, stripe_quad, four_pixel_cell);
    /*
     * Optionally equalise the bands' luminance.
@@ -451,10 +478,10 @@ void main(void) {
     * smooth falloff from the centre of the cell instead, which is closer to
     * how a real cell looks anyway and still reads as a grid at 3x. */
    vec2 edge = abs(phase - 0.5) * 2.0;
-   /* The row gap dominates.  On a real panel the gap between rows is a whole
-    * cell boundary while the columns are split by subpixels, so the screen
-    * reads as fine horizontal lines with colour texture between them - which
-    * is what a photograph of one shows. */
+   /* The SEGA panel close-up shows the RGB apertures continuing vertically
+    * without a horizontal black matrix.  Keep row_edge2 available as a
+    * diagnostic parameter, but ship it at zero; the remaining structure is
+    * the vertical aperture/column pattern. */
    /* The grid carries unit mean and the stripe unit luminance, so structure
     * costs contrast rather than light.  That does push peaks above one, which
     * the saturation below absorbs - clipping them instead would flatten the

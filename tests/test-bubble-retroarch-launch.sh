@@ -38,9 +38,31 @@ panel_shader=configs/retroarch/shaders/gamegear-lcd-panel.glsl
 grep -Fq 'vec2 content_uv = cell / InputSize;' "$panel_shader"
 grep -Fq 'float horizontal_tube_distance(vec2 uv)' "$panel_shader"
 grep -Fq 'float edge_response = tube_edge_response(content_uv);' "$panel_shader"
-grep -Fq '#define gg_dark_smear 0.75' "$panel_shader"
+grep -Fq '#define gg_dark_smear 0.90' "$panel_shader"
+grep -Fq '#define gg_rowgap    0.00' "$panel_shader"
+! grep -Fq 'step(0.50, phase.x)' "$panel_shader"
 grep -Fq 'float tube_light = 0.936 - 0.522 * away_from_tube;' "$panel_shader"
-grep -Fq '"dark_smear": 0.75' scripts/preview-gamegear-lcd.py
+grep -Fq '"dark_smear": 0.90' scripts/preview-gamegear-lcd.py
+grep -Fq '"rowgap": 0.00' scripts/preview-gamegear-lcd.py
+grep -Fq 'periodic_box_coverage(u * sw, sw / ow, 0.75, 1.00)' scripts/preview-gamegear-lcd.py
+grep -Fq 'rgbk_mean = (0.25 * (2.0 + b_band_transmission) +' scripts/preview-gamegear-lcd.py
+grep -Fq 'periodic_box_coverage(cell.x, quad_width, 0.75, 1.00)' "$panel_shader"
+grep -Fq '0.25 * (2.0 + B_BAND_TRANSMISSION)' "$panel_shader"
+grep -Fq 'const float B1_OUTPUT_MATCH = 1.523;' "$panel_shader"
+grep -Fq 'b1_output_match = 1.523' scripts/preview-gamegear-lcd.py
+grep -Fq 'const float B_BAND_TRANSMISSION = 0.25;' "$panel_shader"
+grep -Fq 'b_band_transmission = 0.25' scripts/preview-gamegear-lcd.py
+grep -Fq 'const float RG_BAND_TRANSMISSION = 0.85;' "$panel_shader"
+grep -Fq 'rg_band_transmission = 0.85' scripts/preview-gamegear-lcd.py
+grep -Fq '#define gg_black     0.12' "$panel_shader"
+grep -Fq '"black": 0.12' scripts/preview-gamegear-lcd.py
+grep -Fq '#define gg_bluesat   1.20' "$panel_shader"
+grep -Fq '"bluesat": 1.20' scripts/preview-gamegear-lcd.py
+grep -Fq '#define gg_blueweak  0.15' "$panel_shader"
+grep -Fq '"blueweak": 0.15' scripts/preview-gamegear-lcd.py
+grep -Fq '#define gg_aperture  1.00' "$panel_shader"
+grep -Fq '"aperture": 1.00' scripts/preview-gamegear-lcd.py
+grep -Fq 'const float B1_REFERENCE_MEAN = 0.912;' "$panel_shader"
 grep -Fq 'tube_light = 0.936 - 0.522 * edge_response' scripts/preview-gamegear-lcd.py
 grep -Fq 'float scale_x = OutputSize.x / InputSize.x;' "$panel_shader"
 grep -Fq 'float vertical_scale = OutputSize.y / InputSize.y;' "$panel_shader"

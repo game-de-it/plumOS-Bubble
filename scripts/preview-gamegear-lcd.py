@@ -25,19 +25,19 @@ P = {
     "smear_up": 0.18,
     "smear_luma": 1.00,
     "center_dark": 0.20,
-    "dark_smear": 0.75,
+    "dark_smear": 0.90,
     "subpixel": 0.62,
-    "aperture": 0.88,
+    "aperture": 1.00,
     "balance": 0.00,
     "subcells": 1.0,
-    "rowgap": 0.80,
+    "rowgap": 0.00,
     "colgap": 0.35,
     "elemgap": 0.35,
-    "black": 0.14,
+    "black": 0.12,
     "white": 0.97,
     "sat": 0.55,
-    "bluesat": 0.90,
-    "blueweak": 0.14,
+    "bluesat": 1.20,
+    "blueweak": 0.15,
     "gamma": 1.35,
     "backlight": 0.28,
     "tint": 0.55,
@@ -183,16 +183,34 @@ def panel(src, ow=OUT_W, oh=OUT_H):
 
     if abs(ow / sw - 4.0) < 1e-3 and abs(P["subcells"] - 1.0) < 1e-3:
         qcov = np.stack([
-            periodic_box_coverage(u * sw, sw / ow, 0.00, 0.30),
-            periodic_box_coverage(u * sw, sw / ow, 0.30, 0.60),
-            periodic_box_coverage(u * sw, sw / ow, 0.60, 0.90),
-            periodic_box_coverage(u * sw, sw / ow, 0.90, 1.00),
+            periodic_box_coverage(u * sw, sw / ow, 0.00, 0.25),
+            periodic_box_coverage(u * sw, sw / ow, 0.25, 0.50),
+            periodic_box_coverage(u * sw, sw / ow, 0.50, 0.75),
+            periodic_box_coverage(u * sw, sw / ow, 0.75, 1.00),
         ], axis=-1)
         qmask = np.array([[2.0, 0.5, 0.5],
                           [0.5, 2.0, 0.5],
                           [0.5, 0.5, 2.0]], np.float32)
         active = 1.0 + (qmask - 1.0) * P["subpixel"]
-        stripe = qcov[..., :3] @ active + qcov[..., 3:4] * (1.0 - P["aperture"])
+        b_band_transmission = 0.25
+        rg_band_transmission = 0.85
+        stripe_raw = (qcov[..., 0:1] * active[0] * rg_band_transmission +
+                      qcov[..., 1:2] * active[1] * rg_band_transmission +
+                      qcov[..., 2:3] * active[2] * b_band_transmission +
+                      qcov[..., 3:4] * (1.0 - P["aperture"]))
+        # Equal R/G/B/K quarters, with the same mean transmission as B1's
+        # former 30/30/30/10 aperture.  Fine element separators are still
+        # supplied below by elemgap and softened by the optics pass.
+        # Historical B1 was 30/30/30/10 with 88% separator opacity.
+        b1_mean = 0.912
+        # Do not include RG attenuation in the comparison normalizer: its
+        # brightness loss is intentional and belongs at the hardware backlight.
+        rgbk_mean = (0.25 * (2.0 + b_band_transmission) +
+                     0.25 * (1.0 - P["aperture"]))
+        # Match final post-exponential luminance, not only linear input
+        # transmission; calibrated against the same Sonic reference as B1.
+        b1_output_match = 1.523
+        stripe = stripe_raw * (b1_mean / rgbk_mean) * b1_output_match
     # Off by default: at the physical element pitch the imbalance is a three
     # pixel ripple, below what the eye separates into lines, and it is what
     # makes the elements visible rather than a flat wash.  Raise it only when
