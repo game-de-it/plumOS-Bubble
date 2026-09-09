@@ -14,13 +14,16 @@ read-only inventoryに対して再照合した。文書だけ、hostだけ、pro
 
 ## Mechanical verification
 
-- repository test: `tests/test-*` 33/33 pass（監査test追加前）。監査test自身も単独pass。
+- repository test: `tests/test-*` 34/34 pass（TODO監査testを含む）
 - macOS bash 3.2: first-boot storage/start-menu contract pass
 - emulator catalog: 98 systems、196 profiles、114/114 source core load smoke
 - GGFE artwork: PNG/JPEG/WebP decoder fixture pass
 - frontend: AArch64 build、component checksum、GL非リンク、JPEG/WebP runtime DSO/license収録 pass
 - clean full-stack image: partition/System A/B/component/catalog verifier pass、
   `personalized=no`、`release_complete=no`、`publishable=no`
+  - source `0ce1e6d`
+  - SHA-256 `0adf1d7f9a7ed40fb8e2b67498eba96166d96c0daff6ef12b9906a7898bc0099`
+  - `output/image/`以下のSD imageはこの1個だけ
 
 `release_complete=no`は失敗の隠蔽ではない。captured vendor artifactの再配布判断と、物理acceptance、
 fault injection、利用者の公開承認が残るため、private hardware-validation imageをreleaseへ昇格させない
