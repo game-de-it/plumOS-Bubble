@@ -192,8 +192,7 @@
     guarded bring-upを実装。Bubble実機のcontrol/readbackとheadphone routeは未確認。
 - [ ] `BUB-P4-A02` supported rate/format、hardware pointer、XRUN、5分継続を speaker で確認する。
   - QuickNES/gpSP/PCSX-ReARMed/Flycast Xtreme/YabaSanshiroでALSA `RUNNING`と
-    pointer進行を実機確認した。N64 2 coreは`PREPARED`/`hw_ptr=0`のため未解決。
-    route横断のspeaker実聴、XRUN、5分継続は未確認。
+    pointer進行を実機確認した。route横断のspeaker実聴、XRUN、5分継続は未確認。
   - RetroArch FCEUmmのNES実聴で音飛びを確認。CPU idle 82-87%でもPCMが
     `RUNNING`から`PREPARED`へ戻るunderrunを採取したため、CPU性能設定ではなく
     DRM page-flip待ちを`video_threaded=true`でproducerから分離した。通常の
@@ -204,7 +203,14 @@
   - QuickNES `Akumajou Densetsu.nes`をspeakerで5分01秒連続監視し、60/60 sampleが
     `RUNNING`、owner交代0、hardware pointer停滞0、kernel XRUN/underrun増加0、
     `avail_max=1861 < buffer_size=3072`だった。途中のfast-forwardとRA menu往復を含め、
-    利用者も音、画面、操作に問題なしと確認した。N64 2 coreの無音解消と他routeを残す。
+    利用者も音、画面、操作に問題なしと確認した。他routeを残す。
+  - N64は両coreを`performance`/1.992GHzで再試験し、ParaLLEl/Mupen64Plus-Nextとも
+    48kHz stereo S32_LEのPCMが`RUNNING`となりhardware pointerが進行したため、従来の
+    無音障害は解消した。通常レースは利用者実聴で実用範囲だが、player selectや別character
+    登場時に音飛びを確認。30秒監視でParaLLElはXRUN 1回、Mupen64Plus-Nextは`PREPARED`
+    1回とXRUN 1回を採取した。CPU全体には82%以上のidleがあり最大clockでも発生するcore内の
+    瞬間的遅延で、ParaLLElの方が安定するため既定を維持する。破綻はないがXRUN-freeではなく、
+    他routeと合わせA02はopenを維持する。
 - [x] `BUB-P4-A03` headphone 接続/抜去、ゲーム終了、suspend/resume 後の route 復帰を確認する。
   - RetroArch Picodriveの32X gameを再生中にイヤホンを接続し、イヤホン出力を実聴確認した。
     抜去すると再生を止めず本体speakerへ切り替わり、再接続後はイヤホンへ戻った。接続状態で
@@ -454,7 +460,8 @@
   - hostでは全system/profile解決と114/114 core load smokeまで合格。
     contentを使う代表起動、画面・入力・音声・終了復帰は正式partition imageで一括実機試験する。
   - 実機代表contentはNES/GBA/PS1/Dreamcast/Saturnのprocess・PCM進行に合格。
-    N64はParaLLEl/Mupen64Plus-NextともPCMが`PREPARED`のままで未合格。
+    N64は後続修正でParaLLEl/Mupen64Plus-NextともPCM `RUNNING`とpointer進行へ改善した。
+    通常レースは実用範囲だが場面切替で一時XRUNが残るため、詳細は`BUB-P4-A02`で追跡する。
     PSP/NDSはROM SDにcontentがなく未試験。物理LCD/aspect/speaker確認を残す。
   - boot supervisorがSD2 pathをexportしない場合もfrontend launcherがread-only
     `/run/media/sd2`を自動選択するよう修正。SD2へdirectoryを作らず、実機再走査を検証する。
@@ -540,6 +547,10 @@
     `system_id + core_id`の上書き表を導入した。ROM2のSHA検証済みBIOSをtmpfsへ一時配置して
     Sega CDも300 frameでnativeを確認し、source `286007b`でPicoDrive公開5 systemすべてを
     route表へ固定した。永続BIOS/ROMは変更せず、一時BIOSは試験後に削除した。
+  - N64のParaLLEl/Mupen64Plus-Nextを同一`Mario Kart 64 [V1.0].z64`で物理比較した。
+    両routeともN64限定`performance`が適用されPCMは進行、レース中は実用範囲だった。
+    player select/character登場時は両方に一時的な音飛びがあり、30秒監視ではParaLLElの方が
+    再初期化回数が少なかったため既定を維持する。display/input/FE復帰と全route横断確認は継続する。
   - 起動168導線のrendererを再監査し、Mali 128、GL非使用CPU framebuffer 40、意図しない
     llvmpipe/softpipe/swrast mapping 0。geometryを出す123導線はhorizontal 112、vertical 11。
     VarthでArcade/CPS1 9導線を再試験し全起動、geometry出力8導線は3:4・360x480中央配置。
