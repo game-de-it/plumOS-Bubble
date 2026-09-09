@@ -187,9 +187,13 @@
 
 ### Audio/power
 
-- [ ] `BUB-P4-A01` RK817 mixer controls、speaker/headphone route、jack detect、safe gain を採取する。
+- [x] `BUB-P4-A01` RK817 mixer controls、speaker/headphone route、jack detect、safe gain を採取する。
   - exact control存在時だけ`Resume Path=ON`、`Playback Path=SPK`、`SPK=40%`を行う
-    guarded bring-upを実装。Bubble実機のcontrol/readbackとheadphone routeは未確認。
+    guarded bring-upを実装。実機ALSA hardware controlを`hw:0`で全列挙し、公開controlは
+    plumOSの`Soft Volume Master`のみで、RK817 hardware mixer/jack switchは非公開と確認した。
+    softvolは0..255/-90..0dBで増幅せず、既定level 8はraw 232。物理挿抜では再生を止めず
+    headphone/speakerが自動切替し、再挿入とsuspend/resume後もheadphone routeへ復帰した。
+    存在しないroute controlを強制せず、codec自動切替と0dB以下のsoftvolをsafe contractとする。
 - [ ] `BUB-P4-A02` supported rate/format、hardware pointer、XRUN、5分継続を speaker で確認する。
   - QuickNES/gpSP/PCSX-ReARMed/Flycast Xtreme/YabaSanshiroでALSA `RUNNING`と
     pointer進行を実機確認した。route横断のspeaker実聴、XRUN、5分継続は未確認。

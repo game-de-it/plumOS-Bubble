@@ -4,10 +4,10 @@ Date: 2026-09-10 JST (device UTC log date 2026-09-09)
 
 ## Scope
 
-This validation closes `BUB-P4-A03`: physical headphone insertion/removal,
-audio-route recovery after deep suspend, and PCM/display cleanup after normal
-game exit. It does not close the mixer-control inventory or the separate
-five-minute/XRUN matrix in `BUB-P4-A01` and `BUB-P4-A02`.
+This validation closes `BUB-P4-A01` and `BUB-P4-A03`: the RK817 control
+inventory, physical headphone insertion/removal, audio-route recovery after
+deep suspend, and PCM/display cleanup after normal game exit. It does not close
+the separate five-minute/XRUN matrix in `BUB-P4-A02`.
 
 The normal frontend route launched `BC Racers (USA).32x` with
 `retroarch:picodrive`. RetroArch PID 3941 owned the RK817 playback PCM at
@@ -38,8 +38,24 @@ The normal frontend route launched `BC Racers (USA).32x` with
 
 Insertion, removal, reinsertion, suspend/resume routing, normal game exit, PCM
 release, and frontend display reacquisition passed on the physical Bubble.
-The RK817 driver did not expose a separate readable jack switch or hardware
-mixer controls through the current ALSA control interface, so the physical
-audible route transition is the acceptance evidence here. Exact jack-detect
-inventory remains part of `BUB-P4-A01`; multi-runtime duration and XRUN proof
-remain part of `BUB-P4-A02`.
+
+On the final post-reboot inventory, the packaged `plumos-amixer` was run against
+`hw:0` with the app-layer ALSA libraries. The complete control list contained
+only plumOS's software control:
+
+```text
+numid=1,iface=MIXER,name='Soft Volume Master'
+type=INTEGER,values=2,min=0,max=255
+dBscale-min=-90.00dB,step=0.35dB,mute=0
+current values=232,232
+```
+
+The vendor RK817 driver exposes neither a hardware playback-path/gain control
+nor a readable jack switch. The existing guarded setup therefore correctly
+avoids writing guessed `Resume Path`, `Playback Path`, or `SPK` controls.
+Logical volume level 8 maps to raw 232. The softvol range ends at 0 dB, so it
+does not amplify the codec output; this and the physically accepted automatic
+route switching form the safe gain/route contract for Bubble.
+
+`BUB-P4-A01` and `BUB-P4-A03` are complete. Multi-runtime duration and XRUN
+proof remain part of `BUB-P4-A02`.
