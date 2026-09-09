@@ -8,8 +8,9 @@ ACTION=${1:-status}
 STATE_DIR=$PLUMOS_ROOT/state/storage-health
 STATUS=$STATE_DIR/status
 LOG=$PLUMOS_ROOT/logs/storage-health.log
+MOUNTS_FILE=${PLUMOS_MOUNTS_FILE:-/proc/mounts}
 
-if [ "$MEDIA_ROOT" = /storage ] && "$BB" grep -qs ' /run/media/sd2 ' /proc/mounts; then
+if [ "$MEDIA_ROOT" = /storage ] && "$BB" grep -qs ' /run/media/sd2 ' "$MOUNTS_FILE"; then
     MEDIA_ROOT=/run/media/sd2
 fi
 
@@ -29,7 +30,7 @@ esac
 tmp=$STATUS.new.$$
 trap '"$BB" rm -f "$tmp"' EXIT HUP INT TERM
 
-mount_line=$($BB awk -v path="$MEDIA_ROOT" '$2 == path { print $1 "\t" $3 "\t" $4; exit }' /proc/mounts)
+mount_line=$($BB awk -v path="$MEDIA_ROOT" '$2 == path { print $1 "\t" $3 "\t" $4; exit }' "$MOUNTS_FILE")
 device=$(printf '%s\n' "$mount_line" | "$BB" awk -F '\t' '{print $1}')
 fstype=$(printf '%s\n' "$mount_line" | "$BB" awk -F '\t' '{print $2}')
 options=$(printf '%s\n' "$mount_line" | "$BB" awk -F '\t' '{print $3}')
@@ -37,8 +38,26 @@ last_check=$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown)
 result=not_mounted
 evidence='media root is not mounted'
 previous_result=
-if [ -r "$STATUS" ]; then
-    previous_result=$($BB awk -F= '$1 == "result" { print $2; exit }' "$STATUS")
+media_status=
+previous_status=
+if [ -n "$device" ]; then
+    media_key=$(printf '%s' "${device##*/}" | $BB sed 's/[^A-Za-z0-9_.-]/_/g')
+    media_status=$STATE_DIR/media-$media_key.status
+    if [ -r "$media_status" ]; then
+        previous_status=$media_status
+    elif [ -r "$STATUS" ]; then
+        previous_device=$($BB awk -F= '$1 == "device" { print $2; exit }' "$STATUS")
+        previous_mount=$($BB awk -F= '$1 == "mount_path" { print $2; exit }' "$STATUS")
+        previous_filesystem=$($BB awk -F= '$1 == "filesystem" { print $2; exit }' "$STATUS")
+        if [ "$previous_device" = "$device" ] &&
+            [ "$previous_mount" = "$MEDIA_ROOT" ] &&
+            [ "$previous_filesystem" = "$fstype" ]; then
+            previous_status=$STATUS
+        fi
+    fi
+fi
+if [ -n "$previous_status" ]; then
+    previous_result=$($BB awk -F= '$1 == "result" { print $2; exit }' "$previous_status")
 fi
 
 if [ -n "$device" ]; then
@@ -47,15 +66,15 @@ if [ -n "$device" ]; then
         result=dirty
         evidence='kernel reported filesystem corruption; no repair attempted'
     elif [ "$ACTION" = observe ]; then
-        case "$previous_result" in
-            dirty|inconsistent)
-                result=$previous_result
-                evidence='previous filesystem error remains until a read-only check proves clean'
-                ;;
+        case "$fstype:$previous_result" in
+            vfat:dirty|vfat:inconsistent|msdos:dirty|msdos:inconsistent|exfat:dirty|exfat:inconsistent)
+                    result=$previous_result
+                    evidence='previous filesystem error remains until a read-only check proves clean'
+                    ;;
             *)
-                result=observed
-                evidence='no filesystem error found in current boot log'
-                ;;
+                    result=observed
+                    evidence='no filesystem error found in current boot log'
+                    ;;
         esac
     elif ! printf ',%s,' "$options" | "$BB" grep -q ',ro,'; then
         result=check_refused
@@ -97,6 +116,10 @@ fi
     printf 'evidence=%s\n' "$evidence"
 } >"$tmp"
 "$BB" mv "$tmp" "$STATUS"
+if [ -n "$media_status" ]; then
+    "$BB" cp "$STATUS" "$media_status.new.$$"
+    "$BB" mv "$media_status.new.$$" "$media_status"
+fi
 [ "$ACTION" != check ] || "$BB" sync
 trap - EXIT HUP INT TERM
 printf 'storage_health=action=%s result=%s media=%s device=%s evidence=%s\n' \

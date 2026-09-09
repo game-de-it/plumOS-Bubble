@@ -27,6 +27,20 @@ The host fixture proves first-use UUID recording, a later start with a changed
 device selector resolved by UUID, same-OS-disk rejection, read-write bind
 parity, read-only fallback, clean unbind and SD1 fallback.
 
+## SD2-absent scan regression
+
+The first physical boot without SD2 exposed a separate state-ownership fault.
+The user correctly saved `show_empty_systems=false`, but the frontend still
+displayed every system. The old index reported SD2 ROM counts (for example NES
+118) even though `/storage/user/Roms` contained no files.
+
+The frontend had skipped its scan because the single storage-health status file
+carried an earlier SD2 FAT `dirty` result into the current ext4 `/storage`
+fallback. Storage-health state is now isolated by device. A sticky FAT result
+applies only to the same device, mount path and filesystem; it cannot suppress
+an ext4 fallback scan. Reinserting the original card restores that card's own
+health history.
+
 ## Physical acceptance remaining
 
 1. deploy and record the current ROM SD UUID;
