@@ -201,7 +201,11 @@
     324秒時点まで95/95 sampleが`RUNNING`、`PREPARED=0`、owner PID不変、hardware
     pointer継続進行、`avail_max < buffer_size`を満たした。FCEUmm NES音声は合格。
     N64、headphone、他routeの同等確認が残るためA02全体はopenを維持する。
-- [ ] `BUB-P4-A03` headphone 接続/抜去、ゲーム終了、suspend/resume 後の route 復帰を確認する。
+- [x] `BUB-P4-A03` headphone 接続/抜去、ゲーム終了、suspend/resume 後の route 復帰を確認する。
+  - RetroArch Picodriveの32X gameを再生中にイヤホンを接続し、イヤホン出力を実聴確認した。
+    抜去すると再生を止めず本体speakerへ切り替わり、再接続後はイヤホンへ戻った。接続状態で
+    deep suspend/resumeを行い、復帰後もイヤホンから音楽が再開しspeakerは無音だった。
+    SELECT+START終了後はPCMが`closed`、RetroArch残留0、FE単独DRM ownerへ戻ることを確認した。
 - [x] `BUB-P4-P01` backlight 0..255 の安全範囲、段階、persist policy を決める。
 - [x] `BUB-P4-P02` battery/charger node、capacity、charging状態、volume/power keyをhelperへ閉じ込める。
 - [x] `BUB-P4-P03` normal shutdown/reboot、charger接続前後、cold boot、suspend/resumeを実機確認する。
