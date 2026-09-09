@@ -19,7 +19,7 @@ WPA_CLI=${PLUMOS_WPA_CLI:-/usr/sbin/wpa_cli}
 LOG=${PLUMOS_NETWORK_LOG:-$PLUMOS_ROOT/logs/network-control.log}
 WAIT=${PLUMOS_WPA_WAIT_SECONDS:-20}
 CONTROL_WAIT=${PLUMOS_WPA_CONTROL_WAIT_SECONDS:-5}
-SUSPEND_STOP_TENTHS=${PLUMOS_WIFI_SUSPEND_STOP_TENTHS:-5}
+STOP_TENTHS=${PLUMOS_WIFI_STOP_TENTHS:-${PLUMOS_WIFI_SUSPEND_STOP_TENTHS:-5}}
 
 usage() {
     printf '%s\n' \
@@ -196,11 +196,12 @@ wifi_on() {
 }
 
 wifi_off() {
-    wpa_ready && wpa terminate >/dev/null 2>&1 || true
-    if [ -r "$DHCP_PID" ]; then
-        pid=$(sed -n '1p' "$DHCP_PID" 2>/dev/null || true)
-        case "$pid" in ''|*[!0-9]*) ;; *) kill "$pid" 2>/dev/null || true ;; esac
-    fi
+    # Bubble's bcmdhd stack can block wpa_cli terminate for about ten seconds.
+    # Stop the owned runtime processes directly with the same bounded path as
+    # suspend.  Persistent policy and credentials are owned by the caller and
+    # remain untouched here.
+    terminate_pid_file_bounded "$DHCP_PID"
+    terminate_pid_file_bounded "$WPA_PID"
     "$BB" ip address flush dev "$WIFI_IFACE" >/dev/null 2>&1 || true
     "$BB" ip link set "$WIFI_IFACE" down >/dev/null 2>&1 || true
     "$BB" rm -f "$WPA_PID" "$DHCP_PID" 2>/dev/null || true
@@ -220,7 +221,7 @@ terminate_pid_file_bounded() {
     case "$pid" in ''|*[!0-9]*) return 0 ;; esac
     kill "$pid" 2>/dev/null || return 0
     count=0
-    while kill -0 "$pid" 2>/dev/null && [ "$count" -lt "$SUSPEND_STOP_TENTHS" ]; do
+    while kill -0 "$pid" 2>/dev/null && [ "$count" -lt "$STOP_TENTHS" ]; do
         "$BB" sleep 0.1
         count=$((count + 1))
     done

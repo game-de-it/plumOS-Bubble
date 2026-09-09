@@ -102,4 +102,43 @@ set -e
 grep -q '"wifi_enabled": false' "$root/config/system/settings.json"
 grep -qx 'wpa_state=SUSPENDED' "$run/network-control/wpa_status.txt"
 
-printf 'bubble_sleep=result-ok backend=mem wifi=paused-restored-background rtc=bounded\n'
+# A user-requested Wi-Fi OFF uses the same bounded process stop.  It must not
+# call the bcmdhd-facing `wpa_cli terminate`, and the network helper must not
+# alter the caller-owned persistent Wi-Fi policy or saved credentials.
+cat >"$tmp/fake-wpa-cli" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >>"$PLUMOS_TEST_WPA_CALLS"
+exit 1
+EOF
+chmod +x "$tmp/fake-wpa-cli"
+/bin/sleep 30 & dhcp_pid=$!
+/bin/sleep 30 & wpa_pid=$!
+printf '%s\n' "$dhcp_pid" >"$tmp/dhcp.pid"
+printf '%s\n' "$wpa_pid" >"$tmp/wpa.pid"
+printf '{"wifi_enabled": true}\n' >"$root/config/system/settings.json"
+printf 'saved-network-must-survive\n' >"$root/config/wpa_supplicant.conf"
+: >"$tmp/wpa.calls"
+PLUMOS_ROOT=$root \
+PLUMOS_RUNTIME_ROOT=$run \
+PLUMOS_BUSYBOX=$tmp/fake-busybox \
+PLUMOS_WIFI_SYS_CLASS_NET=$tmp \
+PLUMOS_NETWORK_RUN_DIR=$run/network-control \
+PLUMOS_WPA_PID_FILE=$tmp/wpa.pid \
+PLUMOS_DHCP_PID_FILE=$tmp/dhcp.pid \
+PLUMOS_WPA_CLI=$tmp/fake-wpa-cli \
+PLUMOS_TEST_WPA_CALLS=$tmp/wpa.calls \
+PLUMOS_NETWORK_LOG=$tmp/network.log \
+PLUMOS_WIFI_STOP_TENTHS=1 \
+    sh "$network" --wifi off >"$tmp/off.result"
+grep -qx 'result=off' "$tmp/off.result"
+set +e
+wait "$dhcp_pid"; dhcp_status=$?
+wait "$wpa_pid"; wpa_status=$?
+set -e
+[[ $dhcp_status -ne 0 && $wpa_status -ne 0 ]]
+! grep -q 'terminate' "$tmp/wpa.calls"
+grep -q '"wifi_enabled": true' "$root/config/system/settings.json"
+grep -qx 'saved-network-must-survive' "$root/config/wpa_supplicant.conf"
+grep -qx 'wpa_state=DISCONNECTED' "$run/network-control/wpa_status.txt"
+
+printf 'bubble_sleep=result-ok backend=mem wifi=bounded-off-suspend-restored-background rtc=bounded\n'
