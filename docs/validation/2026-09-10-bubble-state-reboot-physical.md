@@ -35,3 +35,40 @@ accepted as clean-filesystem proof. The fix moves Dropbear's inherited log FD
 to tmpfs, terminates only residual `/storage` writers without a fixed delay,
 and refuses the terminal backend if the read-only remount still fails.
 
+## Fast fail-safe power follow-up
+
+Source `b292210` was rebuilt and deployed as a scoped managed update. The live
+device's checksum lists were used as the baseline, so unrelated newer build
+outputs such as RetroArch, BusyBox and Game Gear shader defaults were not
+installed. The frontend 217-entry checksum, network-services checksum and the
+complete app-layer checksum all passed after the atomic switch. Mutable config
+hashes were identical before and after deployment. The retained rollback is:
+
+```text
+/storage/plumos/state/app-deploy/b292210-power-fast-20260910T021301/rollback.tar
+SHA-256 8cb25ebc387c4623d4fd75ececf85788bcaf5accb7426d088c509b8f1f077619
+```
+
+The rebuilt System was written to inactive slot B and read back as
+`d733f035899a78bb564a63f51caa98ad93016eedb7d957a985f9e4b70960732a`.
+Slot A remains the byte-verified rollback at
+`bf08369a3fa8af91ccd20a463f42d217e4944d7a8cde8d92ec7a611148641db7`.
+
+The user then exercised both normal frontend actions:
+
+- Reboot began at `17:55:46Z`, reached the terminal stage at `17:55:47Z`, and
+  requested the backend at `17:55:48Z`.
+- Shutdown began at `17:59:19Z`, reached the terminal stage at `17:59:20Z`,
+  and requested the backend at `17:59:21Z`. The user observed actual power-off
+  in approximately four seconds.
+- Both following boots reported `previous_shutdown=clean automatic_repair=no`.
+- The shutdown boot reached frontend start at kernel timestamp 3.89 seconds.
+- Active slot B and its System checksum passed after both boots. The frontend
+  was the only renderer after return.
+- Dropbear held no descriptor below `/storage`; its persistent stdout/stderr
+  descriptors resolved to `/run/plumos/dropbear/dropbear.log`.
+
+There is no new fixed power delay. A clean idle system proceeds immediately;
+only an actual residual `/storage` writer receives the bounded termination
+path. The existing offline FAT dirty-flag inspection remains a separate open
+part of `BUB-P4-P04`.

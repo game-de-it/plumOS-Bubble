@@ -211,6 +211,12 @@
     続くFE Shutdownも`shutdown complete poweroff`、SD2/p4 clean unmount、電源断、再投入後の
     clean判定、FEと4 network serviceの復帰まで合格。charger接続前後とsuspend/resumeは
     未確認のためopenを維持する。
+  - source `b292210`でterminal power pathから固定waitを除き、残存writerがある場合だけ
+    bounded TERM/KILLする方式へ変更した。FE Rebootはpower action開始からbackend requestまで
+    2秒、次bootのFE開始はkernel timestamp 3.89秒、FE Shutdownはbackend requestまで2秒、
+    実際の電源断まで利用者計測で約4秒だった。両方の次bootで`previous_shutdown=clean`
+    `automatic_repair=no`、System B readback、FE単独描画ownerを確認した。charger接続前後と
+    suspend/resumeは引き続き未確認。
 - [ ] `BUB-P4-P04` power action後にFAT/ext4がcleanであることを次boot/read-only fs checkで確認する。
   - terminal shutdown/rebootでp3/p4 clean markerを書いてsyncし、p4を明示unmountしてから
     p3をread-only化する実装を追加。marker作成/unmount順はhost fixture合格。markerは
@@ -219,6 +225,11 @@
     marker消費、ext4/kernel error 0は実機合格。過去の強制電源断で残ったp4 FAT dirty flagは
     clean unmountだけでは消えず、方針どおり自動修復していない。ユーザー主導offline scan後の
     FAT read-only再検査を残す。
+  - source `b292210`のreboot/shutdownでは、Dropbearの継承log FDを`/run`へ移し、p3を
+    read-only化できない場合はbackendを拒否してruntimeへ復帰するfail-safeを追加した。
+    両action後の次bootが`previous_shutdown=clean automatic_repair=no`となり、起動後の
+    Dropbear `/storage` FDは0だった。online clean proofは再合格したが、既存dirty flagを
+    対象とするoffline FAT read-only scanが残るためgateはopenを維持する。
 
 ### Network/USB/storage
 
