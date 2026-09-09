@@ -290,7 +290,9 @@
     `/storage`と同じdisk上のpartitionを必ず拒否するresolverをhost fixtureへ追加した。
     SD2なし起動では旧SD2のdirty状態がOS側ext4へ誤継承され、旧library indexが残る問題を実機で検出。
     storage-healthをdevice別に分離し、現在の媒体だけがscan抑止を判断するよう修正した。
-    実機へ反映後、SD2なしcold bootと同一UUIDのSD2復帰cold bootを確認するまでopenを維持する。
+    source `8759f08`を実機へ反映し、SD2なしcold bootではext4 fallbackを再走査して、
+    `SHOW EMPTY SYSTEMS=OFF`時に内蔵側のPyxelだけが表示されることを利用者が確認した。
+    保存済みUUID `130C-1033`の同一SD2復帰cold bootを確認するまでopenを維持する。
 - [x] `BUB-P4-S02` dirty ROM SD を自動修復せず、警告・read-only・退避手順を定義する。
   - startup時のkernel filesystem errorをmanaged stateへ記録し、System Settingsへ表示する
     `plumos-storage-health observe`を追加した。手動checkはread-write mountを拒否し、

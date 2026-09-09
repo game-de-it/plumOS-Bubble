@@ -43,10 +43,20 @@ health history.
 
 ## Physical acceptance remaining
 
-1. deploy and record the current ROM SD UUID;
-2. perform a normal shutdown and remove only the ROM SD while power is off;
-3. cold boot and verify the frontend operates with SD1 fallback;
-4. perform a normal shutdown, reinsert the same ROM SD and cold boot;
-5. verify UUID resolution, ROM/BIOS binds and frontend library visibility.
+Completed on the physical Bubble:
+
+1. deployed the resolver and recorded ROM SD filesystem UUID `130C-1033`;
+2. performed a normal shutdown and removed only the ROM SD while power was off;
+3. cold booted without SD2;
+4. observed ext4 `/storage` health independently from the removed FAT card and
+   completed a fresh frontend scan with zero ROM files;
+5. with `show_empty_systems=false`, the user confirmed that only the expected
+   built-in Pyxel system remained visible.
+
+Remaining:
+
+1. perform a normal shutdown, reinsert the same ROM SD while powered off and
+   cold boot;
+2. verify UUID resolution, ROM/BIOS binds and frontend library visibility.
 
 No card is removed while the OS is running.
