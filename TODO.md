@@ -201,6 +201,10 @@
     324秒時点まで95/95 sampleが`RUNNING`、`PREPARED=0`、owner PID不変、hardware
     pointer継続進行、`avail_max < buffer_size`を満たした。FCEUmm NES音声は合格。
     N64、headphone、他routeの同等確認が残るためA02全体はopenを維持する。
+  - QuickNES `Akumajou Densetsu.nes`をspeakerで5分01秒連続監視し、60/60 sampleが
+    `RUNNING`、owner交代0、hardware pointer停滞0、kernel XRUN/underrun増加0、
+    `avail_max=1861 < buffer_size=3072`だった。途中のfast-forwardとRA menu往復を含め、
+    利用者も音、画面、操作に問題なしと確認した。N64 2 coreの無音解消と他routeを残す。
 - [x] `BUB-P4-A03` headphone 接続/抜去、ゲーム終了、suspend/resume 後の route 復帰を確認する。
   - RetroArch Picodriveの32X gameを再生中にイヤホンを接続し、イヤホン出力を実聴確認した。
     抜去すると再生を止めず本体speakerへ切り替わり、再接続後はイヤホンへ戻った。接続状態で
