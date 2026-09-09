@@ -38,6 +38,10 @@ mkdir -p "$bin" "$lib" "$scraper_lib" "$component" "$root/state/frontend" \
 common=(-std=gnu99 -Os -pipe -Wall -Wextra -D_GNU_SOURCE)
 png_cflags=$(pkg-config --cflags libpng)
 png_libs=$(pkg-config --libs libpng)
+jpeg_cflags=$(pkg-config --cflags libjpeg)
+jpeg_libs=$(pkg-config --libs libjpeg)
+webp_cflags=$(pkg-config --cflags libwebp)
+webp_libs=$(pkg-config --libs libwebp)
 ft_cflags=$(pkg-config --cflags freetype2)
 ft_libs=$(pkg-config --libs freetype2)
 drm_cflags=$(pkg-config --cflags libdrm)
@@ -51,12 +55,12 @@ gcc "${common[@]}" $png_cflags $ft_cflags $drm_cflags \
 # GGFE: the Game Gear frontend.  Same CPU renderer path as the stock frontend,
 # no GL and no /dev/mali0, so it never competes for the GPU or for DRM master.
 # shellcheck disable=SC2086
-gcc "${common[@]}" $png_cflags $ft_cflags $drm_cflags \
+gcc "${common[@]}" $png_cflags $jpeg_cflags $webp_cflags $ft_cflags $drm_cflags \
     -DPLUMOS_ENABLE_FBDEV_RENDERER=1 -DPLUMOS_FBDEV_ENABLE_PNG=1 \
     -DPLUMOS_FBDEV_ENABLE_FREETYPE=1 -DPLUMOS_FBDEV_ENABLE_DRM=1 \
     -DGGFE_PROFILE=1 \
     src/frontend/plumos_ggfe.c -o "$bin/plumos-ggfe" \
-    $png_libs $ft_libs $drm_libs -lm -lpthread
+    $png_libs $jpeg_libs $webp_libs $ft_libs $drm_libs -lm -lpthread
 gcc "${common[@]}" src/services/plumos_bubble_volume_keys.c \
     -o "$bin/plumos-volume-keys"
 gcc "${common[@]}" $drm_cflags src/services/plumos_drm_master.c \
@@ -160,6 +164,10 @@ install_scraper_runtime() {
     [[ ! -r /usr/share/doc/ca-certificates/copyright ]] || \
         install -m 0644 /usr/share/doc/ca-certificates/copyright \
             "$doc_dir/ca-certificates-copyright"
+    install -m 0644 /usr/share/doc/libjpeg62-turbo/copyright \
+        "$doc_dir/libjpeg62-turbo-copyright"
+    install -m 0644 /usr/share/doc/libwebp7/copyright \
+        "$doc_dir/libwebp7-copyright"
 
     cat >"$bin/curl" <<'EOF'
 #!/bin/sh

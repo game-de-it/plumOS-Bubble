@@ -26,6 +26,9 @@
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include <jpeglib.h>
+#include <setjmp.h>
+#include <webp/decode.h>
 
 /*
  * PLUMOS_GGFE_HOST builds everything above the panel - artwork resolution,
@@ -470,13 +473,9 @@ static void ggfe_image_free(struct ggfe_image *img) {
   memset(img, 0, sizeof(*img));
 }
 
-/* Only PNG is decoded.  The resolver still honours jpg/jpeg/webp so it stays
- * faithful to the stock frontend's rules, but this build links libpng alone -
- * a jpg hit falls back to the no-artwork plate rather than silently showing
- * the wrong thing. */
-static int ggfe_path_is_png(const char *path) {
+static const char *ggfe_path_extension(const char *path) {
   const char *dot = strrchr(path, '.');
-  return dot && ascii_equal_ci(dot + 1, "png");
+  return dot ? dot + 1 : "";
 }
 
 static int ggfe_image_load_png(const char *path, struct ggfe_image *out) {
@@ -485,7 +484,7 @@ static int ggfe_image_load_png(const char *path, struct ggfe_image *out) {
   long i, n;
 
   memset(out, 0, sizeof(*out));
-  if (!ggfe_path_is_png(path)) {
+  if (!ascii_equal_ci(ggfe_path_extension(path), "png")) {
     return 0;
   }
   if (!plumos_fbdev_load_png_rgba(path, &rgba, &w, &h) || w <= 0 || h <= 0) {
@@ -509,6 +508,142 @@ static int ggfe_image_load_png(const char *path, struct ggfe_image *out) {
   out->width = w;
   out->height = h;
   return 1;
+}
+
+struct ggfe_jpeg_error {
+  struct jpeg_error_mgr pub;
+  jmp_buf jump;
+};
+
+static void ggfe_jpeg_error_exit(j_common_ptr cinfo) {
+  struct ggfe_jpeg_error *error = (struct ggfe_jpeg_error *)cinfo->err;
+  longjmp(error->jump, 1);
+}
+
+static int ggfe_image_load_jpeg(const char *path, struct ggfe_image *out) {
+  struct jpeg_decompress_struct cinfo;
+  struct ggfe_jpeg_error error;
+  FILE *file = NULL;
+  size_t pixels;
+  int decoder_created = 0;
+
+  if (!ascii_equal_ci(ggfe_path_extension(path), "jpg") &&
+      !ascii_equal_ci(ggfe_path_extension(path), "jpeg")) return 0;
+  memset(out, 0, sizeof(*out));
+  memset(&cinfo, 0, sizeof(cinfo));
+  cinfo.err = jpeg_std_error(&error.pub);
+  error.pub.error_exit = ggfe_jpeg_error_exit;
+  if (setjmp(error.jump)) {
+    if (decoder_created) jpeg_destroy_decompress(&cinfo);
+    if (file) fclose(file);
+    ggfe_image_free(out);
+    return 0;
+  }
+  jpeg_create_decompress(&cinfo);
+  decoder_created = 1;
+  file = fopen(path, "rb");
+  if (!file) {
+    jpeg_destroy_decompress(&cinfo);
+    return 0;
+  }
+  jpeg_stdio_src(&cinfo, file);
+  if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) {
+    jpeg_destroy_decompress(&cinfo);
+    fclose(file);
+    return 0;
+  }
+  cinfo.out_color_space = JCS_RGB;
+  jpeg_start_decompress(&cinfo);
+  if (!cinfo.output_width || !cinfo.output_height ||
+      cinfo.output_components != 3 ||
+      (size_t)cinfo.output_width > SIZE_MAX / (size_t)cinfo.output_height ||
+      (size_t)cinfo.output_width * (size_t)cinfo.output_height > SIZE_MAX / 3 ||
+      cinfo.output_width > INT_MAX || cinfo.output_height > INT_MAX) {
+    jpeg_destroy_decompress(&cinfo);
+    fclose(file);
+    return 0;
+  }
+  pixels = (size_t)cinfo.output_width * (size_t)cinfo.output_height;
+  out->rgb = (unsigned char *)malloc(pixels * 3);
+  out->alpha = (unsigned char *)malloc(pixels);
+  if (!out->rgb || !out->alpha) {
+    jpeg_destroy_decompress(&cinfo);
+    fclose(file);
+    ggfe_image_free(out);
+    return 0;
+  }
+  while (cinfo.output_scanline < cinfo.output_height) {
+    JSAMPROW row = out->rgb +
+        (size_t)cinfo.output_scanline * (size_t)cinfo.output_width * 3;
+    jpeg_read_scanlines(&cinfo, &row, 1);
+  }
+  memset(out->alpha, 0xff, pixels);
+  out->width = (int)cinfo.output_width;
+  out->height = (int)cinfo.output_height;
+  jpeg_finish_decompress(&cinfo);
+  jpeg_destroy_decompress(&cinfo);
+  fclose(file);
+  return 1;
+}
+
+static int ggfe_image_load_webp(const char *path, struct ggfe_image *out) {
+  unsigned char *encoded = NULL;
+  uint8_t *rgba = NULL;
+  FILE *file = NULL;
+  long size;
+  int width = 0, height = 0;
+  size_t pixels, i;
+
+  if (!ascii_equal_ci(ggfe_path_extension(path), "webp")) return 0;
+  memset(out, 0, sizeof(*out));
+  file = fopen(path, "rb");
+  if (!file || fseek(file, 0, SEEK_END) != 0 ||
+      (size = ftell(file)) <= 0 || fseek(file, 0, SEEK_SET) != 0) {
+    if (file) fclose(file);
+    return 0;
+  }
+  encoded = (unsigned char *)malloc((size_t)size);
+  if (!encoded || fread(encoded, 1, (size_t)size, file) != (size_t)size) {
+    free(encoded);
+    fclose(file);
+    return 0;
+  }
+  fclose(file);
+  rgba = WebPDecodeRGBA(encoded, (size_t)size, &width, &height);
+  free(encoded);
+  if (!rgba || width <= 0 || height <= 0 ||
+      (size_t)width > SIZE_MAX / (size_t)height ||
+      (size_t)width * (size_t)height > SIZE_MAX / 4) {
+    WebPFree(rgba);
+    return 0;
+  }
+  pixels = (size_t)width * (size_t)height;
+  out->rgb = (unsigned char *)malloc(pixels * 3);
+  out->alpha = (unsigned char *)malloc(pixels);
+  if (!out->rgb || !out->alpha) {
+    WebPFree(rgba);
+    ggfe_image_free(out);
+    return 0;
+  }
+  for (i = 0; i < pixels; i++) {
+    out->rgb[i * 3 + 0] = rgba[i * 4 + 0];
+    out->rgb[i * 3 + 1] = rgba[i * 4 + 1];
+    out->rgb[i * 3 + 2] = rgba[i * 4 + 2];
+    out->alpha[i] = rgba[i * 4 + 3];
+  }
+  WebPFree(rgba);
+  out->width = width;
+  out->height = height;
+  return 1;
+}
+
+static int ggfe_image_load(const char *path, struct ggfe_image *out) {
+  const char *extension = ggfe_path_extension(path);
+  if (ascii_equal_ci(extension, "png")) return ggfe_image_load_png(path, out);
+  if (ascii_equal_ci(extension, "jpg") || ascii_equal_ci(extension, "jpeg"))
+    return ggfe_image_load_jpeg(path, out);
+  if (ascii_equal_ci(extension, "webp")) return ggfe_image_load_webp(path, out);
+  return 0;
 }
 
 static void ggfe_scale_rgb(const unsigned char *src, int sw, int sh,
@@ -1375,7 +1510,7 @@ static struct cart3d_tex *ggfe_label_tex(struct ggfe_app *app, int entry) {
   memset(&art, 0, sizeof(art));
   kind = app->entries[entry].kind;
   if (app->entries[entry].art[0] &&
-      ggfe_image_load_png(app->entries[entry].art, &art)) {
+      ggfe_image_load(app->entries[entry].art, &art)) {
     if (kind == GGFE_ART_UNKNOWN) {
       /* a stock-scheme hit carries no kind; the decoded aspect decides */
       kind = ggfe_classify_size(&app->cfg, art.width, art.height);
@@ -1910,7 +2045,7 @@ static void ggfe_load_asset(struct ggfe_app *app, const char *rel,
   char path[PATH_MAX];
   memset(out, 0, sizeof(*out));
   if (join_path(path, sizeof(path), app->theme_root, rel)) {
-    ggfe_image_load_png(path, out);
+    ggfe_image_load(path, out);
   }
 }
 

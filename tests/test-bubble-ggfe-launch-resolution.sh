@@ -30,8 +30,33 @@ expect_line() {
 cc=${CC:-cc}
 $cc -std=gnu99 -O1 -Wall -D_GNU_SOURCE -DPLUMOS_GGFE_HOST=1 \
     "$repo_root/src/frontend/plumos_ggfe.c" -o "$tmp/ggfe-host" -lm -lpthread \
-    $(pkg-config --cflags --libs libpng freetype2) 2>/dev/null ||
+    $(pkg-config --cflags --libs libpng libjpeg libwebp freetype2) 2>/dev/null ||
     fail "cannot build the GGFE host harness"
+
+# The resolver has always advertised PNG/JPEG/WebP.  Exercise each non-PNG
+# decoder directly so a build cannot silently fall back to NO ARTWORK again.
+printf '%s' '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAACAAIDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAVAQEBAAAAAAAAAAAAAAAAAAAHCf/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/ADoDFU3/2Q==' |
+    openssl base64 -d -A >"$tmp/fixture.jpg"
+printf '%s' 'UklGRjgAAABXRUJQVlA4ICwAAACQAQCdASoCAAIAAgA0JaACdLoAA5gA/vmTb/+QH/+QH/+QH/8gP+IXeyAwAA==' |
+    openssl base64 -d -A >"$tmp/fixture.webp"
+cat >"$tmp/image-decode.c" <<EOF
+#define main ggfe_program_main
+#include "$repo_root/src/frontend/plumos_ggfe.c"
+#undef main
+int main(int argc, char **argv) {
+  struct ggfe_image image;
+  int ok = argc == 2 && ggfe_image_load(argv[1], &image) &&
+           image.width == 2 && image.height == 2 && image.rgb && image.alpha;
+  if (ok) ggfe_image_free(&image);
+  return ok ? 0 : 1;
+}
+EOF
+$cc -std=gnu99 -O1 -Wall -D_GNU_SOURCE -DPLUMOS_GGFE_HOST=1 \
+    "$tmp/image-decode.c" -o "$tmp/image-decode" -lm -lpthread \
+    $(pkg-config --cflags --libs libpng libjpeg libwebp freetype2) 2>/dev/null ||
+    fail "cannot build the GGFE image decoder fixture"
+"$tmp/image-decode" "$tmp/fixture.jpg" || fail "GGFE JPEG decode failed"
+"$tmp/image-decode" "$tmp/fixture.webp" || fail "GGFE WebP decode failed"
 
 # A managed root with two of the three Game Gear cores present, so the
 # unavailable ones have to be skipped rather than chosen.
@@ -82,7 +107,7 @@ for threads in 1 4; do
         -DGGFE_FORCE_THREADS="$threads" \
         "$repo_root/src/frontend/plumos_ggfe.c" \
         -o "$tmp/ggfe-host-$threads" -lm -lpthread \
-        $(pkg-config --cflags --libs libpng freetype2) 2>/dev/null ||
+        $(pkg-config --cflags --libs libpng libjpeg libwebp freetype2) 2>/dev/null ||
         fail "cannot build the GGFE $threads-thread host harness"
     mkdir -p "$tmp/render-$threads"
     "$tmp/ggfe-host-$threads" "$root" "$card" "$tmp/render-$threads" \

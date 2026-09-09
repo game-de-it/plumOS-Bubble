@@ -11,8 +11,8 @@
  * that distinction disappears, but on ext4 it does not, and GGFE must not
  * quietly resolve a file the stock frontend would miss.
  *
- * plumos_library_scan.c still carries its own copies; adopting this header
- * there is a separate, mechanical change and is tracked in TODO.md.
+ * plumos_library_scan.c and GGFE both include this header so artwork paths use
+ * one implementation and cannot drift apart.
  */
 
 #include <ctype.h>

@@ -30,7 +30,7 @@ test "$(grep -Fc '[ "$network_stage_fat" -eq 1 ]' "$init")" -eq 1
 grep -q '^app_layer_verification=full-at-build-update-deploy,boot-critical-metadata-only$' \
     "$builder"
 grep -q '^recovery_network_start=background-before-frontend$' "$builder"
-grep -q '^power_finalization=frontend-request,pid1-storage-read-only,forced-kernel-action$' "$builder"
+grep -q '^power_finalization=frontend-request,exclusive-claim,pid1-preferred,app-layer-8s-fallback,storage-read-only,forced-kernel-action$' "$builder"
 grep -q '^normal_boot=completed-layout-validation-without-filesystem-repair$' \
     "$repo_root/scripts/build-bubble-external-initramfs.sh"
 grep -q 'threshold_seconds=10' "$init"

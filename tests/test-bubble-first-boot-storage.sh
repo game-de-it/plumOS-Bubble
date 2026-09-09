@@ -130,14 +130,14 @@ run_expect_success() {
 
 assert_final_geometry() {
     refresh_partition_nodes
-    [[ $(blockdev --getsz "${ACTIVE_LOOP}p3") == 16777216 ]]
-    [[ $(cat "/sys/class/block/${ACTIVE_LOOP##*/}p4/start") == 17989632 ]]
-    [[ $(blkid -s LABEL -o value "${ACTIVE_LOOP}p4") == PLUMOS ]]
-    [[ $(blkid -s TYPE -o value "${ACTIVE_LOOP}p4") == vfat ]]
+    if [[ $(blockdev --getsz "${ACTIVE_LOOP}p3") != 16777216 ]]; then return 1; fi
+    if [[ $(cat "/sys/class/block/${ACTIVE_LOOP##*/}p4/start") != 17989632 ]]; then return 1; fi
+    if [[ $(blkid -s LABEL -o value "${ACTIVE_LOOP}p4") != PLUMOS ]]; then return 1; fi
+    if [[ $(blkid -s TYPE -o value "${ACTIVE_LOOP}p4") != vfat ]]; then return 1; fi
     local block_count block_size
     block_count=$(dumpe2fs -h "${ACTIVE_LOOP}p3" 2>/dev/null | awk -F: '/^Block count:/ {gsub(/ /,"",$2); print $2}')
     block_size=$(dumpe2fs -h "${ACTIVE_LOOP}p3" 2>/dev/null | awk -F: '/^Block size:/ {gsub(/ /,"",$2); print $2}')
-    [[ $((block_count * block_size)) == $((16777216 * 512)) ]]
+    if [[ $((block_count * block_size)) != $((16777216 * 512)) ]]; then return 1; fi
 }
 
 # Clean seed: expand p3, resize ext4, create and format p4.  A second run must
@@ -152,9 +152,9 @@ p4_uuid=$(blkid -s UUID -o value "${ACTIVE_LOOP}p4")
 table_before=$(sfdisk -d "$ACTIVE_LOOP")
 run_expect_success "$WORK/seed-second.log"
 assert_final_geometry
-[[ $p3_uuid == "$(blkid -s UUID -o value "${ACTIVE_LOOP}p3")" ]]
-[[ $p4_uuid == "$(blkid -s UUID -o value "${ACTIVE_LOOP}p4")" ]]
-[[ $table_before == "$(sfdisk -d "$ACTIVE_LOOP")" ]]
+if [[ $p3_uuid != "$(blkid -s UUID -o value "${ACTIVE_LOOP}p3")" ]]; then exit 1; fi
+if [[ $p4_uuid != "$(blkid -s UUID -o value "${ACTIVE_LOOP}p4")" ]]; then exit 1; fi
+if [[ $table_before != "$(sfdisk -d "$ACTIVE_LOOP")" ]]; then exit 1; fi
 run_completed_provisioner >"$WORK/seed-completed.log" 2>&1
 grep -q 'result=ok mode=completed-no-repair' "$WORK/seed-completed.log"
 grep -q 'stage=S24B_P3_FILESYSTEM_CHECK_SKIPPED mode=completed-no-repair' \
@@ -183,7 +183,7 @@ if run_provisioner >"$WORK/unknown-p4.log" 2>&1; then
     printf 'error: unknown blank p4 was accepted\n' >&2
     exit 1
 fi
-[[ -z $(blkid -s TYPE -o value "${ACTIVE_LOOP}p4" 2>/dev/null || true) ]]
+if [[ -n $(blkid -s TYPE -o value "${ACTIVE_LOOP}p4" 2>/dev/null || true) ]]; then exit 1; fi
 write_p4_intent
 run_expect_success "$WORK/resumed-p4.log"
 assert_final_geometry

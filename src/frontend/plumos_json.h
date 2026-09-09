@@ -7,8 +7,8 @@
  * These are the helpers plumos_library_scan.c has always used to read
  * systems.json, lifted into a header so GGFE can read its own config with
  * exactly the same semantics rather than growing a second, subtly different
- * parser.  plumos_library_scan.c still carries its own copies; adopting this
- * header there is a separate, mechanical change and is tracked in TODO.md.
+ * parser.  plumos_library_scan.c and GGFE both include this header so the
+ * parser semantics cannot drift apart.
  */
 
 #include <ctype.h>

@@ -16,16 +16,16 @@ expected_apps_catalog='["scraping","file_manager","music_player","retroarch","py
 expected_apps_hidden='["thumbnail-plan","thumbnail-fetch","thumbnail-results"]'
 expected_legacy_hidden='["settings","network"]'
 
-[[ $(jq -c '[.menus[] | select(.id == "start") | .entries[].id]' "$menus") == "$expected_start" ]]
-[[ $(jq -c '[.apps[] | select(.menu == "apps" and .visible != false) | .id]' "$apps") == "$expected_apps" ]]
-[[ $(jq -c '[.apps[] | select(.menu == "apps") | .id]' "$apps") == "$expected_apps_catalog" ]]
-[[ $(jq -c '[.apps[] | select(.menu == "apps" and .visible == false) | .id]' "$apps") == "$expected_apps_hidden" ]]
-[[ $(jq -c '[.apps[] | select(.menu == "start" and .visible == false) | .id]' "$apps") == "$expected_legacy_hidden" ]]
-[[ $(jq -c '.start_order' "$coverage") == "$expected_start" ]]
-[[ $(jq -c '.apps_order' "$coverage") == "$expected_apps" ]]
-[[ $(jq -c '.apps_catalog_order' "$coverage") == "$expected_apps_catalog" ]]
-[[ $(jq -c '.apps_hidden_order' "$coverage") == "$expected_apps_hidden" ]]
-[[ $(jq -c '.legacy_hidden_order' "$coverage") == "$expected_legacy_hidden" ]]
+if [[ $(jq -c '[.menus[] | select(.id == "start") | .entries[].id]' "$menus") != "$expected_start" ]]; then exit 1; fi
+if [[ $(jq -c '[.apps[] | select(.menu == "apps" and .visible != false) | .id]' "$apps") != "$expected_apps" ]]; then exit 1; fi
+if [[ $(jq -c '[.apps[] | select(.menu == "apps") | .id]' "$apps") != "$expected_apps_catalog" ]]; then exit 1; fi
+if [[ $(jq -c '[.apps[] | select(.menu == "apps" and .visible == false) | .id]' "$apps") != "$expected_apps_hidden" ]]; then exit 1; fi
+if [[ $(jq -c '[.apps[] | select(.menu == "start" and .visible == false) | .id]' "$apps") != "$expected_legacy_hidden" ]]; then exit 1; fi
+if [[ $(jq -c '.start_order' "$coverage") != "$expected_start" ]]; then exit 1; fi
+if [[ $(jq -c '.apps_order' "$coverage") != "$expected_apps" ]]; then exit 1; fi
+if [[ $(jq -c '.apps_catalog_order' "$coverage") != "$expected_apps_catalog" ]]; then exit 1; fi
+if [[ $(jq -c '.apps_hidden_order' "$coverage") != "$expected_apps_hidden" ]]; then exit 1; fi
+if [[ $(jq -c '.legacy_hidden_order' "$coverage") != "$expected_legacy_hidden" ]]; then exit 1; fi
 jq -e '.language == "en.lang"' "$system_defaults" >/dev/null
 # GGFE is the Game Gear frontend and exists only on Bubble; it is tracked
 # here rather than added to the common plumOS apps list.
@@ -68,8 +68,8 @@ done
 
 grep -Fq 'PLUMOS_BUSYBOX="$BB"' "$package/bin/plumos-frontend-launch"
 grep -Fq 'PLUMOS_BUSYBOX="$BB"' "$package/bin/plumos-controller-ui-bubble"
-[[ $(wc -l < "$gg_boxart_rescue") -eq 2 ]]
-[[ $(wc -l < "$gg_title_rescue") -eq 2 ]]
+if [[ $(wc -l < "$gg_boxart_rescue") -ne 2 ]]; then exit 1; fi
+if [[ $(wc -l < "$gg_title_rescue") -ne 2 ]]; then exit 1; fi
 grep -q $'^04302bbd\tEternal%20Legend' "$gg_boxart_rescue"
 grep -q $'^407ac070\tPutt%20_%20Putter' "$gg_boxart_rescue"
 cmp "$gg_boxart_rescue" "$gg_title_rescue"
@@ -110,7 +110,7 @@ PLUMOS_ROOT="$tmp/root" PLUMOS_RUNTIME_ROOT="$tmp/run" \
 PLUMOS_BUBBLE_BACKLIGHT="$tmp/backlight/brightness" \
 PLUMOS_BUBBLE_MAX_BRIGHTNESS="$tmp/backlight/max_brightness" \
     sh "$package/bin/plumos-display-control" apply 20
-[[ $(cat "$tmp/backlight/brightness") == 255 ]]
+if [[ $(cat "$tmp/backlight/brightness") != 255 ]]; then exit 1; fi
 grep -q '"brightness": 10' "$tmp/root/config/system/settings.json"
 
 mkdir -p "$tmp/factory/retroarch" "$tmp/factory/picoarch/config/standalone" \
@@ -158,8 +158,8 @@ PLUMOS_TEST_POWER_CALLS="$tmp/power-calls.log" \
 PLUMOS_NETWORK_SERVICES=/nonexistent \
 PLUMOS_POWER_REQUEST="$tmp/power-request" \
     sh "$package/bin/plumos-safe-shutdown" --reboot
-[[ -f "$tmp/power-root/provision/clean-shutdown" ]]
-[[ -f "$tmp/power-user/.plumos-clean-shutdown" ]]
+if [[ ! -f "$tmp/power-root/provision/clean-shutdown" ]]; then exit 1; fi
+if [[ ! -f "$tmp/power-user/.plumos-clean-shutdown" ]]; then exit 1; fi
 grep -q "^umount $tmp/power-user$" "$tmp/power-calls.log"
 grep -qx reboot "$tmp/power-request"
 ! grep -Eq '^(reboot|poweroff) ' "$tmp/power-calls.log"
@@ -176,7 +176,7 @@ PLUMOS_NETWORK_SERVICES=/nonexistent \
 PLUMOS_POWER_REQUEST="$tmp/power-request" \
     sh "$package/bin/plumos-safe-shutdown" --reboot >"$tmp/power-repeat.log"
 grep -q 'pending=reused' "$tmp/power-repeat.log"
-[[ -f "$tmp/power-root/provision/clean-shutdown" ]]
+if [[ ! -f "$tmp/power-root/provision/clean-shutdown" ]]; then exit 1; fi
 # A user may correct an accidental Shutdown selection to Reboot while the
 # original request is still awaiting PID 1.  The clean unmount remains valid.
 PLUMOS_ROOT="$tmp/power-root" \
@@ -191,7 +191,7 @@ PLUMOS_POWER_REQUEST="$tmp/power-request" \
     >"$tmp/power-switch.log"
 grep -q 'pending=updated-from-reboot' "$tmp/power-switch.log"
 grep -qx shutdown "$tmp/power-request"
-[[ -f "$tmp/power-root/provision/clean-shutdown" ]]
+if [[ ! -f "$tmp/power-root/provision/clean-shutdown" ]]; then exit 1; fi
 grep -q 'finalize_power_action' "$repo_root/rootfs/bubble-frontend/init"
 grep -q 'ui->exit_requested = 1' "$repo_root/src/frontend/plumos_controller_ui.c"
 
@@ -203,7 +203,7 @@ services_before=$(sha256sum "$tmp/network-root/config/network/services.conf" | a
 PLUMOS_ROOT="$tmp/network-root" PLUMOS_RUNTIME_ROOT="$tmp/network-run" \
     sh "$network_script" quiesce
 services_after=$(sha256sum "$tmp/network-root/config/network/services.conf" | awk '{print $1}')
-[[ $services_before == "$services_after" ]]
+if [[ $services_before != "$services_after" ]]; then exit 1; fi
 
 network_package="$repo_root/package/network-services-bubble/plumos"
 sh -n "$network_package/bin/plumos-network-services"
