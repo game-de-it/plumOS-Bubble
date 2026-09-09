@@ -217,6 +217,12 @@
     実際の電源断まで利用者計測で約4秒だった。両方の次bootで`previous_shutdown=clean`
     `automatic_repair=no`、System B readback、FE単独描画ownerを確認した。charger接続前後と
     suspend/resumeは引き続き未確認。
+  - 同じSystem Bで充電器を外すと`bq2589x-usb online=0`、battery `Discharging`、kernel
+    `adapter removed`へ切り替わり、FEとWi-Fiは継続した。非充電状態のFE Rebootも2秒で
+    backend requestへ到達し、次bootは`previous_shutdown=clean`、FE開始3.84秒だった。
+    稼働中に再接続すると`online=1`、battery `Charging`、約1.03 A、kernel
+    `usb dcp adapter plugged in`へ切り替わり、FEとWi-Fiは継続した。charger transitionと
+    charger非接続rebootは合格、suspend/resumeだけを残す。
 - [ ] `BUB-P4-P04` power action後にFAT/ext4がcleanであることを次boot/read-only fs checkで確認する。
   - terminal shutdown/rebootでp3/p4 clean markerを書いてsyncし、p4を明示unmountしてから
     p3をread-only化する実装を追加。marker作成/unmount順はhost fixture合格。markerは

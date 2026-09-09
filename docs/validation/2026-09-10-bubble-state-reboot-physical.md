@@ -72,3 +72,20 @@ There is no new fixed power delay. A clean idle system proceeds immediately;
 only an actual residual `/storage` writer receives the bounded termination
 path. The existing offline FAT dirty-flag inspection remains a separate open
 part of `BUB-P4-P04`.
+
+## Charger transition and battery reboot
+
+The charger was removed while the frontend was idle. The device changed to
+`bq2589x-usb online=0`, battery `Discharging`, and logged `adapter removed`.
+The frontend and Wi-Fi remained available with no second renderer. A normal FE
+reboot while still disconnected again reached the backend request in two
+seconds. The following boot reported `previous_shutdown=clean`, retained
+System B, remained in battery discharge state, and started the frontend at
+kernel timestamp 3.84 seconds.
+
+The charger was then reconnected while the frontend remained active. The
+device changed to `bq2589x-usb online=1`, battery `Charging` at approximately
+1.03 A, and logged `usb dcp adapter plugged in`. The frontend and Wi-Fi stayed
+available. Charger disconnect, battery-only reboot, and live reconnect are
+therefore accepted. Actual suspend/resume remains the only open power-mode
+portion of `BUB-P4-P03`.
