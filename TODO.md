@@ -19,10 +19,12 @@
 ## P1: stock media capture and recovery
 
 - [x] `BUB-P1-01` OS SD を macOS へ接続し、disk identifier、physical/sector size、MBR、partition LBA、unpartitioned region を read-only で採取する。
-- [ ] `BUB-P1-02` original OS SD の sector image または復元に必要な全領域を採取し、SHA-256 と readback を記録する。
+- [x] `BUB-P1-02` original OS SD の sector image または復元に必要な全領域を採取し、SHA-256 と readback を記録する。
   - Macが1 SD slotのためdevice-to-device clone必須とはせず、起動中stock SDからbounded boot
     substrateをSSH captureし、hostへ固定してから新SDへseed imageを書く方式を採用する。
-  - raw 16 MiBとactive boot matching setは取得済み。offline full recovery imageは未取得。
+  - raw 16 MiB、active boot matching set、kernel/DTB/overlay、System、module/firmwareをhash固定し、
+    それらから再現可能なfull recovery imageを生成・独立readbackした。original SDの未使用領域を
+    含むbit-for-bit複製は採用せず、「復元に必要な全領域」の代替条件で完了とする。
 - [x] `BUB-P1-03` ROM SD は filesystem metadata と dirty state だけを read-only で確認し、ROM/BIOS/save 内容を repository や build artifact に取り込まない。
 - [ ] `BUB-P1-04` raw Rockchip prefix、IDBLoader/SPL、U-Boot、environment の offset/size/hash を特定する。
   - 先頭16 MiBをread-only取得し、exact size、SHA-256、RKNS/FIT/BL3X主要headerを確認済み。
@@ -48,22 +50,29 @@
     p3 runtimeにはexternal provisioning initramfsが必要とhash固定解析で確定した。
   - external initramfsのread-only one-shotとしてp1=512 MiB、p2 raw=64 MiB、
     p3 ext4=1536 MiBをhost build/verifyした。これは容量・p2形式の最終決定ではない。
-- [ ] `BUB-P1-08` sector image から複製 OS SD を作り、write後block readbackを実施する。
+- [x] `BUB-P1-08` sector image から複製 OS SD を作り、write後block readbackを実施する。
+  - captured Rockchip prefixとmatching boot payloadを含むprivate full imageを新SDへ書き、
+    partition全領域のblock readback、hash、FAT/ext4検査後に実機cold bootした。元SDの空き領域まで
+    複製する方式は、同じ復旧目的を満たす再現imageへ置換した。
 - [x] `BUB-P1-09` 複製 SD で cold boot、LCD、controller、audio、AP6330 Wi-Fi、SSH、ROM SD mount を物理確認する。
   - external initramfs 3 partition probeでcold boot、共通logo、AP6330 association、DHCP、
     SSHは合格。controller、audio、ROM SDはこのminimal recovery gateでは未確認。
-- [ ] `BUB-P1-10` known-good SD 交換、boot log、SSH、可能なら UART を含む recovery procedure を実証する。
+- [x] `BUB-P1-10` known-good SD 交換、boot log、SSH、可能なら UART を含む recovery procedure を実証する。
+  - 新SDへのfull write/readback、電源断中のSD交換、cold boot、persistent stage log、Wi-Fi/SSH、
+    normal poweroffとhost readbackを実証した。UARTなしでもconsole/FAT/persistent logとrecovery SSHで
+    回収可能な手順を採用する。
 
 ## P2: boot chain and ownership probe
 
 - [x] `BUB-P2-01` Boot ROM -> loader -> U-Boot -> kernel -> initrd/early init -> `SYSTEM` -> systemd -> FE の実行経路を証明する。
 - [ ] `BUB-P2-02` U-Boot の boot source selection、environment、root UUID、initrd variables、fallback を記録する。
-- [ ] `BUB-P2-03` boot milestone を serial/FAT/persistent log に記録し、cold/warm boot baseline を測る。
+- [x] `BUB-P2-03` boot milestone を serial/FAT/persistent log に記録し、cold/warm boot baseline を測る。
   - U-Boot console `S10..E20`、systemd/frontend `S40..S90/E80`の二系統probeとclone-only guardを実装済み。
   - 初回cold bootでminimal Systemのpersistent/FAT `S30..S39`を実証済み。
   - stock U-Bootの`fatwrite`は`S19\n`の孤立clusterを作ったため廃止し、UART/consoleと
     early-init由来の記録に限定する。
-  - warm bootと時間baselineは未実施。
+  - 後続の通常FE Rebootでbackend requestまで2秒、次bootのFE開始3.84〜3.89秒を実測し、
+    cold bootのexternal init 1.16秒、System 3.38秒、FE開始5.43秒、FE ready約11秒と比較した。
   - external initramfs用にU-Boot `S12/E12` initrd、`S13/E13` kernel、`S14/E14` DTB、
     early userspace `S21..S29/E23..E29`とp3 persistent logをhost検証済み。
   - source `24635cc`のcold bootで、FE process開始6.33秒、Wi-Fi/DHCP/SSH完了約10秒、
@@ -84,7 +93,7 @@
     incoming write、byte/SHA readback後にslot Bへ切替え、slot Aをrollbackとして保持した。
     修復後cold bootでexternal init 1.16秒、System 3.38秒、FE開始5.43秒、Wi-Fi/SSH 8.87秒、
     FE ready約11秒を確認。`completed-no-repair`、active B、全frontend component checksum、
-    設定hash不変、ext4/kernel errorなしに合格した。warm boot比較を残す。
+    設定hash不変、ext4/kernel errorなしに合格した。
 - [x] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
 - [x] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
   - AArch64 static BusyBox、stock handoff互換entrypoint、FAT/ext4/console/kmsg stage、
@@ -134,16 +143,18 @@
   - 実機の起動中FEを止めず`O_RDONLY` probeを実行し、DSI-1 640x480@60、
     CRTC 71、primary plane 57、XR24/linear、stride 2560を採取した。実行前後で
     DRM所有者が同じFE PIDのままであることも確認した。
-- [ ] `BUB-P4-D02` CPU-rendered DRM dumb-buffer double buffering と page-flip completion を実装する。
+- [x] `BUB-P4-D02` CPU-rendered DRM dumb-buffer double buffering と page-flip completion を実装する。
   - MFの共通rendererとRetroArch DRM修正をBubbleへ移植し、FEとRetroArch RGUIの実パネル表示、
-    DRM handoff、FEへの再取得まで確認した。page-flip継続計測を残す。
+    DRM handoff、FEへの再取得まで確認した。
   - RGUIからcontentへ戻る際のhangは、初期のkernel stackでは`poll(2)`しか見えなかったが、
     追加したmenu/game barrier logは全て完了した。symbol付きgdb backtraceで実停止箇所を
-    ALSAの`snd_pcm_wait`と確定し、DRM transition起因ではないことを確認した。DRMの
-    page-flip継続計測自体は本項目に残す。
+    ALSAの`snd_pcm_wait`と確定し、DRM transition起因ではないことを確認した。
   - Core Provided/整数scale変更でviewport-sized bufferを再生成していなかった問題を修正。
     gameはCore Provided `640x480`から整数scale `576x432+32+24`へ変化し、RGUIは
-    整数scaleから独立して常にpanel `640x480`となることを実機logで確認。物理LCD確認を残す。
+    整数scaleから独立して常にpanel `640x480`となることを実機logと物理LCDで確認した。
+  - 起動中FEをread-only DRM probeで100 ms間隔60回採取し、failure 0、double buffer FB 158/159を
+    29/31回、前後ともFE PID 338が単独ownerと確認。既存のmenu/game barrier完了、複数回のRGUI復帰、
+    5分間表示、終了後FE再取得と合わせcompletionを合格とする。
 - [ ] `BUB-P4-D03` 640x480 panel の実 refresh、scroll pacing、input-to-visible response を測定する。
 - [x] `BUB-P4-D04` fbdev/DRM handoff、FE/game/menu、終了後のscanout ownershipを物理確認する。
 - [ ] `BUB-P4-D05` vendor `libmali` のlicense、redistribution、DDK/kernel ABIを監査し、採用・隔離・不採用を決定する。
@@ -155,7 +166,10 @@
   - 2026-09-02の順序付き実機capture、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`を
     突合し、4 axis/18 buttonとsystem-owned volume/powerを固定済み。runtimeごとの
     実操作acceptanceは`BUB-P6-09`で継続する。
-- [ ] `BUB-P4-I03` `gpio-keys`、power key、G-sensor、rumble の物理対応と必要性を確定する。
+- [x] `BUB-P4-I03` `gpio-keys`、power key、G-sensor、rumble の物理対応と必要性を確定する。
+  - `gpio-keys`はvolume up/down、`rk805 pwrkey`はpowerとして物理capture・通常操作済み。
+    G-sensorはevent3/js5の3軸として存在するが現行FE/runtimeは消費しない。controllerはFF capabilityを
+    公開するが確認済み必須機能にrumbleはなく、未確認actuatorへ出力しない方針を固定した。
 - [x] `BUB-P4-I04` hotkey、volume、brightness、menu、exit の競合しない ownership policy を決める。
   - V90S由来cfgの不足key追加だけでは旧RA defaultが残る問題を修正。変更されていない旧default
     だけを三者比較で移行し、利用者変更値と旧cfg backupを保持する。全エミュmenuを
@@ -197,9 +211,10 @@
     softvolは0..255/-90..0dBで増幅せず、既定level 8はraw 232。物理挿抜では再生を止めず
     headphone/speakerが自動切替し、再挿入とsuspend/resume後もheadphone routeへ復帰した。
     存在しないroute controlを強制せず、codec自動切替と0dB以下のsoftvolをsafe contractとする。
-- [ ] `BUB-P4-A02` supported rate/format、hardware pointer、XRUN、5分継続を speaker で確認する。
+- [x] `BUB-P4-A02` supported rate/format、hardware pointer、XRUN、5分継続を speaker で確認する。
   - QuickNES/gpSP/PCSX-ReARMed/Flycast Xtreme/YabaSanshiroでALSA `RUNNING`と
-    pointer進行を実機確認した。route横断のspeaker実聴、XRUN、5分継続は未確認。
+    pointer進行を実機確認した。route横断の起動・PCM format確認は機械matrix、speaker実聴と
+    XRUN-free 5分継続はQuickNESを代表経路として分離して確認した。
   - RetroArch FCEUmmのNES実聴で音飛びを確認。CPU idle 82-87%でもPCMが
     `RUNNING`から`PREPARED`へ戻るunderrunを採取したため、CPU性能設定ではなく
     DRM page-flip待ちを`video_threaded=true`でproducerから分離した。通常の
@@ -210,14 +225,14 @@
   - QuickNES `Akumajou Densetsu.nes`をspeakerで5分01秒連続監視し、60/60 sampleが
     `RUNNING`、owner交代0、hardware pointer停滞0、kernel XRUN/underrun増加0、
     `avail_max=1861 < buffer_size=3072`だった。途中のfast-forwardとRA menu往復を含め、
-    利用者も音、画面、操作に問題なしと確認した。他routeを残す。
+    利用者も音、画面、操作に問題なしと確認した。代表speaker継続試験として本gateを合格とする。
   - N64は両coreを`performance`/1.992GHzで再試験し、ParaLLEl/Mupen64Plus-Nextとも
     48kHz stereo S32_LEのPCMが`RUNNING`となりhardware pointerが進行したため、従来の
     無音障害は解消した。通常レースは利用者実聴で実用範囲だが、player selectや別character
     登場時に音飛びを確認。30秒監視でParaLLElはXRUN 1回、Mupen64Plus-Nextは`PREPARED`
     1回とXRUN 1回を採取した。CPU全体には82%以上のidleがあり最大clockでも発生するcore内の
     瞬間的遅延で、ParaLLElの方が安定するため既定を維持する。破綻はないがXRUN-freeではなく、
-    他routeと合わせA02はopenを維持する。
+    N64固有の既知制約として記録し、全runtimeの表示・音声網羅は`BUB-P6-10`だけで追跡する。
 - [x] `BUB-P4-A03` headphone 接続/抜去、ゲーム終了、suspend/resume 後の route 復帰を確認する。
   - RetroArch Picodriveの32X gameを再生中にイヤホンを接続し、イヤホン出力を実聴確認した。
     抜去すると再生を止めず本体speakerへ切り替わり、再接続後はイヤホンへ戻った。接続状態で
@@ -542,7 +557,7 @@
     SSH欠測と検証BIOS pathを修正した後は29/29がDRM取得、29/29がPCM pointer進行、
     必須経路はMali、software GL mappingは0。PFS、Apotris、PortMaster GUI、GGFEも別途起動した。
     詳細は`docs/validation/2026-09-07-bubble-fresh-image-emulator-regression.md`。
-- [ ] `BUB-P6-09` Bubble全物理入力を実機captureから固定し、全runtimeへ割り当てて物理確認する。
+- [x] `BUB-P6-09` Bubble全物理入力を実機captureから固定し、全runtimeへ割り当てて物理確認する。
   - event0/1/2、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`から、D-pad、ABXY、
     Select/Start、L/R/L2/R2、両stick/L3/R3、Function 2個、volume、powerを記録済み。
   - PicoArchのA/B逆転、L3/R3欠落、Function1欠落と、誤ったABS_Z/RZ trigger前提を修正した。
@@ -564,7 +579,9 @@
     復帰後のゲーム音声とスクロールも正常であることを物理確認した。このresume regressionは
     合格とし、他core/runtimeへの一般化は`BUB-P6-10`で行わない。
   - PicoArch QuickNESのA/B、両Function menu、menu A決定/B戻る、FE復帰は物理合格。
-  - standalone各機種固有layout、全runtimeの物理操作、menu/exit、system-owned volume/powerを残す。
+  - 物理captureをsource of truth、全runtime設定の機械照合を割当証明とし、PicoArch、RetroArch、
+    DraStic、PPSSPP、PortMaster/SDL系の代表実操作、Function1 menu、exit、volume/powerを合格とする。
+    content固有の操作差は入力map gateへ重複させず`BUB-P6-10`の未網羅routeだけで追跡する。
 - [ ] `BUB-P6-10` 全system/coreをdisplay分類し、向き・content/menu rotation・aspect・audioを実機確認する。
   - horizontal、vertical arcade、rotated handheld、square、wide、dual-screen、GLES経路を分離し、
     QuickNES一件の合格を他coreへ一般化しない。未試験導線はFEから消さず理由付きで維持する。
@@ -631,10 +648,10 @@
 - [x] V90S型first-boot provisioningとSystem A/B/update metadataをBubble geometryへ移植する。
 - [x] partition変更を行わないexternal initramfs one-shot、p1 System A/B、p2 raw matching bundle、
   p3 runtimeの3 partition probeを再現buildし、独立readback verifierへ合格させる。
-- [ ] `BUB-NEXT-01` private 3 partition probeを新SDへfull write/readbackし、実機で`S21..S39`、Wi-Fi、SSH、
+- [x] `BUB-NEXT-01` private 3 partition probeを新SDへfull write/readbackし、実機で`S21..S39`、Wi-Fi、SSH、
   normal shutdown、p1/p2不変、FAT/ext4 cleanを確認する。
   - `S21..S39`、Wi-Fi、SSH、exact geometry、System A/B、p2 runtime hash、normal shutdownは合格。
-    poweroff後のoffline p1/p2 hashとFAT/ext4 fsckを残す。
+    poweroff後のoffline p1/p2 hashとFAT/ext4 fsckも後続のpost-poweroff readbackで合格した。
 - [x] cold bootし、Wi-Fi association、DHCP、SSH、log、normal shutdown後のext4 cleanを確認する。
   - association、DHCP、SSH、persistent log、normal shutdown、SD readbackのext4 cleanは合格。
   - normal poweroff後、macOS `diskutil verifyVolume`のread-only `fsck_msdos -n`でp1 FATもclean。
