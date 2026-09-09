@@ -55,6 +55,9 @@ if $BB mount -o remount,ro /storage 2>/dev/null; then
 else
     log 'stage=E93_STORAGE_READ_ONLY_FAILED clean-shutdown-proof=invalid'
     $BB rm -f "$CLEAN_MARKER" 2>/dev/null || true
+    $BB rmdir "$CLAIM" 2>/dev/null || true
+    log "stage=E94_POWER_ACTION_REFUSED action=$expected"
+    exit 1
 fi
 $BB mount -o remount,ro /flash 2>/dev/null || true
 $BB sync

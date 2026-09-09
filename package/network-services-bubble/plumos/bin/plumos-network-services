@@ -9,6 +9,7 @@ RUN_DIR=${PLUMOS_NETWORK_SERVICES_RUN_DIR:-$RUNTIME_ROOT/network-services}
 CONFIG_DIR=$PLUMOS_ROOT/config/network
 SERVICES_CONF=$CONFIG_DIR/services.conf
 LOG=$PLUMOS_ROOT/logs/network-services.log
+DROPBEAR_RUNTIME_LOG=$RUNTIME_ROOT/dropbear/dropbear.log
 BUSYBOX=$PLUMOS_ROOT/network-services/bin/busybox
 SFTP_SERVER=$PLUMOS_ROOT/network-services/ssh/libexec/sftp-server
 SFTP_SYSTEM_BRIDGE=${PLUMOS_SFTP_SYSTEM_BRIDGE:-/usr/lib/sftp-server}
@@ -21,7 +22,8 @@ SMBD_PID=$RUN_DIR/smbd.pid
 FTP_PORT=${PLUMOS_FTP_PORT:-21}
 TRANSFER_MAX_CONNECTIONS=${PLUMOS_TRANSFER_MAX_CONNECTIONS:-20}
 
-mkdir -p "$RUN_DIR" "$CONFIG_DIR" "$PLUMOS_ROOT/logs" 2>/dev/null || true
+mkdir -p "$RUN_DIR" "$CONFIG_DIR" "$PLUMOS_ROOT/logs" \
+    "${DROPBEAR_RUNTIME_LOG%/*}" 2>/dev/null || true
 
 log() {
     printf '%s service=%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || true)" "$1" "$2" >>"$LOG"
@@ -139,7 +141,11 @@ start_ssh() {
         /usr/bin/dropbearkey -t ed25519 -f "$HOST_KEY" >>"$LOG" 2>&1 || return 1
         chmod 0600 "$HOST_KEY"
     fi
-    /usr/sbin/dropbear -E -P "$SSH_PID" -r "$HOST_KEY" -p 22 -K 30 -I 300 >>"$LOG" 2>&1 || return 1
+    # The listener and each accepted SSH child inherit stderr. Keep that
+    # descriptor on tmpfs so an idle or active SSH session cannot prevent the
+    # final /storage remount during reboot or shutdown.
+    /usr/sbin/dropbear -E -P "$SSH_PID" -r "$HOST_KEY" -p 22 -K 30 -I 300 \
+        >>"$DROPBEAR_RUNTIME_LOG" 2>&1 || return 1
     status_service ssh
 }
 

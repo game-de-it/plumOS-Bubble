@@ -12,6 +12,7 @@ CLEAN_P3_MARKER=${PLUMOS_CLEAN_P3_MARKER:-$PLUMOS_ROOT/provision/clean-shutdown}
 CLEAN_P4_MARKER=${PLUMOS_CLEAN_P4_MARKER:-$USER_MOUNT/.plumos-clean-shutdown}
 MOUNTS_FILE=${PLUMOS_MOUNTS_FILE:-/proc/mounts}
 POWER_REQUEST=${PLUMOS_POWER_REQUEST:-$RUNTIME_ROOT/power-action/request}
+USER_SOURCE_FILE=${PLUMOS_USER_SOURCE_FILE:-$RUNTIME_ROOT/power-action/user-source}
 NETWORK_SERVICES=${PLUMOS_NETWORK_SERVICES:-$PLUMOS_ROOT/bin/plumos-network-services}
 VOLUME_KEYS_SERVICE=${PLUMOS_VOLUME_KEYS_SERVICE:-$PLUMOS_ROOT/bin/plumos-volume-keys-service}
 RUNTIME_QUIESCE=${PLUMOS_RUNTIME_QUIESCE:-$PLUMOS_ROOT/bin/plumos-runtime-quiesce}
@@ -57,12 +58,14 @@ start_power_finalizer() {
         log 'stage=power-fallback result=unavailable owner=pid1-only'
         return 0
     }
+    finalizer_log=$RUNTIME_ROOT/power-action/finalizer.log
+    "$BB" mkdir -p "${finalizer_log%/*}" 2>/dev/null || true
     PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
         PLUMOS_BUSYBOX="$BB" PLUMOS_POWER_REQUEST="$POWER_REQUEST" \
         PLUMOS_POWER_ACTION_LOG="$LOG" PLUMOS_MOUNTS_FILE="$MOUNTS_FILE" \
         PLUMOS_USER_MOUNT="$USER_MOUNT" PLUMOS_CLEAN_P3_MARKER="$CLEAN_P3_MARKER" \
         "$BB" sh "$POWER_FINALIZER" "$ACTION" \
-        >>"$LOG" 2>&1 </dev/null &
+        >>"$finalizer_log" 2>&1 </dev/null &
     log "stage=power-fallback result=armed action=$ACTION"
 }
 
@@ -151,6 +154,15 @@ printf '%s\n' "$ACTION" >"$POWER_REQUEST.next.$$" || {
     exit 1
 }
 if "$BB" grep -qs " $USER_MOUNT " "$MOUNTS_FILE" 2>/dev/null; then
+    user_source=$($BB awk -v mount="$USER_MOUNT" '$2 == mount { print $1; exit }' \
+        "$MOUNTS_FILE" 2>/dev/null || true)
+    case "$user_source" in
+        /dev/*)
+            "$BB" mkdir -p "${USER_SOURCE_FILE%/*}" 2>/dev/null || true
+            printf '%s\n' "$user_source" >"$USER_SOURCE_FILE.next.$$" &&
+                "$BB" mv -f "$USER_SOURCE_FILE.next.$$" "$USER_SOURCE_FILE"
+            ;;
+    esac
     if "$BB" mkdir -p "${CLEAN_P3_MARKER%/*}" 2>/dev/null &&
         "$BB" touch "$CLEAN_P3_MARKER" "$CLEAN_P4_MARKER" 2>/dev/null; then
         "$BB" sync
@@ -198,6 +210,18 @@ fi
 if [ -x "$NETWORK_SERVICES" ]; then
     "$BB" sh "$NETWORK_SERVICES" quiesce >/dev/null 2>&1 ||
         log 'stage=network-quiesce result=failed'
+fi
+# A service listener can exit while an accepted child keeps the inherited log
+# descriptor open. Kill only remaining /storage users as one bounded group;
+# the helper excludes this transaction and its frontend/PID-1 ancestors.
+if [ -x "$RUNTIME_QUIESCE" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+        PLUMOS_BUSYBOX="$BB" "$BB" sh "$RUNTIME_QUIESCE" \
+        terminate-storage /storage >>"$LOG" 2>&1 || {
+            "$BB" rm -f "$CLEAN_P3_MARKER" 2>/dev/null || true
+            log 'result=error stage=storage-writer-termination'
+            exit 1
+        }
 fi
 if ! "$BB" mv -f "$POWER_REQUEST.next.$$" "$POWER_REQUEST"; then
     "$BB" rm -f "$CLEAN_P3_MARKER" 2>/dev/null || true

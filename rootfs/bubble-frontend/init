@@ -201,6 +201,8 @@ finalize_power_action() {
     request=/run/plumos/power-action/request
     claim=/run/plumos/power-action/finalizing
     clean_marker=/storage/plumos/provision/clean-shutdown
+    user_marker=/storage/user/.plumos-clean-shutdown
+    user_source_file=/run/plumos/power-action/user-source
     if ! $bb mkdir "$claim" 2>/dev/null; then
         log "stage=S90_POWER_FINALIZE_ALREADY_CLAIMED action=$action"
         return 0
@@ -212,13 +214,37 @@ finalize_power_action() {
         log 'stage=E90_USER_STORAGE_STILL_MOUNTED clean-shutdown-proof=invalid'
         $bb rm -f "$clean_marker" 2>/dev/null || true
     fi
-    if $bb mount -o remount,ro /storage 2>/dev/null; then
+    writer_quiesce_ok=1
+    if [ -x /storage/plumos/bin/plumos-runtime-quiesce ]; then
+        PLUMOS_ROOT=/storage/plumos PLUMOS_RUNTIME_ROOT=/run/plumos \
+            PLUMOS_BUSYBOX="$bb" $bb sh \
+            /storage/plumos/bin/plumos-runtime-quiesce \
+            terminate-storage /storage \
+            >>/storage/plumos/logs/power-action.log 2>&1 || {
+                log 'stage=E91_STORAGE_WRITER_QUIESCE_FAILED clean-shutdown-proof=invalid'
+                $bb rm -f "$clean_marker" 2>/dev/null || true
+                writer_quiesce_ok=0
+            }
+    fi
+    $bb sync
+    if [ "$writer_quiesce_ok" -eq 1 ] &&
+        $bb mount -o remount,ro /storage 2>/dev/null; then
         printf 'plumos-bubble-init=stage=S91_STORAGE_READ_ONLY action=%s\n' \
             "$action" >/dev/console 2>/dev/null || true
     else
         log 'stage=E91_STORAGE_READ_ONLY_FAILED clean-shutdown-proof=invalid'
         $bb rm -f "$clean_marker" 2>/dev/null || true
         $bb sync
+        user_source=$($bb sed -n '1p' "$user_source_file" 2>/dev/null || true)
+        case "$user_source" in /dev/*) ;; *) user_source=/dev/mmcblk1p4 ;; esac
+        if ! mounted /storage/user; then
+            $bb mount -t vfat -o rw,noatime "$user_source" /storage/user \
+                2>/dev/null || true
+        fi
+        $bb rm -f "$user_marker" 2>/dev/null || true
+        $bb rmdir "$claim" 2>/dev/null || true
+        log 'stage=E91_POWER_ACTION_REFUSED runtime=recoverable'
+        return 1
     fi
     $bb mount -o remount,ro /flash 2>/dev/null || true
     $bb sync

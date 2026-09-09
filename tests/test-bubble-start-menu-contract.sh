@@ -193,10 +193,18 @@ grep -q 'pending=updated-from-reboot' "$tmp/power-switch.log"
 grep -qx shutdown "$tmp/power-request"
 if [[ ! -f "$tmp/power-root/provision/clean-shutdown" ]]; then exit 1; fi
 grep -q 'finalize_power_action' "$repo_root/rootfs/bubble-frontend/init"
+grep -q 'terminate-storage /storage' "$package/bin/plumos-safe-shutdown"
+grep -q 'E91_POWER_ACTION_REFUSED runtime=recoverable' \
+    "$repo_root/rootfs/bubble-frontend/init"
+grep -q 'E94_POWER_ACTION_REFUSED' \
+    "$package/bin/plumos-power-request-finalizer"
 grep -q 'ui->exit_requested = 1' "$repo_root/src/frontend/plumos_controller_ui.c"
 
 network_script="$repo_root/package/network-services-bubble/plumos/bin/plumos-network-services"
 grep -q 'if \[ "$action" = quiesce \]' "$network_script"
+grep -Fq 'DROPBEAR_RUNTIME_LOG=$RUNTIME_ROOT/dropbear/dropbear.log' \
+    "$network_script"
+! grep -Eq 'dropbear .*>>"\$LOG"' "$network_script"
 mkdir -p "$tmp/network-root/config/network"
 printf 'ssh_enabled=1\nftp_enabled=1\n' >"$tmp/network-root/config/network/services.conf"
 services_before=$(sha256sum "$tmp/network-root/config/network/services.conf" | awk '{print $1}')

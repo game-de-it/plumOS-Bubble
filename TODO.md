@@ -148,7 +148,10 @@
 ### Input
 
 - [x] `BUB-P4-I01` `event0..3` と `js0/js5` の capability を machine-readable inventory にする。
-- [ ] `BUB-P4-I02` 全物理button、D-pad、ABXY、shoulder、START/SELECT、analog、stick click をpress/release採取する。
+- [x] `BUB-P4-I02` 全物理button、D-pad、ABXY、shoulder、START/SELECT、analog、stick click をpress/release採取する。
+  - 2026-09-02の順序付き実機capture、runtime DT、`JSIOCGBTNMAP`/`JSIOCGAXMAP`を
+    突合し、4 axis/18 buttonとsystem-owned volume/powerを固定済み。runtimeごとの
+    実操作acceptanceは`BUB-P6-09`で継続する。
 - [ ] `BUB-P4-I03` `gpio-keys`、power key、G-sensor、rumble の物理対応と必要性を確定する。
 - [x] `BUB-P4-I04` hotkey、volume、brightness、menu、exit の競合しない ownership policy を決める。
   - V90S由来cfgの不足key追加だけでは旧RA defaultが残る問題を修正。変更されていない旧default
@@ -304,7 +307,11 @@
   - RetroArchとPicoArchのQuickNESはcontent起動、ALSA pointer進行、停止後FE 1 process、
     audio owner解放まで合格。PicoArch QuickNESはLCD向き/aspect、speaker実聴、A/B、
     両Function menuとFE復帰を物理合格。RetroArch側の同等物理確認は別gateとして残す。
-- [ ] `BUB-P5-06` menu/exit、save/state、reboot後の保持を確認する。
+- [x] `BUB-P5-06` menu/exit、save/state、reboot後の保持を確認する。
+  - 2026-09-10、QuickNES/Akumajou DensetsuでFunction1 menuからmanual stateを保存し、
+    同bootでload、SELECT+START終了、FE再取得を確認。manual state SHA-256
+    `a0b4cc509ec62c29368598f32660a5bdfa7347ab134687e0c17dbab944015820`は
+    FE Reboot前後で不変で、異なるboot IDで再loadし保存場面へ復帰、通常FEへ戻った。
 - [x] `BUB-P5-07` game終了後にfrontendが1 processだけで、DRM/input/audio owner残留がないことを確認する。
 
 ## P6: wider runtime and compatibility

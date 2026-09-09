@@ -30,7 +30,7 @@ cat > "$work/busybox" <<'EOF'
 command_name=${1:-}
 shift || true
 case "$command_name" in
-    mount) exit 1 ;;
+    mount) exit "${FAKE_MOUNT_RESULT:-0}" ;;
     sync) sync ;;
     *) exec "$command_name" "$@" ;;
 esac
@@ -67,5 +67,25 @@ FAKE_POWER_RESULT="$work/unexpected" \
     sh "$finalizer" shutdown
 [ ! -e "$work/unexpected" ]
 [ "$(cat "$work/run/power-action/request")" = reboot ]
+
+rm -rf "$work/run/power-action/finalizing"
+printf 'shutdown\n' > "$work/run/power-action/request"
+rm -f "$work/denied"
+if PLUMOS_ROOT="$work/plumos" \
+    PLUMOS_RUNTIME_ROOT="$work/run" \
+    PLUMOS_BUSYBOX="$work/busybox" \
+    PLUMOS_POWER_REQUEST="$work/run/power-action/request" \
+    PLUMOS_POWER_FINALIZE_CLAIM="$work/run/power-action/finalizing" \
+    PLUMOS_POWER_FINALIZE_WAIT_SECONDS=0 \
+    PLUMOS_POWER_BACKEND="$work/backend" \
+    PLUMOS_MOUNTS_FILE="$work/mounts" \
+    FAKE_MOUNT_RESULT=1 FAKE_POWER_RESULT="$work/denied" \
+        sh "$finalizer" shutdown; then
+    exit 1
+fi
+[ ! -e "$work/denied" ]
+[ ! -e "$work/run/power-action/finalizing" ]
+grep -q 'stage=E94_POWER_ACTION_REFUSED action=shutdown' \
+    "$work/plumos/logs/power-action.log"
 
 printf 'bubble_power_request_finalizer=result-ok pid1=preferred fallback=bounded recovery=watched\n'
