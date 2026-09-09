@@ -285,9 +285,10 @@
     反映し、217 frontend fileと全12,460 app-layer fileのchecksum、既存設定hash不変を確認した。
     通常再起動後、利用者が実LCD上で`NW Service`と`NW情報`の双方にADBがないことを確認した。
 - [ ] `BUB-P4-S01` OS SD と ROM SD を UUID/label/partition identity で安全に解決する。
-  - Bubble runtime inventoryで固定したsecondary controller `/dev/mmcblk3p1`だけを、
-    OS `/storage` sourceとの非一致を確認して`/run/media/sd2`へread-only mountするhelperを追加。
-    UUID/labelによる可搬なidentityと抜差し再mountは引き続き未完了。
+  - runtime中のSD2 hotplugは製品要件に含めず、ROM SDの抜差しは電源OFF中だけ行う。
+    起動時は保存済みfilesystem UUID、明示label、secondary controller fallbackの順で解決し、
+    `/storage`と同じdisk上のpartitionを必ず拒否するresolverをhost fixtureへ追加した。
+    実機へ反映後、SD2なしcold bootと同一UUIDのSD2復帰cold bootを確認するまでopenを維持する。
 - [x] `BUB-P4-S02` dirty ROM SD を自動修復せず、警告・read-only・退避手順を定義する。
   - startup時のkernel filesystem errorをmanaged stateへ記録し、System Settingsへ表示する
     `plumos-storage-health observe`を追加した。手動checkはread-write mountを拒否し、

@@ -2,7 +2,10 @@
 set -u
 
 BB=${PLUMOS_BUSYBOX:-/bin/busybox}
-DEVICE=${PLUMOS_SD2_DEVICE:-/dev/mmcblk3p1}
+DEVICE_OVERRIDE=${PLUMOS_SD2_DEVICE:-}
+FALLBACK_DEVICE=${PLUMOS_SD2_FALLBACK_DEVICE:-/dev/mmcblk3p1}
+REQUESTED_UUID=${PLUMOS_SD2_UUID:-}
+REQUESTED_LABEL=${PLUMOS_SD2_LABEL:-}
 SD2_MOUNT=${PLUMOS_SD2_MOUNTPOINT:-/run/media/sd2}
 SD2_ACCESS=${PLUMOS_SD2_ACCESS:-rw}
 USER_ROOT=${PLUMOS_USERDATA_ROOT:-/storage/user}
@@ -10,8 +13,11 @@ ROM_TARGET=${PLUMOS_ROM_BIND_TARGET:-$USER_ROOT/Roms}
 BIOS_TARGET=${PLUMOS_BIOS_BIND_TARGET:-$USER_ROOT/BIOS}
 RUNTIME_ROOT=${PLUMOS_RUNTIME_ROOT:-/run/plumos}
 STATE_DIR=$RUNTIME_ROOT/sd2-content
+IDENTITY_FILE=${PLUMOS_SD2_IDENTITY_FILE:-$USER_ROOT/config/system/sd2-identity.conf}
 LOG=${PLUMOS_ROOT:-/storage/plumos}/logs/storage-health.log
 MOUNTS_FILE=${PLUMOS_MOUNTS_FILE:-/proc/mounts}
+DEVICE=
+DEVICE_REASON=
 
 case $SD2_ACCESS in
     rw|ro) ;;
@@ -34,6 +40,120 @@ mount_source() {
 
 is_mounted() {
     [ -n "$(mount_source "$1")" ]
+}
+
+identity_value() {
+    key=$1
+    [ -r "$IDENTITY_FILE" ] || return 1
+    value=$($BB sed -n "s/^$key=//p" "$IDENTITY_FILE" 2>/dev/null | $BB head -n 1)
+    case $value in
+        ''|*[!A-Za-z0-9_.+-]*) return 1 ;;
+    esac
+    printf '%s\n' "$value"
+}
+
+find_identity() {
+    kind=$1
+    value=$2
+    [ -n "$value" ] || return 1
+    candidate=$($BB findfs "$kind=$value" 2>/dev/null) || return 1
+    case $candidate in
+        /dev/*) printf '%s\n' "$candidate" ;;
+        *)
+            if [ "${PLUMOS_SD2_TEST_ALLOW_REGULAR:-0}" = 1 ] &&
+                [ -f "$candidate" ]; then
+                printf '%s\n' "$candidate"
+            else
+                return 1
+            fi
+            ;;
+    esac
+}
+
+device_disk() {
+    candidate=$1
+    case $candidate in
+        */mmcblk*p[0-9]*) printf '%s\n' "${candidate%p*}" ;;
+        /dev/sd*[0-9]) printf '%s\n' "$candidate" | $BB sed 's/[0-9][0-9]*$//' ;;
+        *) printf '%s\n' "$candidate" ;;
+    esac
+}
+
+device_available() {
+    [ -b "$1" ] ||
+        { [ "${PLUMOS_SD2_TEST_ALLOW_REGULAR:-0}" = 1 ] && [ -f "$1" ]; }
+}
+
+validate_device() {
+    candidate=$1
+    device_available "$candidate" || return 1
+    storage_source=$(mount_source /storage)
+    [ -z "$storage_source" ] || [ "$candidate" != "$storage_source" ] || return 1
+    if [ -n "$storage_source" ] &&
+        [ "$(device_disk "$candidate")" = "$(device_disk "$storage_source")" ]; then
+        return 1
+    fi
+    return 0
+}
+
+resolve_device() {
+    saved_uuid=$(identity_value uuid 2>/dev/null) || saved_uuid=
+    saved_label=$(identity_value label 2>/dev/null) || saved_label=
+
+    if [ -n "$DEVICE_OVERRIDE" ]; then
+        candidate=$DEVICE_OVERRIDE
+        reason=explicit-device
+    elif candidate=$(find_identity UUID "${REQUESTED_UUID:-$saved_uuid}"); then
+        reason=filesystem-uuid
+    elif candidate=$(find_identity LABEL "${REQUESTED_LABEL:-$saved_label}"); then
+        reason=filesystem-label
+    else
+        candidate=$FALLBACK_DEVICE
+        reason=secondary-controller-fallback
+    fi
+
+    if ! validate_device "$candidate"; then
+        printf 'sd2_resolve=result-refused reason=invalid-or-os-device device=%s selected_by=%s\n' \
+            "$candidate" "$reason" >&2
+        return 1
+    fi
+    DEVICE=$candidate
+    DEVICE_REASON=$reason
+    printf 'sd2_resolve=result-ok device=%s selected_by=%s\n' \
+        "$DEVICE" "$DEVICE_REASON"
+}
+
+fat_uuid() {
+    candidate=$1
+    signature=$($BB dd if="$candidate" bs=1 skip=82 count=5 2>/dev/null)
+    if [ "$signature" = FAT32 ]; then
+        serial_offset=67
+    else
+        serial_offset=39
+    fi
+    serial=$($BB dd if="$candidate" bs=1 skip="$serial_offset" count=4 2>/dev/null |
+        $BB od -An -tx1 | $BB tr -d ' \n')
+    [ "${#serial}" -eq 8 ] || return 1
+    printf '%s\n' "$serial" | $BB awk '{
+        printf "%s%s-%s%s\n", substr($0,7,2), substr($0,5,2),
+               substr($0,3,2), substr($0,1,2)
+    }' | $BB tr 'a-f' 'A-F'
+}
+
+record_identity() {
+    uuid=$(fat_uuid "$DEVICE" 2>/dev/null) || return 0
+    label=${REQUESTED_LABEL:-}
+    [ -n "$label" ] || label=$(identity_value label 2>/dev/null) || label=
+    $BB mkdir -p "${IDENTITY_FILE%/*}" || return 1
+    {
+        printf 'uuid=%s\n' "$uuid"
+        [ -z "$label" ] || printf 'label=%s\n' "$label"
+        printf 'partition=1\n'
+    } >"$IDENTITY_FILE.tmp" || return 1
+    $BB chmod 0600 "$IDENTITY_FILE.tmp" 2>/dev/null || true
+    $BB mv -f "$IDENTITY_FILE.tmp" "$IDENTITY_FILE" || return 1
+    printf 'sd2_identity=result-saved uuid=%s label=%s device=%s\n' \
+        "$uuid" "${label:-none}" "$DEVICE" | $BB tee -a "$LOG"
 }
 
 mount_access() {
@@ -127,6 +247,10 @@ unbind_content_dir() {
 }
 
 mount_sd2() {
+    if ! resolve_device; then
+        printf 'sd2_mount=result-unavailable fallback=sd1\n'
+        return 2
+    fi
     mounted_source=$(mount_source "$SD2_MOUNT")
     if [ -n "$mounted_source" ]; then
         if [ "$mounted_source" = "$DEVICE" ]; then
@@ -145,17 +269,6 @@ mount_sd2() {
         fi
         printf 'sd2_mount=result-refused reason=target-owned source=%s target=%s\n' \
             "$mounted_source" "$SD2_MOUNT" >&2
-        return 1
-    fi
-
-    [ -b "$DEVICE" ] || {
-        printf 'sd2_mount=result-unavailable device=%s fallback=sd1\n' "$DEVICE"
-        return 2
-    }
-    storage_source=$($BB awk '$2 == "/storage" { print $1; exit }' "$MOUNTS_FILE")
-    if [ -n "$storage_source" ] && [ "$storage_source" = "$DEVICE" ]; then
-        printf 'sd2_mount=result-refused reason=os-storage-device device=%s\n' \
-            "$DEVICE" >&2
         return 1
     fi
 
@@ -186,6 +299,7 @@ start_sd2() {
         [ "$mount_rc" -eq 2 ] && return 0
         return "$mount_rc"
     }
+    record_identity || log 'sd2_identity=result-save-failed'
 
     rom_source=$(find_content_dir "$SD2_MOUNT" roms ROMS Roms) || rom_source=
     bios_source=$(find_content_dir "$SD2_MOUNT" bios BIOS Bios) || bios_source=
@@ -235,8 +349,15 @@ status_sd2() {
     bios_source=$(mount_source "$BIOS_TARGET")
     access=unmounted
     [ -z "$sd2_source" ] || access=$(mount_access "$SD2_MOUNT")
-    printf 'sd2_mount=%s\nsd2_source=%s\nsd2_access=%s\nrom_target=%s\nrom_source=%s\nbios_target=%s\nbios_source=%s\n' \
-        "$SD2_MOUNT" "${sd2_source:-unmounted}" "$access" "$ROM_TARGET" \
+    resolved_device=unavailable
+    resolved_by=none
+    if resolve_device >/dev/null 2>&1; then
+        resolved_device=$DEVICE
+        resolved_by=$DEVICE_REASON
+    fi
+    printf 'sd2_mount=%s\nsd2_source=%s\nsd2_access=%s\nresolved_device=%s\nresolved_by=%s\nrom_target=%s\nrom_source=%s\nbios_target=%s\nbios_source=%s\n' \
+        "$SD2_MOUNT" "${sd2_source:-unmounted}" "$access" \
+        "$resolved_device" "$resolved_by" "$ROM_TARGET" \
         "${rom_source:-sd1}" "$BIOS_TARGET" "${bios_source:-sd1}"
 }
 
