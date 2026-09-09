@@ -433,7 +433,7 @@
     root/通常subdirectoryの`.bin`は収録したまま`SAVE`以下だけを除外するhost fixtureを追加済み。
     source `7deab58`をclean image実機へ反映し、Mega Drive 153件を21 msで走査、
     正規`.bin`を維持したまま`EDMD/SAVE`由来は0件であることを確認した。
-- [ ] `BUB-P6-06` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。
+- [x] `BUB-P6-06` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。
   - MF/V90S/Pixel2のPortMaster履歴を再監査し、GUI restart marker、component-owned
     Bash/patcher/LOVE、font/cairo/audio/transitive DSO、`pgrep -f`、GPTokeYB所有権付き停止、
     session/mount回収、staged updateをBubble adapter 24へ反映した。実機GUIはcanonical
@@ -445,8 +445,8 @@
     trusted DSO chain、`execve`/`execveat`/`posix_spawn`環境guard、session ID継承と終了時の
     tagged-process回収を実装。実機Apotris/GPTokeYBのloader closureと起動を確認し、停止後は
     tagged process/mount/holdが0、FE 1 processへ復帰、mutable `installed.json` hash不変。
-    実機にあるport scriptはApotris 1件のみのため、物理LCD/input/audioのFE導線確認と、
-    将来追加される異なるruntime種別の代表試験を残す。
+    実機にあるport scriptはApotris 1件のみのため、将来追加される異なるruntime種別は
+    追加時のregression対象とする。
   - clean image再試験でPortMaster GUI launcherへTERMした際、bootstrapの子がDRMを保持した
     ままFEをreleaseする競合を検出。GUIにも所有session IDを付与し、全tagged processの
     TERM/KILL・回収をmount解除とFE releaseより先に行う契約へ修正した。source `7deab58`の
@@ -457,7 +457,11 @@
     `libmali.so.1`とFE DRM broker共有DSOを継承せず、EGL/GLES/GBM別名のmega-DSOを分離map
     していた。adapter 29でmanaged DRM share、canonical Mali、SDL EGL/GL driverを同じ
     preload chainへ固定し、実機live deploy後244/244 checksumとmutable state不変を確認。
-    修正後の物理LCD/input/終了復帰を残す。
+    2026-09-10、通常FEのPORTS導線からApotrisを起動し、利用者がLCD表示、音声、十字キー、
+    A/B、STARTを物理確認した。25回の連続採取はPCM `RUNNING` 25/25、hardware pointer停止0、
+    owner交代0、XRUN/underrun 0。canonical Mali/GBMだけをmapしsoftware/Mesa fallbackは0だった。
+    PortMaster portはRetroArchのSELECT+START終了契約を持たず、各game固有の終了操作を用いる。
+    game内から正常終了後、Apotris/GPTokeYB/mount残留0、FE 1 processのDRM再取得まで確認した。
 - [x] `BUB-P6-07` app/game終了時に同一sessionだけを回収し、frontend/device ownershipを復元する。
   - SSH benchmarkがfrontendを複数回停止してPID 1の4回restart limitへ到達した。`sync`後の
     強制rebootで通常FE 1 processへ復旧。今後の繰返し性能試験は通常FE導線を各試行で使うか、

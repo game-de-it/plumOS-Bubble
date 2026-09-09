@@ -135,11 +135,21 @@ follow-up evidence rather than suppressed or treated as successful hardware
 acceptance.
 
 Apotris is the only installed port script on this device, so it is the current
-representative AArch64 runtime. Process/loader/lifecycle acceptance is complete.
-Physical LCD and controller behavior through the normal FE selection after the
-adapter 29 renderer fix is still a user-observed acceptance step; process
-liveness and the previously observed audio alone are not recorded as visual or
-input acceptance.
+representative AArch64 runtime. On 2026-09-10 the user launched it through the
+normal frontend PORTS route and physically confirmed the LCD image, audio,
+D-pad, A/B and START controls. A concurrent 25-sample monitor observed PCM
+`RUNNING` in all 25 samples, no hardware-pointer stall, no owner change and no
+kernel XRUN/underrun. The process mapped only the canonical managed Mali/GBM
+runtime, with no Mesa or software renderer.
+
+PortMaster ports do not inherit RetroArch's SELECT+START exit contract. Each
+port uses its own in-game exit operation; the earlier instruction to try that
+combo was incorrect. The user exited through Apotris itself. Afterwards there
+were no Apotris/GPTokeYB processes, session mounts or display holds, and exactly
+one frontend process had reacquired DRM. This completes the currently installed
+representative runtime acceptance. A newly installed port using a different
+runtime family remains a future regression target rather than keeping this
+gate open indefinitely.
 
 ## Capacity note
 
