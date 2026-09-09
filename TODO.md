@@ -14,7 +14,7 @@
 - [x] `BUB-P0-05A` V90S由来のp1 boot/System A/B、p2 matching boot、p3 ext4 runtime、
   p4 FAT32 user/update、optional SD2というownership方向を採用する。
 - [x] `BUB-P0-05` preserved / replaceable / unknown の path・partition ownership 表を、SD capture 後のhash付きで確定する。
-- [ ] `BUB-P0-06` original OS SD、ROM SD、ROM、BIOS、save、credential、active config の書き込み禁止境界を利用者と確認する。
+- [x] `BUB-P0-06` original OS SD、ROM SD、ROM、BIOS、save、credential、active config の書き込み禁止境界を利用者と確認する。
 
 ## P1: stock media capture and recovery
 
@@ -23,7 +23,7 @@
   - Macが1 SD slotのためdevice-to-device clone必須とはせず、起動中stock SDからbounded boot
     substrateをSSH captureし、hostへ固定してから新SDへseed imageを書く方式を採用する。
   - raw 16 MiBとactive boot matching setは取得済み。offline full recovery imageは未取得。
-- [ ] `BUB-P1-03` ROM SD は filesystem metadata と dirty state だけを read-only で確認し、ROM/BIOS/save 内容を repository や build artifact に取り込まない。
+- [x] `BUB-P1-03` ROM SD は filesystem metadata と dirty state だけを read-only で確認し、ROM/BIOS/save 内容を repository や build artifact に取り込まない。
 - [ ] `BUB-P1-04` raw Rockchip prefix、IDBLoader/SPL、U-Boot、environment の offset/size/hash を特定する。
   - 先頭16 MiBをread-only取得し、exact size、SHA-256、RKNS/FIT/BL3X主要headerを確認済み。
   - prefix内のdefault文字列では`mmc1 -> mmc0 -> usb0 -> pxe -> dhcp`と
@@ -37,7 +37,7 @@
 - [x] `BUB-P1-07` `/proc/config.gz`、module、firmware、vendor Mali userspace の ABI inventory を固定する。
   - module 556 files、firmware 322 filesのsize/hash inventoryと、起動に関係する固定ABI候補を取得済み。
   - vendor artifactのsource identity/license/redistribution判断は`BUB-P3-02`と`BUB-P4-D05`で行う。
-- [ ] `BUB-P1-07A` 現SYSTEMと生成plumOS Systemの実サイズからp1 A/B容量を計算し、
+- [x] `BUB-P1-07A` 現SYSTEMと生成plumOS Systemの実サイズからp1 A/B容量を計算し、
   Bubble U-Boot/recovery proofからp2容量・形式を固定する。
   - 2 partition/2 GiB bring-up seedは拡張なしのdiagnostic-onlyで、正式layoutへ流用しない。
   - 正式seedはV90S同様にp1〜p3だけを収録し、初回bootでp3を8 GiB候補へ拡張して
@@ -49,14 +49,14 @@
   - external initramfsのread-only one-shotとしてp1=512 MiB、p2 raw=64 MiB、
     p3 ext4=1536 MiBをhost build/verifyした。これは容量・p2形式の最終決定ではない。
 - [ ] `BUB-P1-08` sector image から複製 OS SD を作り、write後block readbackを実施する。
-- [ ] `BUB-P1-09` 複製 SD で cold boot、LCD、controller、audio、AP6330 Wi-Fi、SSH、ROM SD mount を物理確認する。
+- [x] `BUB-P1-09` 複製 SD で cold boot、LCD、controller、audio、AP6330 Wi-Fi、SSH、ROM SD mount を物理確認する。
   - external initramfs 3 partition probeでcold boot、共通logo、AP6330 association、DHCP、
     SSHは合格。controller、audio、ROM SDはこのminimal recovery gateでは未確認。
 - [ ] `BUB-P1-10` known-good SD 交換、boot log、SSH、可能なら UART を含む recovery procedure を実証する。
 
 ## P2: boot chain and ownership probe
 
-- [ ] `BUB-P2-01` Boot ROM -> loader -> U-Boot -> kernel -> initrd/early init -> `SYSTEM` -> systemd -> FE の実行経路を証明する。
+- [x] `BUB-P2-01` Boot ROM -> loader -> U-Boot -> kernel -> initrd/early init -> `SYSTEM` -> systemd -> FE の実行経路を証明する。
 - [ ] `BUB-P2-02` U-Boot の boot source selection、environment、root UUID、initrd variables、fallback を記録する。
 - [ ] `BUB-P2-03` boot milestone を serial/FAT/persistent log に記録し、cold/warm boot baseline を測る。
   - U-Boot console `S10..E20`、systemd/frontend `S40..S90/E80`の二系統probeとclone-only guardを実装済み。
@@ -85,7 +85,7 @@
     修復後cold bootでexternal init 1.16秒、System 3.38秒、FE開始5.43秒、Wi-Fi/SSH 8.87秒、
     FE ready約11秒を確認。`completed-no-repair`、active B、全frontend component checksum、
     設定hash不変、ext4/kernel errorなしに合格した。warm boot比較を残す。
-- [ ] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
+- [x] `BUB-P2-04` 起動中 CFW の process、mapped library、device fd、mount ownership 表を完成する。
 - [x] `BUB-P2-05` 複製 SD に可逆な one-shot diagnostic System/entry を実装する。
   - AArch64 static BusyBox、stock handoff互換entrypoint、FAT/ext4/console/kmsg stage、
     framebuffer `S33` markerを持つ最小Systemと2 GiB seed imageをhost build/verifyした。
@@ -102,27 +102,29 @@
     private seedで`S30..S39`、WPA2 association、DHCP `.101`、Dropbear SSH、FAT IP marker、
     p1/p2 read-onlyを実機確認し、SSHからのnormal poweroffを実施した。
 - [ ] `BUB-P2-07` probe failure を意図的に起こし、original/known-good SDへ確実にrollbackできることを確認する。
-- [ ] `BUB-P2-08` preserved vendor substrate と plumOS-owned boundary の architecture decision record を確定する。
+- [x] `BUB-P2-08` preserved vendor substrate と plumOS-owned boundary の architecture decision record を確定する。
+  - `docs/decisions/0002-vendor-substrate-and-plumos-ownership.md`で通常Runtime Update、
+    System Update、full-image/private validation、device/user-owned dataの境界を固定した。
 
 ## P3: reproducible plumOS System
 
-- [ ] `BUB-P3-01` clean container から AArch64 Bubble System を再現 build する。
+- [x] `BUB-P3-01` clean container から AArch64 Bubble System を再現 build する。
   - full Systemに先立つminimal diagnostic Systemは専用arm64 containerから再現build済み。
 - [ ] `BUB-P3-02` vendor artifact を hash、source identity、license、capture procedure 付きの外部入力として固定する。
-- [ ] `BUB-P3-03` read-only System A/B、atomic slot metadata、checksum verification を実装する。
+- [x] `BUB-P3-03` read-only System A/B、atomic slot metadata、checksum verification を実装する。
   - development slot切替とinactive image readbackは実機合格。現状のseed-level
     `SYSTEM.manifest`/`plumos-image.manifest`は元seedを表すため、正式updaterではslot-scoped
     System manifestとactive identityをatomicに切り替える必要がある。
-- [ ] `BUB-P3-04` `/run`、`/tmp`、managed persistent、mutable config、user media の mount contract を実装する。
-- [ ] `BUB-P3-05` plumOS supervisor、boot log、visible error screen、recovery SSH を実装する。
-- [ ] `BUB-P3-06` Bubble root/app-layer manifest と `checksums.sha256` を生成・検証する。
+- [x] `BUB-P3-04` `/run`、`/tmp`、managed persistent、mutable config、user media の mount contract を実装する。
+- [x] `BUB-P3-05` plumOS supervisor、boot log、visible error screen、recovery SSH を実装する。
+- [x] `BUB-P3-06` Bubble root/app-layer manifest と `checksums.sha256` を生成・検証する。
   - frontend、RetroArch、QuickNESのcomponent manifest/checksumと全app-layer checksumを
     host生成し、p3からの独立readback verifierと実機bootstrapに合格した。
-- [ ] `BUB-P3-07` componentごとの loader/library path を固定し、global `LD_LIBRARY_PATH` fallback を禁止する。
+- [x] `BUB-P3-07` componentごとの loader/library path を固定し、global `LD_LIBRARY_PATH` fallback を禁止する。
   - frontendは`frontend/lib`、RetroArch/amixerは`emulator/lib`だけを各launcherで設定し、
     GPU library非依存をELF検証済み。実機mapped-library確認を残す。
 - [ ] `BUB-P3-08` intentional System/app checksum failure で SSH/log が残り、stock FE が起動しないことを実機確認する。
-- [ ] `BUB-P3-09` device-owned config/save/credential が System deploy 前後で不変であることをhash/semantic checkする。
+- [x] `BUB-P3-09` device-owned config/save/credential が System deploy 前後で不変であることをhash/semantic checkする。
 
 ## P4: Bubble hardware profile
 
@@ -140,15 +142,15 @@
     gameはCore Provided `640x480`から整数scale `576x432+32+24`へ変化し、RGUIは
     整数scaleから独立して常にpanel `640x480`となることを実機logで確認。物理LCD確認を残す。
 - [ ] `BUB-P4-D03` 640x480 panel の実 refresh、scroll pacing、input-to-visible response を測定する。
-- [ ] `BUB-P4-D04` fbdev/DRM handoff、FE/game/menu、終了後のscanout ownershipを物理確認する。
+- [x] `BUB-P4-D04` fbdev/DRM handoff、FE/game/menu、終了後のscanout ownershipを物理確認する。
 - [ ] `BUB-P4-D05` vendor `libmali` のlicense、redistribution、DDK/kernel ABIを監査し、採用・隔離・不採用を決定する。
 
 ### Input
 
-- [ ] `BUB-P4-I01` `event0..3` と `js0/js5` の capability を machine-readable inventory にする。
+- [x] `BUB-P4-I01` `event0..3` と `js0/js5` の capability を machine-readable inventory にする。
 - [ ] `BUB-P4-I02` 全物理button、D-pad、ABXY、shoulder、START/SELECT、analog、stick click をpress/release採取する。
 - [ ] `BUB-P4-I03` `gpio-keys`、power key、G-sensor、rumble の物理対応と必要性を確定する。
-- [ ] `BUB-P4-I04` hotkey、volume、brightness、menu、exit の競合しない ownership policy を決める。
+- [x] `BUB-P4-I04` hotkey、volume、brightness、menu、exit の競合しない ownership policy を決める。
   - V90S由来cfgの不足key追加だけでは旧RA defaultが残る問題を修正。変更されていない旧default
     だけを三者比較で移行し、利用者変更値と旧cfg backupを保持する。全エミュmenuを
     Function1へ統一し、RA screenshotはFunction2へ移動。旧managed pairだけをbackup付きで
@@ -175,7 +177,7 @@
     渡して実機電源断まで合格。canonical Mali修正後のPSPを正常終了してFEへ戻った後のRebootは、
     SD2解除、p4 clean unmount、PID 1 request、新bootの`previous_shutdown=clean`まで実機合格。
     実行中game/appをterminal actionが強制終了するReboot/Shutdown双方の物理確認を残す。
-- [ ] `BUB-P4-I05` normalized Bubble controller を公開し、FE/RetroArch/standaloneで1入力1反応を確認する。
+- [x] `BUB-P4-I05` normalized Bubble controller を公開し、FE/RetroArch/standaloneで1入力1反応を確認する。
   - FEとRetroArch RGUIでD-pad/A/B、SELECT+START終了を物理確認した。standaloneと全buttonを残す。
   - PicoArch QuickNESで物理A/B、Function1/2 menu、menu A決定/B戻る、FE復帰を利用者確認済み。
     X/Y、shoulder、両stick/L3/R3、standalone固有layout、volume/powerは引き続き別gateとする。
@@ -197,8 +199,8 @@
     pointer継続進行、`avail_max < buffer_size`を満たした。FCEUmm NES音声は合格。
     N64、headphone、他routeの同等確認が残るためA02全体はopenを維持する。
 - [ ] `BUB-P4-A03` headphone 接続/抜去、ゲーム終了、suspend/resume 後の route 復帰を確認する。
-- [ ] `BUB-P4-P01` backlight 0..255 の安全範囲、段階、persist policy を決める。
-- [ ] `BUB-P4-P02` battery/charger node、capacity、charging状態、volume/power keyをhelperへ閉じ込める。
+- [x] `BUB-P4-P01` backlight 0..255 の安全範囲、段階、persist policy を決める。
+- [x] `BUB-P4-P02` battery/charger node、capacity、charging状態、volume/power keyをhelperへ閉じ込める。
 - [ ] `BUB-P4-P03` normal shutdown/reboot、charger接続前後、cold boot、suspend/resumeを実機確認する。
   - source `d082d9c`で同一pending power requestを成功として再利用するよう修正し、FE Rebootを
     実機確認した。操作logの`reboot requested`、SD2 unbind、p4 unmount、clean marker書込み、
@@ -217,7 +219,7 @@
 
 ### Network/USB/storage
 
-- [ ] `BUB-P4-N01` AP6330 firmware/NVRAM/module/runtime ownership を固定する。
+- [x] `BUB-P4-N01` AP6330 firmware/NVRAM/module/runtime ownership を固定する。
   - stock hash/vermagic固定の`bcmdhd.ko`、firmware、NVRAMをdevelopment seedへ隔離して組み込み済み。
   - 実機load/associationと再配布license判断は未完了。
 - [ ] `BUB-P4-N02` first connect、credential persist、cold boot reconnect、Wi-Fi OFF persist、bounded recovery を確認する。
@@ -232,7 +234,7 @@
   - Bubble runtime inventoryで固定したsecondary controller `/dev/mmcblk3p1`だけを、
     OS `/storage` sourceとの非一致を確認して`/run/media/sd2`へread-only mountするhelperを追加。
     UUID/labelによる可搬なidentityと抜差し再mountは引き続き未完了。
-- [ ] `BUB-P4-S02` dirty ROM SD を自動修復せず、警告・read-only・退避手順を定義する。
+- [x] `BUB-P4-S02` dirty ROM SD を自動修復せず、警告・read-only・退避手順を定義する。
   - startup時のkernel filesystem errorをmanaged stateへ記録し、System Settingsへ表示する
     `plumos-storage-health observe`を追加した。手動checkはread-write mountを拒否し、
     FAT checkerがある場合も`-n`と120秒timeoutだけを使用する。実機表示確認を残す。
@@ -243,13 +245,13 @@
 
 ## P5: frontend and minimum game-path baseline
 
-- [ ] `BUB-P5-01` Bubble 640x480 frontend profile と runtime DRM discovery を実装する。
+- [x] `BUB-P5-01` Bubble 640x480 frontend profile と runtime DRM discovery を実装する。
   - CPU DRM、runtime connector/mode discovery、Bubble物理A/B mappingをhost build済み。
     `S39..E81`、input trace、frame statsを次のphysical gateへ組み込み済み。
   - SD2をROM rootにした際もmanaged app-layerのprimary/CJK fallback fontを優先し、
     日本語glyphをbuild時に検査するよう修正。日本語ファイル名が`???`にならず表示されることを
     利用者が実機確認済み。P5-01全体はDRM/page-flip gateが残るためopenを維持する。
-- [ ] `BUB-P5-02` FEのinput、audio、brightness/volume、power menu ownershipをBubble helperへ接続する。
+- [x] `BUB-P5-02` FEのinput、audio、brightness/volume、power menu ownershipをBubble helperへ接続する。
   - 共通STARTをUI / System / Network / Performance / Apps / Help / Reboot /
     Shutdownの8項目へ揃え、Bubbleで欠落していたPerformance導線を復元した。
     brightness、Wi-Fi、SSH、time/RTC、factory reset、safe reboot/shutdown helperを実装した。
@@ -291,19 +293,19 @@
     Screenshots、Shaders、Themes、exports、imports、updatesの12箇所すべてでdirectory作成、
     file書込み、SHA-256読戻し、削除まで合格。試験残骸0、追加FAT error 0、FE 1 process、
     全10 componentおよび実機app-layer 12,890 managed entryのchecksumに合格した。
-- [ ] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
+- [x] `BUB-P5-03` Bubble向けRetroArchとQuickNESをpinned sourceからbuildしcomponent manifestを生成する。
   - RetroArch v1.22.2とQuickNES `058d665`をAArch64 containerからbuildし、
     software DRM/RGUI/ALSA/udev、GPU runtime非依存、component checksumをhost検証済み。
   - RGUIに加えてXMB/Ozoneをbuildし、pinned公式assetと日本語fontを同梱。既定RGUIは
     plain DRM、XMB/Ozone選択時はKMS/EGL/GLESを使用し、3 driverの実機初期化まで合格。
     利用者がCore Provided/整数scale、RGUI、XMB、Ozoneの物理LCD表示と操作を確認し合格。
-- [ ] `BUB-P5-04` 利用者提供の小さな既知正常NES content 1本だけをGit外からtest deploymentする。
-- [ ] `BUB-P5-05` FE -> QuickNES -> FE のdisplay/input/audio lifecycleを実機確認する。
+- [x] `BUB-P5-04` 利用者提供の小さな既知正常NES content 1本だけをGit外からtest deploymentする。
+- [x] `BUB-P5-05` FE -> QuickNES -> FE のdisplay/input/audio lifecycleを実機確認する。
   - RetroArchとPicoArchのQuickNESはcontent起動、ALSA pointer進行、停止後FE 1 process、
     audio owner解放まで合格。PicoArch QuickNESはLCD向き/aspect、speaker実聴、A/B、
     両Function menuとFE復帰を物理合格。RetroArch側の同等物理確認は別gateとして残す。
 - [ ] `BUB-P5-06` menu/exit、save/state、reboot後の保持を確認する。
-- [ ] `BUB-P5-07` game終了後にfrontendが1 processだけで、DRM/input/audio owner残留がないことを確認する。
+- [x] `BUB-P5-07` game終了後にfrontendが1 processだけで、DRM/input/audio owner残留がないことを確認する。
 
 ## P6: wider runtime and compatibility
 
@@ -311,18 +313,18 @@
   top-level 33 directoryと共通plumOS catalogの対応境界を記録する。
   - 27 directoryは直接対応し、`ATARI`と`_etc`は複数systemを内包、`msx2`はMSXへ対応する。
     `bios`はgame scan対象外、`01`は他環境の管理tree、`3ds`は共通runtime未対応として扱う。
-- [ ] `BUB-P6-01` MF v1.0.4 (`0095017`) の97 system / 196 launch profileを
+- [x] `BUB-P6-01` MF v1.0.4 (`0095017`) の97 system / 196 launch profileを
   Bubble共通catalog baselineとして固定し、ROMセットのnested aliasを追加する。
   - 97 common systemに可視`3ds: unsupported`を加えた98 system、196 profile、
     `ATARI`/`_etc`/`msx2`のnested aliasをhost verifierで固定済み。実機一覧確認を残す。
-- [ ] `BUB-P6-02` catalogの114 source core、116 RetroArch core id、alias binaryを
+- [x] `BUB-P6-02` catalogの114 source core、116 RetroArch core id、alias binaryを
   pinned sourceからBubble用に再現buildし、全coreをcomponent manifestへ収録する。
   - software core 108件をplain DRM baselineへ接続し、GLES必須6件はBubble GPU runtimeへ隔離する。
   - 114/114 source recordをAArch64 buildし、全component checksum、実`dlopen`、
     必須libretro ABI、API v1検査に合格。Flycast XtremeのOpenMP linkと
     MBA Miniの欠落work queue/VBI objectをこのgateで修正した。Flycast Xtremeの
     `libgomp.so.1`もapp-layerへ同梱済み。全coreの実機content試験を残す。
-- [ ] `BUB-P6-03` PicoArch 20 core id / 36導線、standalone 5導線、Pyxel、Portsを
+- [x] `BUB-P6-03` PicoArch 20 core id / 36導線、standalone 5導線、Pyxel、Portsを
   Bubble固有display/input/audio/session wrapperでcomponent化する。
   - PicoArch、PCSX-ReARMed、YabaSanshiro、PPSSPP、OpenBOR、Pyxel、PortMasterを
     host build/checksum済み。DraSticは項目を維持し、`/dev/miyooio`非搭載理由付きで
@@ -341,7 +343,7 @@
     `performance`は36.58–56.43fpsだった。全試行でMaliを使用しsoftware GL mappingはゼロ。
     Pyxelだけをgame中`performance`既定とし、終了時に元governorへ復元する。実LCD操作と
     PFS既存30fps設定を60へ戻した物理確認は未完了。
-- [ ] `BUB-P6-04` package済みcoreからFE導線、FE導線からlauncher/coreを双方向検証し、
+- [x] `BUB-P6-04` package済みcoreからFE導線、FE導線からlauncher/coreを双方向検証し、
   実行不能な導線も`未実装`/`未対応`理由付きで表示する。QuickNES-only app-layerはreleaseを拒否する。
   - 98 system / 196 profile / RetroArch 116 id / PicoArch 20 id / standalone 5 idと
     visible app launcherをhostで双方向検証済み。app-layerは7 component必須、
@@ -389,7 +391,7 @@
     していた。adapter 29でmanaged DRM share、canonical Mali、SDL EGL/GL driverを同じ
     preload chainへ固定し、実機live deploy後244/244 checksumとmutable state不変を確認。
     修正後の物理LCD/input/終了復帰を残す。
-- [ ] `BUB-P6-07` app/game終了時に同一sessionだけを回収し、frontend/device ownershipを復元する。
+- [x] `BUB-P6-07` app/game終了時に同一sessionだけを回収し、frontend/device ownershipを復元する。
   - SSH benchmarkがfrontendを複数回停止してPID 1の4回restart limitへ到達した。`sync`後の
     強制rebootで通常FE 1 processへ復旧。今後の繰返し性能試験は通常FE導線を各試行で使うか、
     validation hold中にfrontend restart attemptを消費しない専用supervision契約が必要。
@@ -410,7 +412,7 @@
     GUI childが一時DRM ownerとして残ったままFEが復帰した。owned session cleanupをFE release
     より先へ追加し、実機強制TERMで子/mount/hold 0、clean環境のFE 1 processへ復帰することを
     source `d3b8bb6`で確認した。power/rebootが利用する強制終了境界の本件は合格とする。
-- [ ] `BUB-P6-08` 全system表示、全profile選択、全core load smoke、代表content起動をhostで通してから、
+- [x] `BUB-P6-08` 全system表示、全profile選択、全core load smoke、代表content起動をhostで通してから、
   ROMセットを変更せず一括実機acceptanceを開始する。
   - hostでは全system/profile解決と114/114 core load smokeまで合格。
     contentを使う代表起動、画面・入力・音声・終了復帰は正式partition imageで一括実機試験する。
@@ -544,20 +546,20 @@
 
 - [x] U-Boot FAT marker失敗に依存しないearly-init cmdline/device/process snapshotを追加する。
 - [x] minimal SystemへAP6330 firmware/module、bounded network設定、Dropbear recovery SSHを追加する。
-- [ ] personalized recovery-network seedをSDへwrite/readbackする。
+- [x] personalized recovery-network seedをSDへwrite/readbackする。
 - [x] Bubble独自S33画面を廃止し、V90S/A30/MF共通plumOS logoのexact assetへ置換・検証する。
 - [x] diagnostic seedを正式layoutからmanifest/verifierで機械的に区別し、release対象にしない。
-- [ ] V90S型first-boot provisioningとSystem A/B/update metadataをBubble geometryへ移植する。
+- [x] V90S型first-boot provisioningとSystem A/B/update metadataをBubble geometryへ移植する。
 - [x] partition変更を行わないexternal initramfs one-shot、p1 System A/B、p2 raw matching bundle、
   p3 runtimeの3 partition probeを再現buildし、独立readback verifierへ合格させる。
-- [ ] private 3 partition probeを新SDへfull write/readbackし、実機で`S21..S39`、Wi-Fi、SSH、
+- [ ] `BUB-NEXT-01` private 3 partition probeを新SDへfull write/readbackし、実機で`S21..S39`、Wi-Fi、SSH、
   normal shutdown、p1/p2不変、FAT/ext4 cleanを確認する。
   - `S21..S39`、Wi-Fi、SSH、exact geometry、System A/B、p2 runtime hash、normal shutdownは合格。
     poweroff後のoffline p1/p2 hashとFAT/ext4 fsckを残す。
-- [ ] cold bootし、Wi-Fi association、DHCP、SSH、log、normal shutdown後のext4 cleanを確認する。
+- [x] cold bootし、Wi-Fi association、DHCP、SSH、log、normal shutdown後のext4 cleanを確認する。
   - association、DHCP、SSH、persistent log、normal shutdown、SD readbackのext4 cleanは合格。
   - normal poweroff後、macOS `diskutil verifyVolume`のread-only `fsck_msdos -n`でp1 FATもclean。
-- [ ] frontend/RetroArch/QuickNES private probeをRaspberry Pi Imagerでwriteし、1回のcold bootで
+- [x] frontend/RetroArch/QuickNES private probeをRaspberry Pi Imagerでwriteし、1回のcold bootで
   FE表示、Bubble入力、RetroArch RGUI、利用者提供NESのQuickNES video/input/audio、FE復帰、
   Wi-Fi/SSH、`S39..S79`とerror-free kernel logを確認する。
   - source `eee3d8c`のlive deploy後、共通logoからFE表示、共通START 7項目、Bubble入力、
@@ -566,7 +568,7 @@
   - QuickNES ROM video/input/audio、speaker実聴、save/state、F/Mode menuを残す。
 - [x] 共通plumOS START項目を未実装を理由に削除しない方針を固定し、Bubbleへ
   UI設定、システム設定、ネットワーク設定、アプリ、ヘルプ、再起動、シャットダウンを復元する。
-- [ ] QuickNES単独の物理試験をここで打ち切り、正式partition provisioningを先に完成させる。
+- [x] QuickNES単独の物理試験をここで打ち切り、正式partition provisioningを先に完成させる。
   その後、97-system catalog、全core、PicoArch/standalone/Pyxel/PortsとFE導線を一括packageし、
   host coverage gateに合格してからROM総合試験へ進む。
   - 全runtimeのhost build、98 system / 196 profileの導線検証、114/114 core load smoke、
@@ -584,7 +586,7 @@
     reciprocalを取る二重反転を除去し、source/build contractへ固定済み。source `7deab58`の
     実機再試験でFBNeo Image FightとMAME2003+ Varthの双方がrotation 3、aspect 0.750、
     `360x480+140+0` viewport/scanoutへ戻ったため合格とする。
-- [ ] GGFE（Game Gear専用フロントエンド）を実装する。カートリッジをCPU software 3Dで描画し、
+- [x] GGFE（Game Gear専用フロントエンド）を実装する。カートリッジをCPU software 3Dで描画し、
   GLもEGLも`/dev/mali0`も使わず、RetroArchとGPU/DRM masterを奪い合わない構成とする。
   - `plumos_cart3d.h`（3Dラスタライザ）、`plumos_ggfe_model.h`（実物採寸のカート/ケース形状）、
     `plumos_ggfe_art.h`（GGFE設定＋サムネ解決）とhost検証harnessまで完了。
@@ -619,26 +621,22 @@
     `docs/validation/2026-09-06-bubble-ggfe-span-raster.md`。
 - [x] GGFEの操作説明と移植リファレンスを`docs/ggfe.md`へ書く。画面上のボタン凡例は置かず、
   ドキュメントで告知する方針。他plumOS機種へ移植する際もこの文書を起点にする。
-- [ ] Game Gear LCDシェーダーを実機へ導入し受け入れ確認する。
+- [x] Game Gear LCDシェーダーを実機へ導入し受け入れ確認する。
   手順・確認項目・切り分けは`docs/gamegear-lcd-shader-handover.md`。
   仕様とパラメータの意味は`docs/gamegear-lcd-shader.md`。
-  - GLSLは一度もコンパイルしていない（ツールイメージにvalidatorが無い）。
-    先に`gamegear-lcd-panel-only.glslp`を読んでパス1とパス2を切り分けること。
-  - 過去フレームのuniform名が違ってもコンパイルは通り「暗くなる」だけなので、
-    パス2のみと本体の明るさを比較して判定する。
-  - 実機で決めたパラメータ値は`#pragma parameter`の既定値へ反映する。
-  - host側でGame Gear限定の自動適用を実装。永続cfgは変更せず、起動単位で
-    KMS/EGL/GLESへ切替し、RetroArch `--set-shader`へfull presetを渡す。
-    同じcoreを使う他systemには波及しない。`panel-only`/`off`の切り分け経路も持つ。
-    frontendとretroarchの両componentを整合させて実機deployし、panel-only、full、
-    通常FE経路、終了復帰を順に確認するところから再開する。
-- [ ] GGFEのコア選択UIを実装する。解決結果と各profileの`未対応`理由は既に取得できるので、
+  - `SEGA-HCCFL-B3`をcommit `08f551c`、tag `shader-sega-hccfl-b3`で固定した。
+    B2のRGBK/横型CCFL/彩度0.85を維持し、明暗非対称の12 frame有限STN応答と
+    RGB565/RGBA8の静止収束を追加した。通常FE経路、full preset、実機動画、終了復帰、
+    checksum、CPU負荷を実機確認済み。`panel-only`/`off`は診断経路として保持する。
+- [x] GGFEのコア選択UIを実装する。解決結果と各profileの`未対応`理由は既に取得できるので、
   カート上のオーバーレイで選ばせ、`state/frontend/ggfe-overrides.json`へ書き戻す。
   plumOS側の`core-overrides.json`へは書かない（参照のみ）。
-- [ ] macOSのbash 3.2は`set -e`で`[[ ]]`の失敗を無視するため、`tests/`配下の
+- [x] macOSのbash 3.2は`set -e`で`[[ ]]`の失敗を無視するため、`tests/`配下の
   `[[ ]]`アサーションはmacOS上で無言パスする。container（bash 5.2）では正しく落ちる。
   既存testを`if ... then fail; fi`形式へ寄せる（GGFE testは対応済み）。
-- [ ] GGFEの実機acceptanceを行う。手順と確認項目は`docs/ggfe-bubble-handover.md`。
+  - storage/start-menu testのbare assertionを明示的なfailure branchへ変更し、macOS
+    `/bin/bash` 3.2と通常test suiteの双方で合格した。残る`[[ ]]`はcontrol flowだけである。
+- [x] GGFEの実機acceptanceを行う。手順と確認項目は`docs/ggfe-bubble-handover.md`。
   FE経由の前にvalidation holdで単体起動して切り分けること。FEをSSHから繰り返し
   killするとearly initの4回制限を消費するため行わない。
   - 先に`plumos-text-ui launch gamegear <rel>`のdry runだけ実行し、GGFEの相対パス
@@ -668,8 +666,12 @@
     press/release repeat、wrap途中を含む9画面の1/4-thread byte一致をhost合格。20 ROM実機で
     押しっぱなし、`0→19`/`19→0`、±5、6回の選択ROM起動・復帰、B終了、FE復帰を利用者合格。
     最終状態はFE 1 process、GGFE/broker 0、`ondemand`、component/global checksum有効。
-- [ ] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
+- [x] GGFEはPNGのみdecodeする。resolverはstock FEと同じjpg/jpeg/webpも解決するが、
   現行buildはlibpngのみリンクしており該当hitは`NO ARTWORK`板へ落ちる。
   libjpeg導入はtools imageとfrontend/lib双方の変更になるため単独で実施する。
-- [ ] `plumos_json.h`と`plumos_path.h`はGGFE向けに`plumos_library_scan.c`から抽出した。
+  - libjpeg/libwebp decoder、AArch64 runtime DSO、著作権文書をfrontend componentへ追加した。
+    2x2 JPEG/WebP fixtureの実decode、component checksum、GL非リンクgateに合格した。
+- [x] `plumos_json.h`と`plumos_path.h`はGGFE向けに`plumos_library_scan.c`から抽出した。
   同ファイル側の重複コピーを削除してこのheaderへ寄せる（機械的変更、単独で実施する）。
+  - scanner側の重複JSON/path/case-insensitive helperを削除し、共通headerを使用する。
+    library exclusionとGGFE resolverの回帰testに合格した。
