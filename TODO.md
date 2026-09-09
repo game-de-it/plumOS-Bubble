@@ -277,7 +277,13 @@
     変更せず再接続した。通常OFFに残っていた同期`wpa_cli terminate`の約8秒停止を、suspendと
     同じ最大0.5秒のowned-process停止へ変更。全30 host契約、frontend/global checksum後の
     live deployを行い、再試験でOFF後約2秒でFE操作可能、ON後`COMPLETED`/同一IPへ復帰した。
-- [ ] `BUB-P4-N03` USB host/device/charging controller と同時利用制約を調査し、product policy を決める。
+- [x] `BUB-P4-N03` USB host/device/charging controller と同時利用制約を調査し、product policy を決める。
+  - 外部USB端子は1基のみで、Bubbleでは充電専用として扱う。stock runtimeはUDC/USB role switchを
+    公開しないためUSB host/device/ADBを製品機能に含めず、ADBを`NW Service`と`NW情報`の双方から
+    非表示にした。内部backendの`hardware_unavailable`とmachine-readableなproduct exclusionは保持する。
+  - HDMIも現product revisionでは非対応とする。source `8764e39`をfrontend component単位で実機へ
+    反映し、217 frontend fileと全12,460 app-layer fileのchecksum、既存設定hash不変を確認した。
+    通常再起動後、利用者が実LCD上で`NW Service`と`NW情報`の双方にADBがないことを確認した。
 - [ ] `BUB-P4-S01` OS SD と ROM SD を UUID/label/partition identity で安全に解決する。
   - Bubble runtime inventoryで固定したsecondary controller `/dev/mmcblk3p1`だけを、
     OS `/storage` sourceとの非一致を確認して`/run/media/sd2`へread-only mountするhelperを追加。

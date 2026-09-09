@@ -26,8 +26,13 @@ Date: 2026-09-10
   transitions without losing FE or Wi-Fi operation. This decision does not
   alter charging behavior.
 
-## Acceptance remaining
+## Physical acceptance
 
-After the frontend component is deployed and the device is restarted through
-the normal FE path, verify on the physical LCD that neither `NW Service` nor
-`NW Information` contains an ADB row. Close `BUB-P4-N03` only after that check.
+Source `8764e39` was deployed as a frontend-component delta. All 217 frontend
+component files and all 12,460 managed app-layer files passed checksum
+verification; the existing system, frontend and network-service setting hashes
+were unchanged. The running frontend was not killed during deployment.
+
+After a normal OS restart through the frontend, the user inspected the physical
+LCD and confirmed that neither `NW Service` nor `NW Information` contained an
+ADB row. `BUB-P4-N03` is complete.
