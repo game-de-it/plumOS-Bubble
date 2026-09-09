@@ -1116,7 +1116,7 @@
         "retroarch:mupen64plus_next"
       ],
       "default_launch_profile": "retroarch:parallel_n64",
-      "default_cpu_policy": "ondemand",
+      "default_cpu_policy": "performance",
       "scraper": {
         "enabled": false,
         "reason": "frontend_disabled"

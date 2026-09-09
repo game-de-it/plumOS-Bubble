@@ -249,7 +249,7 @@ def route_command(system: dict, profile: str, content: str, bios_root: str) -> t
         command = (
             f"{prefix} /bin/busybox sh {ROOT}/bin/plumos-retroarch-launch "
             f"--system {shlex.quote(sid)} --core {ROOT}/cores/{shlex.quote(core)}_libretro.so "
-            f"{content_arg} --cpu ondemand --safe-exit false"
+            f"{content_arg} --cpu {'performance' if sid == 'n64' else 'ondemand'} --safe-exit false"
         )
         log = f"{ROOT}/logs/retroarch-{sid}-{core}.log"
         seconds = 8 if core in {"flycast", "flycast_xtreme", "km_duckswanstation_xtreme_amped", "mupen64plus_next", "parallel_n64", "yabasanshiro"} else 5

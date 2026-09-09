@@ -8,6 +8,7 @@ THERMAL_ROOT="$TEST_ROOT/sys/class/thermal"
 RUNTIME_ROOT="$TEST_ROOT/run/plumos"
 CPU_CONTROL="$ROOT_DIR/package/frontend-bubble/plumos/bin/plumos-cpu-control"
 GGFE_LAUNCH="$ROOT_DIR/package/frontend-bubble/plumos/bin/plumos-ggfe-launch"
+SYSTEMS="$ROOT_DIR/package/frontend-bubble/plumos/config/frontend/systems.json"
 
 cleanup() {
   case "$TEST_ROOT" in
@@ -83,6 +84,10 @@ grep -q 'restore_cpu_policy' "$ROOT_DIR/scripts/build-pyxel-bubble.sh" ||
 grep -q 'cpu_policy=$2' \
   "$ROOT_DIR/package/frontend-bubble/plumos/bin/plumos-retroarch-launch" ||
   fail 'RetroArch --cpu not wired'
+jq -e '.systems[] | select(.id == "n64") |
+  .default_cpu_policy == "performance" and
+  .launch_profiles == ["retroarch:parallel_n64", "retroarch:mupen64plus_next"]' \
+  "$SYSTEMS" >/dev/null || fail 'N64 performance policy not wired for both cores'
 grep -q 'PLUMOS_PICOARCH_CPU_POLICY:-ondemand' \
   "$ROOT_DIR/package/picoarch-bubble/plumos/bin/plumos-picoarch-launch" ||
   fail 'PicoArch policy not wired'
