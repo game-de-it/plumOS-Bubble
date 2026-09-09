@@ -14,13 +14,22 @@ MOUNTS_FILE=${PLUMOS_MOUNTS_FILE:-/proc/mounts}
 POWER_REQUEST=${PLUMOS_POWER_REQUEST:-$RUNTIME_ROOT/power-action/request}
 USER_SOURCE_FILE=${PLUMOS_USER_SOURCE_FILE:-$RUNTIME_ROOT/power-action/user-source}
 NETWORK_SERVICES=${PLUMOS_NETWORK_SERVICES:-$PLUMOS_ROOT/bin/plumos-network-services}
+NETWORK_CONTROL=${PLUMOS_NETWORK_CONTROL:-$PLUMOS_ROOT/bin/plumos-network-control}
 VOLUME_KEYS_SERVICE=${PLUMOS_VOLUME_KEYS_SERVICE:-$PLUMOS_ROOT/bin/plumos-volume-keys-service}
+VOLUME_CONTROL=${PLUMOS_VOLUME_CONTROL:-$PLUMOS_ROOT/bin/plumos-volume-control}
+DISPLAY_CONTROL=${PLUMOS_DISPLAY_CONTROL:-$PLUMOS_ROOT/bin/plumos-display-control}
 RUNTIME_QUIESCE=${PLUMOS_RUNTIME_QUIESCE:-$PLUMOS_ROOT/bin/plumos-runtime-quiesce}
 POWER_FINALIZER=${PLUMOS_POWER_FINALIZER:-$PLUMOS_ROOT/bin/plumos-power-request-finalizer}
 FOREGROUND_MARKER=${PLUMOS_FOREGROUND_MARKER:-$RUNTIME_ROOT/frontend/foreground.pgid}
+POWER_STATE=${PLUMOS_POWER_STATE:-/sys/power/state}
+RTC_WAKEALARM=${PLUMOS_RTC_WAKEALARM:-/sys/class/rtc/rtc0/wakealarm}
+WIFI_INTERFACE_PATH=${PLUMOS_WIFI_INTERFACE_PATH:-/sys/class/net/wlan0}
+SLEEP_NETWORK_LOG=${PLUMOS_SLEEP_NETWORK_LOG:-$RUNTIME_ROOT/power-action/sleep-network.log}
 ACTION=shutdown
 POWER_OFF=0
 DRY_RUN=0
+SLEEP_BACKEND=mem
+WAKEUP_SEC=
 
 usage() {
     printf '%s\n' \
@@ -35,7 +44,17 @@ while [ "$#" -gt 0 ]; do
         --sleep) ACTION=sleep ;;
         --poweroff) POWER_OFF=1 ;;
         --no-poweroff|--no-hold-resume|--hold-resume) : ;;
-        --power-backend|--sleep-backend|--wakeup-sec|--wait-sec)
+        --sleep-backend)
+            shift
+            [ "$#" -gt 0 ] || { usage >&2; exit 2; }
+            SLEEP_BACKEND=$1
+            ;;
+        --wakeup-sec)
+            shift
+            [ "$#" -gt 0 ] || { usage >&2; exit 2; }
+            WAKEUP_SEC=$1
+            ;;
+        --power-backend|--wait-sec)
             shift
             [ "$#" -gt 0 ] || { usage >&2; exit 2; }
             ;;
@@ -45,6 +64,13 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
+
+case "$SLEEP_BACKEND" in mem|freeze) ;; *) exit 2 ;; esac
+case "$WAKEUP_SEC" in
+    '') ;;
+    *[!0-9]*) exit 2 ;;
+    *) [ "$WAKEUP_SEC" -ge 1 ] && [ "$WAKEUP_SEC" -le 3600 ] || exit 2 ;;
+esac
 
 mkdir -p "${LOG%/*}" "$RUNTIME_ROOT" 2>/dev/null || true
 log() {
@@ -69,15 +95,100 @@ start_power_finalizer() {
     log "stage=power-fallback result=armed action=$ACTION"
 }
 
-if [ "$ACTION" = sleep ]; then
-    log 'result=unsupported action=sleep reason=bubble-backend-not-validated'
-    printf 'result=unsupported action=sleep\n'
-    exit 78
+if [ "$DRY_RUN" -eq 1 ]; then
+    printf 'result=dry-run action=%s poweroff=%s sd2=%s user=%s sleep_backend=%s\n' \
+        "$ACTION" "$POWER_OFF" "$SD2_MOUNT" "$USER_MOUNT" "$SLEEP_BACKEND"
+    exit 0
 fi
 
-if [ "$DRY_RUN" -eq 1 ]; then
-    printf 'result=dry-run action=%s poweroff=%s sd2=%s user=%s\n' \
-        "$ACTION" "$POWER_OFF" "$SD2_MOUNT" "$USER_MOUNT"
+sleep_restore_network() {
+    [ "$1" -eq 1 ] || return 0
+    "$BB" mkdir -p "${SLEEP_NETWORK_LOG%/*}" 2>/dev/null || true
+    (
+        PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+            PLUMOS_BUSYBOX="$BB" "$BB" sh "$NETWORK_CONTROL" --wifi on
+        [ ! -x "$NETWORK_SERVICES" ] || \
+            "$BB" sh "$NETWORK_SERVICES" start-enabled
+    ) >>"$SLEEP_NETWORK_LOG" 2>&1 &
+}
+
+if [ "$ACTION" = sleep ]; then
+    [ -w "$POWER_STATE" ] && "$BB" grep -qw "$SLEEP_BACKEND" "$POWER_STATE" || {
+        log "result=error action=sleep stage=backend backend=$SLEEP_BACKEND"
+        exit 1
+    }
+    wifi_restore=0
+    if [ -d "$WIFI_INTERFACE_PATH" ]; then
+        wifi_setting=$($BB sed -n \
+            's/.*"wifi_enabled"[[:space:]]*:[[:space:]]*\([^,}]*\).*/\1/p' \
+            "$PLUMOS_ROOT/config/system/settings.json" 2>/dev/null | \
+            $BB head -n 1 | $BB tr -d '[:space:]"' || true)
+        case "$wifi_setting" in false|0|off|OFF) ;; *) wifi_restore=1 ;; esac
+    fi
+    volume_before=
+    brightness_before=
+    [ ! -x "$VOLUME_CONTROL" ] || \
+        volume_before=$(PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+            "$BB" sh "$VOLUME_CONTROL" get 2>/dev/null || true)
+    [ ! -x "$DISPLAY_CONTROL" ] || \
+        brightness_before=$(PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+            "$BB" sh "$DISPLAY_CONTROL" get 2>/dev/null || true)
+    log "stage=begin action=sleep backend=$SLEEP_BACKEND wifi_restore=$wifi_restore"
+    if [ "$wifi_restore" -eq 1 ]; then
+        [ -x "$NETWORK_CONTROL" ] || {
+            log 'result=error action=sleep stage=wifi-control-missing'
+            exit 1
+        }
+        PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+            PLUMOS_BUSYBOX="$BB" PLUMOS_NETWORK_LOG="$SLEEP_NETWORK_LOG" \
+            "$BB" sh "$NETWORK_CONTROL" --wifi off >>"$LOG" 2>&1 || {
+                log 'result=error action=sleep stage=wifi-pause'
+                exit 1
+            }
+        # The vendor bcmdhd driver returns EBUSY if deep suspend races its
+        # interface-down callback. This bounded settle is needed only for
+        # Sleep; it is not part of reboot or shutdown latency.
+        "$BB" sleep 1
+    fi
+    if [ -n "$WAKEUP_SEC" ]; then
+        [ -w "$RTC_WAKEALARM" ] || {
+            sleep_restore_network "$wifi_restore"
+            log 'result=error action=sleep stage=rtc-unavailable'
+            exit 1
+        }
+        printf '0\n' >"$RTC_WAKEALARM" 2>/dev/null || true
+        printf '+%s\n' "$WAKEUP_SEC" >"$RTC_WAKEALARM" || {
+            sleep_restore_network "$wifi_restore"
+            log 'result=error action=sleep stage=rtc-arm'
+            exit 1
+        }
+        log "stage=wakealarm result=armed seconds=$WAKEUP_SEC"
+    fi
+    "$BB" sync
+    log "stage=suspend-enter backend=$SLEEP_BACKEND"
+    if ! printf '%s\n' "$SLEEP_BACKEND" >"$POWER_STATE"; then
+        [ -z "$WAKEUP_SEC" ] || printf '0\n' >"$RTC_WAKEALARM" 2>/dev/null || true
+        sleep_restore_network "$wifi_restore"
+        log "result=error action=sleep stage=suspend-entry backend=$SLEEP_BACKEND"
+        exit 1
+    fi
+    [ -z "$WAKEUP_SEC" ] || printf '0\n' >"$RTC_WAKEALARM" 2>/dev/null || true
+    log "stage=suspend-resume backend=$SLEEP_BACKEND"
+    case "$brightness_before" in ''|*[!0-9]*) ;; *)
+        PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+            "$BB" sh "$DISPLAY_CONTROL" apply "$brightness_before" >/dev/null 2>&1 || \
+            log "stage=display-restore result=failed value=$brightness_before"
+        ;;
+    esac
+    case "$volume_before" in ''|*[!0-9]*) ;; *)
+        PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+            "$BB" sh "$VOLUME_CONTROL" apply "$volume_before" >/dev/null 2>&1 || \
+            log "stage=volume-restore result=failed value=$volume_before"
+        ;;
+    esac
+    sleep_restore_network "$wifi_restore"
+    log "result=resumed action=sleep backend=$SLEEP_BACKEND network=background"
+    printf 'result=resumed action=sleep backend=%s\n' "$SLEEP_BACKEND"
     exit 0
 fi
 
