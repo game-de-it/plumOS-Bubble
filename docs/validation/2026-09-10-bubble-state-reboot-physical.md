@@ -87,5 +87,50 @@ The charger was then reconnected while the frontend remained active. The
 device changed to `bq2589x-usb online=1`, battery `Charging` at approximately
 1.03 A, and logged `usb dcp adapter plugged in`. The frontend and Wi-Fi stayed
 available. Charger disconnect, battery-only reboot, and live reconnect are
-therefore accepted. Actual suspend/resume remains the only open power-mode
-portion of `BUB-P4-P03`.
+therefore accepted.
+
+## Deep-suspend acceptance and entry latency
+
+The Bubble kernel advertises `freeze mem`, with `deep` selected in
+`/sys/power/mem_sleep`. A direct deep-suspend attempt while Wi-Fi remained
+active was rejected by the vendor `bcmdhd` SDIO callback with `-EBUSY`.
+Pausing Wi-Fi before suspend allowed the panel and LED to turn off and the
+device to resume through an RTC-bounded diagnostic run.
+
+Source `9b65e19` integrated that sequence into the normal power menu while
+preserving the saved `wifi_enabled` policy and reconnecting in the background
+after resume. Its first physical FE and RetroArch runs both worked, but each
+spent 12 seconds between `stage=begin` and `stage=suspend-enter`. The delay was
+the synchronous `wpa_cli terminate` command rather than display ownership or
+the emulator route.
+
+Source `37520b4` adds a suspend-only runtime pause. It sends TERM directly to
+the DHCP and wpa_supplicant PIDs, escalates after at most 0.5 seconds, lowers
+`wlan0`, and retains only the one-second driver settle. The ordinary Wi-Fi Off
+command and persistent credentials are unchanged. All 34 repository tests
+passed, including real-process termination, unchanged policy, and asynchronous
+resume coverage.
+
+The scoped deployment changed only the two power/network scripts and frontend
+metadata. A full newly-built global checksum could not be installed because it
+also described an unrelated, not-yet-deployed Game Gear factory shader. The
+device's prior global manifest/checksum was therefore retained and only the
+four changed hashes were replaced. An intermediate field-based rewrite split
+two PortMaster paths containing spaces; it was discarded and regenerated from
+the rollback with whole-line-preserving substitutions. The final frontend and
+complete app-layer checks both passed, and frontend/system settings retained
+their pre-deployment hashes. Rollback material is at:
+
+```text
+/storage/plumos/state/app-deploy/37520b4-sleep-fast-20260910T0345/rollback.tar
+```
+
+The user then exercised Sleep from the idle frontend and from a running
+RetroArch game. The device log recorded `begin -> suspend-enter` as two seconds
+for both runs (`18:53:51Z -> 18:53:53Z` and
+`18:54:14Z -> 18:54:16Z`); perceived time to panel-off was approximately three
+seconds. Both resumed normally. The kernel completed deep suspend without an
+SDIO failure, Wi-Fi re-associated with `192.168.10.101/24`, and the frontend
+and game routes recovered as observed by the user. This completes the remaining
+power-mode portion and closes `BUB-P4-P03`; headphone/audio-route persistence
+remains separately tracked by `BUB-P4-A03`.

@@ -204,7 +204,7 @@
 - [ ] `BUB-P4-A03` headphone 接続/抜去、ゲーム終了、suspend/resume 後の route 復帰を確認する。
 - [x] `BUB-P4-P01` backlight 0..255 の安全範囲、段階、persist policy を決める。
 - [x] `BUB-P4-P02` battery/charger node、capacity、charging状態、volume/power keyをhelperへ閉じ込める。
-- [ ] `BUB-P4-P03` normal shutdown/reboot、charger接続前後、cold boot、suspend/resumeを実機確認する。
+- [x] `BUB-P4-P03` normal shutdown/reboot、charger接続前後、cold boot、suspend/resumeを実機確認する。
   - source `d082d9c`で同一pending power requestを成功として再利用するよう修正し、FE Rebootを
     実機確認した。操作logの`reboot requested`、SD2 unbind、p4 unmount、clean marker書込み、
     PID 1への委譲、次bootの`previous_shutdown=clean automatic_repair=no`、FE初回復帰まで合格。
@@ -222,7 +222,12 @@
     backend requestへ到達し、次bootは`previous_shutdown=clean`、FE開始3.84秒だった。
     稼働中に再接続すると`online=1`、battery `Charging`、約1.03 A、kernel
     `usb dcp adapter plugged in`へ切り替わり、FEとWi-Fiは継続した。charger transitionと
-    charger非接続rebootは合格、suspend/resumeだけを残す。
+    charger非接続rebootは合格した。
+  - source `37520b4`ではBubbleの`bcmdhd`がWi-Fi稼働中のdeep suspendを`EBUSY`で拒否するため、
+    保存済みWi-Fi設定を変更しないsuspend専用pauseと復帰後のbackground reconnectを実装した。
+    初版の`wpa_cli terminate`はFE/RAともsuspend直前に12秒を要したため、daemonをbounded
+    TERM/KILLしてinterfaceを下げ、driver settle 1秒だけを残した。修正版は両経路ともlog上2秒、
+    利用者計測約3秒で消灯し、deep suspend、画面/操作復帰、Wi-Fi再接続まで合格した。
 - [ ] `BUB-P4-P04` power action後にFAT/ext4がcleanであることを次boot/read-only fs checkで確認する。
   - terminal shutdown/rebootでp3/p4 clean markerを書いてsyncし、p4を明示unmountしてから
     p3をread-only化する実装を追加。marker作成/unmount順はhost fixture合格。markerは
