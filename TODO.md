@@ -130,7 +130,10 @@
 
 ### Display/GPU
 
-- [ ] `BUB-P4-D01` DRM connector/CRTC/plane/format/stride/modifier を read-only probe で採取する。
+- [x] `BUB-P4-D01` DRM connector/CRTC/plane/format/stride/modifier を read-only probe で採取する。
+  - 実機の起動中FEを止めず`O_RDONLY` probeを実行し、DSI-1 640x480@60、
+    CRTC 71、primary plane 57、XR24/linear、stride 2560を採取した。実行前後で
+    DRM所有者が同じFE PIDのままであることも確認した。
 - [ ] `BUB-P4-D02` CPU-rendered DRM dumb-buffer double buffering と page-flip completion を実装する。
   - MFの共通rendererとRetroArch DRM修正をBubbleへ移植し、FEとRetroArch RGUIの実パネル表示、
     DRM handoff、FEへの再取得まで確認した。page-flip継続計測を残す。
