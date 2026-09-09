@@ -41,6 +41,14 @@ applies only to the same device, mount path and filesystem; it cannot suppress
 an ext4 fallback scan. Reinserting the original card restores that card's own
 health history.
 
+The physical reinsertion then exposed the inverse case: the returned SD2 was
+correctly resolved by UUID and bound read-write, but its sticky dirty status
+preserved the index generated while SD2 was absent. Library indexes are now
+owned and cached by media identity. A dirty medium may preserve only an active
+or cached index with the same UUID/device key; otherwise one bounded read-only
+library scan creates its first matching cache. Switching between SD1 fallback
+and SD2 can no longer display the other medium's library.
+
 ## Physical acceptance remaining
 
 Completed on the physical Bubble:

@@ -145,22 +145,31 @@ if [ -x "$PLUMOS_ROOT/bin/plumos-network-control" ]; then
 fi
 
 printf 'frontend_scan=stage-S41\n' >>"$LOG"
-storage_result=$($BB awk -F= '$1 == "result" { print $2; exit }' \
-    "$PLUMOS_ROOT/state/storage-health/status" 2>/dev/null || true)
-if [ -s "$PLUMOS_ROOT/state/frontend/library-index.json" ] &&
-    { [ "$storage_result" = dirty ] || [ "$storage_result" = inconsistent ]; }; then
-    printf 'frontend_scan=skipped_dirty_media result=%s index=preserved\n' \
-        "$storage_result" >>"$LOG"
-else
+scan_required=yes
+MEDIA_INDEX=$PLUMOS_ROOT/bin/plumos-library-index-media
+if [ -x "$MEDIA_INDEX" ]; then
+    media_decision=$(PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_BUSYBOX="$BB" \
+        "$BB" sh "$MEDIA_INDEX" prepare 2>&1 || true)
+    printf '%s\n' "$media_decision" >>"$LOG"
+    case $media_decision in library_media=preserved*) scan_required=no ;; esac
+fi
+if [ "$scan_required" = yes ]; then
     if PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$PLUMOS_SDCARD_ROOT" \
         "$BB" timeout -s TERM -k 5 "$SCAN_TIMEOUT" \
         "$PLUMOS_ROOT/bin/plumos-library-scan" --defer-thumbnails >>"$LOG" 2>&1; then
         printf 'frontend_scan=complete timeout=%s\n' "$SCAN_TIMEOUT" >>"$LOG"
+        if [ -x "$MEDIA_INDEX" ]; then
+            PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_BUSYBOX="$BB" \
+                "$BB" sh "$MEDIA_INDEX" record >>"$LOG" 2>&1 ||
+                printf 'frontend_scan=media-record-failed\n' >>"$LOG"
+        fi
     else
         scan_rc=$?
         printf 'frontend_scan=bounded_failure rc=%s timeout=%s index=preserved\n' \
             "$scan_rc" "$SCAN_TIMEOUT" >>"$LOG"
     fi
+else
+    printf 'frontend_scan=skipped_dirty_media index=matching-media\n' >>"$LOG"
 fi
 if [ -x "$PLUMOS_ROOT/bin/plumos-storage-health" ]; then
     "$BB" sh "$PLUMOS_ROOT/bin/plumos-storage-health" observe >>"$LOG" 2>&1 ||

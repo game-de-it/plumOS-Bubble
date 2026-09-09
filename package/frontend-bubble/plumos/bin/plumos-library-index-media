@@ -1,0 +1,87 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+ACTION=${1:-prepare}
+STATE_DIR=${PLUMOS_LIBRARY_MEDIA_STATE_DIR:-$PLUMOS_ROOT/state/frontend/media-index}
+STATUS=${PLUMOS_STORAGE_HEALTH_STATUS:-$PLUMOS_ROOT/state/storage-health/status}
+INDEX=${PLUMOS_LIBRARY_INDEX:-$PLUMOS_ROOT/state/frontend/library-index.json}
+IDENTITY_FILE=${PLUMOS_SD2_IDENTITY_FILE:-/storage/user/config/system/sd2-identity.conf}
+OWNER=$STATE_DIR/active-media
+
+status_value() {
+    key=$1
+    $BB awk -F= -v key="$key" '$1 == key { print $2; exit }' "$STATUS" 2>/dev/null
+}
+
+media_key() {
+    device=$(status_value device)
+    mount_path=$(status_value mount_path)
+    key=
+    if [ "$mount_path" = /run/media/sd2 ] && [ -r "$IDENTITY_FILE" ]; then
+        uuid=$($BB awk -F= '$1 == "uuid" { print $2; exit }' "$IDENTITY_FILE" 2>/dev/null)
+        case $uuid in
+            ''|*[!A-Za-z0-9_.+-]*) ;;
+            *) key=uuid-$uuid ;;
+        esac
+    fi
+    [ -n "$key" ] || key=device-${device##*/}
+    printf '%s\n' "$key" | $BB sed 's/[^A-Za-z0-9_.-]/_/g'
+}
+
+write_owner() {
+    key=$1
+    printf '%s\n' "$key" >"$OWNER.new"
+    $BB mv "$OWNER.new" "$OWNER"
+}
+
+case $ACTION in
+    prepare)
+        result=$(status_value result)
+        key=$(media_key)
+        cached=$STATE_DIR/$key.json
+        active_owner=
+        [ ! -r "$OWNER" ] || active_owner=$($BB head -n 1 "$OWNER")
+        $BB mkdir -p "$STATE_DIR"
+        case $result in
+            dirty|inconsistent)
+                if [ -s "$INDEX" ] && [ "$active_owner" = "$key" ]; then
+                    printf 'library_media=preserved key=%s result=%s source=active\n' \
+                        "$key" "$result"
+                    exit 0
+                fi
+                if [ -s "$cached" ]; then
+                    $BB cp "$cached" "$INDEX.new"
+                    $BB mv "$INDEX.new" "$INDEX"
+                    write_owner "$key"
+                    printf 'library_media=preserved key=%s result=%s source=cache\n' \
+                        "$key" "$result"
+                    exit 0
+                fi
+                printf 'library_media=scan key=%s result=%s reason=no-matching-index\n' \
+                    "$key" "$result"
+                ;;
+            *)
+                printf 'library_media=scan key=%s result=%s reason=media-readable\n' \
+                    "$key" "${result:-unknown}"
+                ;;
+        esac
+        ;;
+    record)
+        [ -s "$INDEX" ] || {
+            printf 'library_media=record-failed reason=index-missing\n' >&2
+            exit 1
+        }
+        key=$(media_key)
+        $BB mkdir -p "$STATE_DIR"
+        $BB cp "$INDEX" "$STATE_DIR/$key.json.new"
+        $BB mv "$STATE_DIR/$key.json.new" "$STATE_DIR/$key.json"
+        write_owner "$key"
+        printf 'library_media=recorded key=%s\n' "$key"
+        ;;
+    *)
+        printf 'usage: %s {prepare|record}\n' "$0" >&2
+        exit 2
+        ;;
+esac
