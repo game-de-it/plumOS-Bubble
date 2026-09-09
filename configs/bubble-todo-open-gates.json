@@ -18,7 +18,6 @@
     "BUB-P4-I03": "physical-input",
     "BUB-P4-A02": "physical-audio",
     "BUB-P4-P04": "offline-media",
-    "BUB-P4-N02": "physical-network",
     "BUB-P4-N03": "physical-usb",
     "BUB-P4-S01": "storage-identity",
     "BUB-P6-05": "coverage-development",
