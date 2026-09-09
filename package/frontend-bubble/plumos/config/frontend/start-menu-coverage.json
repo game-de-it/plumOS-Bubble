@@ -194,11 +194,20 @@
       "path": "system/lid-suspend",
       "reason": "no-lid-device",
       "todo": "BUB-P5-02"
-    },
+    }
+  ],
+  "product_excluded": [
     {
       "path": "network/services/adb",
-      "reason": "device-node-and-runtime-absent",
-      "todo": "BUB-P5-02"
+      "reason": "single-usb-connector-is-charge-only-and-stock-kernel-exposes-no-udc",
+      "decision": "BUB-P4-N03",
+      "visible": false
+    },
+    {
+      "path": "display/hdmi",
+      "reason": "connector-is-not-a-supported-output-in-the-current-product-policy",
+      "decision": "BUB-P4-N03",
+      "visible": false
     }
   ]
 }

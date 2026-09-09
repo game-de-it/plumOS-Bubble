@@ -6682,7 +6682,6 @@ static void add_network_service_entries(struct ui_state *ui) {
                            device->sftp_service_running);
     add_bool_setting_entry(ui, "network_samba_enabled", "Samba",
                            device->samba_service_running);
-    add_unavailable_setting_entry(ui, "network_adb_enabled", "ADB");
   } else {
     add_bool_setting_entry(ui, "network_ftp_enabled", "FTP",
                            device->ftp_service_running);
@@ -6739,7 +6738,9 @@ static void add_network_information_entries(struct ui_state *ui) {
   add_setting_entry(ui, "network_ftp_status", "FTP", device->ftp_status);
   add_setting_entry(ui, "network_sftp_status", "SFTP", device->sftp_status);
   add_setting_entry(ui, "network_samba_status", "Samba", device->samba_status);
-  add_setting_entry(ui, "network_adb_status", "ADB", device->adb_status);
+  if (!runtime_device_is_bubble()) {
+    add_setting_entry(ui, "network_adb_status", "ADB", device->adb_status);
+  }
 }
 
 static int performance_top_entry_is_real(const struct top_entry *entry) {
@@ -9976,10 +9977,16 @@ static void setting_help_lines(const struct ui_state *ui,
     copy_string(line2, line2_size, "Use Connect Wi-Fi or NW Service instead.");
   } else if (strcmp(id, "network_services") == 0) {
     copy_string(line1, line1_size, "Open network services.");
-    copy_string(line2, line2_size, "SSH, FTP, SFTP, Samba, and ADB.");
+    copy_string(line2, line2_size,
+                runtime_device_is_bubble()
+                    ? "SSH, FTP, SFTP, and Samba."
+                    : "SSH, FTP, SFTP, Samba, and ADB.");
   } else if (strcmp(id, "network_information") == 0) {
     copy_string(line1, line1_size, "Open read-only network information.");
-    copy_string(line2, line2_size, "Connection, IP, signal, link speed, SSH, and ADB.");
+    copy_string(line2, line2_size,
+                runtime_device_is_bubble()
+                    ? "Connection, IP, signal, link speed, and file services."
+                    : "Connection, IP, signal, link speed, SSH, and ADB.");
   } else if (strncmp(id, "network_", 8) == 0) {
     if (strcmp(id, "network_wifi_enabled") == 0) {
       copy_string(line1, line1_size, "Turn the Wi-Fi runtime on or off.");

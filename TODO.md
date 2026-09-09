@@ -306,8 +306,9 @@
     Rockchip DSIのbrightness/contrast/hue/saturation DRM propertyを実機で変更・readback・復元し、
     lumination/colorを実バックエンドへ接続した。PicoArch resetも既定envの復元へ接続した。
     FTP/SFTP/Sambaは分離stageで起動し、macOS clientから同一fileをreadback後に停止まで合格。
-    lidはDT/input/interruptにsensorがなく、ADBはstock kernelがgadgetをmodule化している一方で
-    対応module/UDCが存在しないため、虚偽の成功扱いにはせずhardware-blocked表示を維持する。
+    lidはDT/input/interruptにsensorがないためhardware-blocked表示を維持する。ADBはstock kernelに
+    対応module/UDCが存在せず、単一USB端子を充電専用とするproduct policyによりFEから非表示とした。
+    hardware-unavailableのbackend診断とcoverage上のproduct-excluded記録は維持する。
     System Updateは`/storage/user/updates`の署名済みRuntime packageを検証・予約し、安全再起動後に
     managed fileだけをjournal付きで適用する。DRM FE ready未確認の次bootでは全pathをrollbackし、
     active config/save/state/log/ROM/BIOS/credential/PortMaster installed stateを更新対象外にした。
@@ -316,7 +317,7 @@
     設定/SSH key不変、FE renderer-ready復帰を確認した。実packageのapply/rollbackはrelease候補で残す。
     NW情報がBusyBoxを解決できず全serviceを`Status Error`にしていたため、Bubble launcherから
     `/bin/busybox`を明示し、FEにも同pathのfallbackを追加した。source `6a72940`を実機へ反映し、
-    SSH=スタート、FTP/SFTP/Samba=ストップ、ADB=利用不可、およびFTP起動時のスタートへの
+    SSH=スタート、FTP/SFTP/Samba=ストップ、ADB=利用不可（product policy決定前）、およびFTP起動時のスタートへの
     動的切替をtext rendererで確認した。表示とNW Serviceトグルは自動起動設定ではなく実processを
     基準にする。全12,373 managed file hashと既存service/system/frontend設定hashは不変・合格。
     Apps可視性監査ではA30/MF/MMF/V90S v2/XU20/Pixel2の現行sourceと計39 release tag、

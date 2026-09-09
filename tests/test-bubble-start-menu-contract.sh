@@ -50,7 +50,10 @@ jq -e '[.implemented_subroutes[].path] == [
   ([.unsupported_visible[].path] | index("system/lumination") == null) and
   ([.unsupported_visible[].path] | index("system/display-color") == null) and
   ([.unsupported_visible[].path] | index("system/update/runtime") == null) and
-  ([.unsupported_visible[].path] | index("system/factory-reset/picoarch") == null)' \
+  ([.unsupported_visible[].path] | index("system/factory-reset/picoarch") == null) and
+  ([.unsupported_visible[].path] | index("network/services/adb") == null) and
+  ([.product_excluded[] | select(.visible == false) | .path] ==
+    ["network/services/adb", "display/hdmi"])' \
     "$coverage" >/dev/null
 
 for id in scraping file_manager music_player retroarch pyxel_setup portmaster \
@@ -79,6 +82,17 @@ grep -Fq 'tr(ui, "common.stop", "Stop")' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
 grep -Fq 'copy_string(busybox, sizeof(busybox), "/bin/busybox")' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
+network_service_entries=$(sed -n \
+    '/^static void add_network_service_entries/,/^}/p' \
+    "$repo_root/src/frontend/plumos_controller_ui.c")
+network_information_entries=$(sed -n \
+    '/^static void add_network_information_entries/,/^}/p' \
+    "$repo_root/src/frontend/plumos_controller_ui.c")
+! grep -q 'add_unavailable_setting_entry(ui, "network_adb_enabled"' \
+    <<<"$network_service_entries"
+grep -q 'if (!runtime_device_is_bubble())' <<<"$network_information_entries"
+grep -q 'add_setting_entry(ui, "network_adb_status"' \
+    <<<"$network_information_entries"
 
 for helper in plumos-display-control plumos-network-control plumos-network-services \
     plumos-time-sync plumos-factory-reset plumos-safe-shutdown \
