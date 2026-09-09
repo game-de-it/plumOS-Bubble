@@ -284,7 +284,7 @@
   - HDMIも現product revisionでは非対応とする。source `8764e39`をfrontend component単位で実機へ
     反映し、217 frontend fileと全12,460 app-layer fileのchecksum、既存設定hash不変を確認した。
     通常再起動後、利用者が実LCD上で`NW Service`と`NW情報`の双方にADBがないことを確認した。
-- [ ] `BUB-P4-S01` OS SD と ROM SD を UUID/label/partition identity で安全に解決する。
+- [x] `BUB-P4-S01` OS SD と ROM SD を UUID/label/partition identity で安全に解決する。
   - runtime中のSD2 hotplugは製品要件に含めず、ROM SDの抜差しは電源OFF中だけ行う。
     起動時は保存済みfilesystem UUID、明示label、secondary controller fallbackの順で解決し、
     `/storage`と同じdisk上のpartitionを必ず拒否するresolverをhost fixtureへ追加した。
@@ -292,7 +292,10 @@
     storage-healthをdevice別に分離し、現在の媒体だけがscan抑止を判断するよう修正した。
     source `8759f08`を実機へ反映し、SD2なしcold bootではext4 fallbackを再走査して、
     `SHOW EMPTY SYSTEMS=OFF`時に内蔵側のPyxelだけが表示されることを利用者が確認した。
-    保存済みUUID `130C-1033`の同一SD2復帰cold bootを確認するまでopenを維持する。
+    同一SD2復帰時にdirty媒体がSD1 indexを保持する逆方向の問題も検出し、source `b5057fd`で
+    library indexを媒体UUID別に所有・cacheするよう修正。frontend 218 file、全app-layer 12,461 fileの
+    checksumとmutable設定hash不変を確認した。cold boot後はUUID `130C-1033`から解決し、ROM/BIOSを
+    `/dev/mmcblk3p1`へrw bind、64のnon-empty systemがFEへ復帰したことを利用者と実機logで確認した。
 - [x] `BUB-P4-S02` dirty ROM SD を自動修復せず、警告・read-only・退避手順を定義する。
   - startup時のkernel filesystem errorをmanaged stateへ記録し、System Settingsへ表示する
     `plumos-storage-health observe`を追加した。手動checkはread-write mountを拒否し、

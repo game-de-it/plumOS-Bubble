@@ -49,7 +49,7 @@ or cached index with the same UUID/device key; otherwise one bounded read-only
 library scan creates its first matching cache. Switching between SD1 fallback
 and SD2 can no longer display the other medium's library.
 
-## Physical acceptance remaining
+## Physical acceptance
 
 Completed on the physical Bubble:
 
@@ -61,10 +61,23 @@ Completed on the physical Bubble:
 5. with `show_empty_systems=false`, the user confirmed that only the expected
    built-in Pyxel system remained visible.
 
-Remaining:
+The same ROM SD was then reinserted while powered off and cold booted. Device
+evidence after boot was:
 
-1. perform a normal shutdown, reinsert the same ROM SD while powered off and
-   cold boot;
-2. verify UUID resolution, ROM/BIOS binds and frontend library visibility.
+- `resolved_by=filesystem-uuid`, UUID `130C-1033`;
+- `/dev/mmcblk3p1` mounted read-write at `/run/media/sd2`;
+- ROM and BIOS targets both bound read-write from `/dev/mmcblk3p1`;
+- active library owner `uuid-130C-1033` with a matching cached index;
+- 4,814 files under the ROM tree, 911 matched ROMs in the boot scan and 64
+  non-empty frontend systems;
+- the user confirmed that the SD2-backed systems were visible again.
+
+The frontend component passed 218-file verification and the complete app layer
+passed 12,461-file verification after deployment. Frontend/system settings and
+the SD2 identity file retained their pre-deployment hashes.
+
+The existing FAT dirty evidence remains recorded and no repair was attempted;
+that safety policy is independent of the completed identity and visibility
+acceptance.
 
 No card is removed while the OS is running.
