@@ -14,7 +14,7 @@ read-only inventoryに対して再照合した。文書だけ、hostだけ、pro
 
 ## Mechanical verification
 
-- repository test: `tests/test-*` 33/33 pass（監査test追加前）
+- repository test: `tests/test-*` 33/33 pass（監査test追加前）。監査test自身も単独pass。
 - macOS bash 3.2: first-boot storage/start-menu contract pass
 - emulator catalog: 98 systems、196 profiles、114/114 source core load smoke
 - GGFE artwork: PNG/JPEG/WebP decoder fixture pass
@@ -39,6 +39,14 @@ fault injection、利用者の公開承認が残るため、private hardware-val
   `event3/js5`。
 
 この採取では画面ownerを変更しておらず、FEと別rendererを同時実行していない。
+
+source `fbfda60`のfrontend差分は、実機設定を対象外にしてstaging hash確認後にatomic switchした。
+GGFE、Game Gear限定RetroArch launcher、JPEG/WebP DSO、license文書、component/global metadataだけを
+更新した。217/217 frontend checksumと12,460-entry global checksumが合格し、実機loaderは
+`libjpeg.so.62`と`libwebp.so.7`をcomponent内から解決した。frontend/system/GGFE設定hashは
+更新前後で不変、最終状態はFE 1 process、staging残骸0だった。rollback archiveは
+`state/app-deploy/fbfda60-todo-frontend/rollback.tar`、SHA-256は
+`7cdb98118bc1f45c97e90398f0322fa593649bc136af16aa5e47a54a4f838eb9`。
 
 ## Remaining gate classes
 

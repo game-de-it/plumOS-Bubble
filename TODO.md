@@ -671,6 +671,8 @@
   libjpeg導入はtools imageとfrontend/lib双方の変更になるため単独で実施する。
   - libjpeg/libwebp decoder、AArch64 runtime DSO、著作権文書をfrontend componentへ追加した。
     2x2 JPEG/WebP fixtureの実decode、component checksum、GL非リンクgateに合格した。
+    source `fbfda60`のmanaged deltaを実機へ反映し、217/217 frontend checksum、
+    12,460-entry global checksum、実機loaderでの両DSO解決、設定hash不変、FE 1 processを確認した。
 - [x] `plumos_json.h`と`plumos_path.h`はGGFE向けに`plumos_library_scan.c`から抽出した。
   同ファイル側の重複コピーを削除してこのheaderへ寄せる（機械的変更、単独で実施する）。
   - scanner側の重複JSON/path/case-insensitive helperを削除し、共通headerを使用する。
