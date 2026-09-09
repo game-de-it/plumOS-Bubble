@@ -141,7 +141,7 @@ if [ "$ACTION" = sleep ]; then
         }
         PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
             PLUMOS_BUSYBOX="$BB" PLUMOS_NETWORK_LOG="$SLEEP_NETWORK_LOG" \
-            "$BB" sh "$NETWORK_CONTROL" --wifi off >>"$LOG" 2>&1 || {
+            "$BB" sh "$NETWORK_CONTROL" --wifi suspend >>"$LOG" 2>&1 || {
                 log 'result=error action=sleep stage=wifi-pause'
                 exit 1
             }

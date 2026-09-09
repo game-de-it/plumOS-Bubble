@@ -20,6 +20,7 @@ shift
 case "$command_name" in
     sync) exit 0 ;;
     sleep) exit 0 ;;
+    ip) exit 0 ;;
     *) exec "$command_name" "$@" ;;
 esac
 EOF
@@ -57,7 +58,7 @@ export PLUMOS_TEST_DISPLAY_CALLS=$tmp/display.calls
 
 sh "$safe" --sleep --sleep-backend mem --wakeup-sec 8 >"$tmp/result"
 grep -q '^result=resumed action=sleep backend=mem$' "$tmp/result"
-grep -qx -- '--wifi off' "$tmp/network.calls"
+grep -qx -- '--wifi suspend' "$tmp/network.calls"
 for _ in {1..20}; do
     grep -qx -- '--wifi on' "$tmp/network.calls" 2>/dev/null && break
     sleep 0.05
@@ -73,5 +74,32 @@ printf 'freeze mem\n' >"$tmp/power-state"
 printf '{"wifi_enabled": false}\n' >"$root/config/system/settings.json"
 sh "$safe" --sleep --sleep-backend mem >"$tmp/disabled.result"
 if [[ -s $tmp/network.calls ]]; then exit 1; fi
+
+# The real suspend-only network path must terminate both runtime daemons
+# without using the potentially blocking wpa_cli terminate command.  It must
+# also leave the persistent Wi-Fi policy untouched.
+network=$repo_root/package/frontend-bubble/plumos/bin/plumos-network-control
+/bin/sleep 30 & dhcp_pid=$!
+/bin/sleep 30 & wpa_pid=$!
+printf '%s\n' "$dhcp_pid" >"$tmp/dhcp.pid"
+printf '%s\n' "$wpa_pid" >"$tmp/wpa.pid"
+PLUMOS_ROOT=$root \
+PLUMOS_RUNTIME_ROOT=$run \
+PLUMOS_BUSYBOX=$tmp/fake-busybox \
+PLUMOS_WIFI_SYS_CLASS_NET=$tmp \
+PLUMOS_NETWORK_RUN_DIR=$run/network-control \
+PLUMOS_WPA_PID_FILE=$tmp/wpa.pid \
+PLUMOS_DHCP_PID_FILE=$tmp/dhcp.pid \
+PLUMOS_NETWORK_LOG=$tmp/network.log \
+PLUMOS_WIFI_SUSPEND_STOP_TENTHS=1 \
+    sh "$network" --wifi suspend >"$tmp/suspend.result"
+grep -qx 'result=suspended' "$tmp/suspend.result"
+set +e
+wait "$dhcp_pid"; dhcp_status=$?
+wait "$wpa_pid"; wpa_status=$?
+set -e
+[[ $dhcp_status -ne 0 && $wpa_status -ne 0 ]]
+grep -q '"wifi_enabled": false' "$root/config/system/settings.json"
+grep -qx 'wpa_state=SUSPENDED' "$run/network-control/wpa_status.txt"
 
 printf 'bubble_sleep=result-ok backend=mem wifi=paused-restored-background rtc=bounded\n'

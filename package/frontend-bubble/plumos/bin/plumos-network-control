@@ -19,10 +19,11 @@ WPA_CLI=${PLUMOS_WPA_CLI:-/usr/sbin/wpa_cli}
 LOG=${PLUMOS_NETWORK_LOG:-$PLUMOS_ROOT/logs/network-control.log}
 WAIT=${PLUMOS_WPA_WAIT_SECONDS:-20}
 CONTROL_WAIT=${PLUMOS_WPA_CONTROL_WAIT_SECONDS:-5}
+SUSPEND_STOP_TENTHS=${PLUMOS_WIFI_SUSPEND_STOP_TENTHS:-5}
 
 usage() {
     printf '%s\n' \
-        'Usage: plumos-network-control --wifi on|off|status' \
+        'Usage: plumos-network-control --wifi on|off|suspend|status' \
         '       plumos-network-control --scan' \
         '       plumos-network-control --connect-file FILE'
 }
@@ -207,6 +208,39 @@ wifi_off() {
     printf 'result=off\n'
 }
 
+# Suspend must not wait for wpa_cli's driver-facing terminate command.  On the
+# Bubble bcmdhd stack that command can block for about ten seconds, even though
+# terminating the daemon and lowering wlan0 releases the SDIO function almost
+# immediately.  Keep this runtime-only: the saved wifi_enabled policy and
+# credentials are not changed, so the resume path can reconnect normally.
+terminate_pid_file_bounded() {
+    pid_file=$1
+    [ -r "$pid_file" ] || return 0
+    pid=$(sed -n '1p' "$pid_file" 2>/dev/null || true)
+    case "$pid" in ''|*[!0-9]*) return 0 ;; esac
+    kill "$pid" 2>/dev/null || return 0
+    count=0
+    while kill -0 "$pid" 2>/dev/null && [ "$count" -lt "$SUSPEND_STOP_TENTHS" ]; do
+        "$BB" sleep 0.1
+        count=$((count + 1))
+    done
+    kill -KILL "$pid" 2>/dev/null || true
+}
+
+wifi_suspend() {
+    terminate_pid_file_bounded "$DHCP_PID"
+    terminate_pid_file_bounded "$WPA_PID"
+    "$BB" ip address flush dev "$WIFI_IFACE" >/dev/null 2>&1 || true
+    "$BB" ip link set "$WIFI_IFACE" down >/dev/null 2>&1 || true
+    "$BB" rm -f "$WPA_PID" "$DHCP_PID" 2>/dev/null || true
+    next=$STATUS_FILE.next.$$
+    {
+        printf 'wpa_state=SUSPENDED\n'
+        printf 'ip_address=\nRSSI=\nLINKSPEED=\nFREQUENCY=\n'
+    } >"$next" && "$BB" mv -f "$next" "$STATUS_FILE"
+    printf 'result=suspended\n'
+}
+
 scan_networks() {
     ensure_wpa_backend >/dev/null || {
         printf 'result=failed\nstage=wpa-start\n'
@@ -320,7 +354,13 @@ connect_file() {
 
 case ${1:-} in
     --wifi)
-        case ${2:-} in on) wifi_on ;; off) wifi_off ;; status) print_status ;; *) usage >&2; exit 2 ;; esac
+        case ${2:-} in
+            on) wifi_on ;;
+            off) wifi_off ;;
+            suspend) wifi_suspend ;;
+            status) print_status ;;
+            *) usage >&2; exit 2 ;;
+        esac
         ;;
     --scan) scan_networks ;;
     --connect-file) [ -n "${2:-}" ] || { usage >&2; exit 2; }; connect_file "$2" ;;
