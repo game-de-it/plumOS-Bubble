@@ -107,6 +107,7 @@ while [ "$#" -gt 0 ]; do
 done
 if [ -n "$append" ]; then cp "$append" "$TEST_TRACE.append"; fi
 printf '%s\n' "$$" >"$TEST_TRACE.pid"
+printf '%s\n' "$HOME" >"$TEST_TRACE.home"
 if [ "${TEST_HOLD:-0}" = 1 ]; then
     trap 'exit 0' TERM
     while :; do sleep 1; done
@@ -156,6 +157,8 @@ grep -qx 'savestates_in_content_dir = "false"' "$tmp/software.append"
 grep -qx "savefile_directory = \"$root/saves\"" "$tmp/software.append"
 grep -qx "savestate_directory = \"$root/states\"" "$tmp/software.append"
 grep -qx 'audio_device = "plumos_output"' "$tmp/software.append"
+grep -qx "$root/state/retroarch/nes" "$tmp/software.home"
+test -d "$root/state/retroarch/nes"
 ! grep -q '^config_save_on_exit = ' "$tmp/software.append"
 ! grep -qx -- --set-shader "$tmp/software.args"
 ! find "$runtime/retroarch" -type f -name 'launch.*.cfg' -print -quit | grep -q .

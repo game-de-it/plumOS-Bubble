@@ -118,7 +118,14 @@ config=$PLUMOS_ROOT/config/retroarch/retroarch-bubble.cfg
 factory=$PLUMOS_ROOT/factory-defaults/retroarch/retroarch-bubble.cfg
 $BB mkdir -p "$PLUMOS_ROOT/config/retroarch" "$PLUMOS_ROOT/logs" \
     "$PLUMOS_ROOT/saves" "$PLUMOS_ROOT/states" \
-    "$PLUMOS_ROOT/state/retroarch" "$RUNTIME_ROOT/retroarch"
+    "$PLUMOS_ROOT/state/retroarch" "$PLUMOS_ROOT/state/retroarch/$system" \
+    "$RUNTIME_ROOT/retroarch"
+# Several computer cores write machine-specific state directly below HOME.
+# StockOS mounts /root read-only, so leaving HOME inherited can make a core
+# initialize video/audio and then spin forever when its first config write
+# fails (Atari800 writes .atari800.cfg this way). Keep that state per system
+# in the mutable plumOS area instead of weakening the read-only rootfs.
+export HOME="$PLUMOS_ROOT/state/retroarch/$system"
 if [ -x "$PLUMOS_ROOT/bin/plumos-retroarch-config-merge" ]; then
     "$PLUMOS_ROOT/bin/plumos-retroarch-config-merge" \
         >>"$PLUMOS_ROOT/logs/retroarch-config.log" 2>&1
