@@ -68,6 +68,7 @@
     "pyxel_setup",
     "portmaster",
     "portmaster_update",
+    "sd2_repair",
     "ggfe"
   ],
   "apps_catalog_order": [
@@ -81,6 +82,7 @@
     "thumbnail-plan",
     "thumbnail-fetch",
     "thumbnail-results",
+    "sd2_repair",
     "ggfe"
   ],
   "apps_hidden_order": [
@@ -134,6 +136,12 @@
       "visible": true
     },
     {
+      "id": "sd2_repair",
+      "status": "implemented",
+      "visible": true,
+      "device": "bubble"
+    },
+    {
       "id": "ggfe",
       "status": "implemented",
       "visible": true,
@@ -157,6 +165,7 @@
   ],
   "bubble_only_start_entries": [],
   "bubble_only_apps_entries": [
+    "sd2_repair",
     "ggfe"
   ],
   "implemented_subroutes": [

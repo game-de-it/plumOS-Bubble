@@ -95,6 +95,16 @@
       "menu": "start"
     },
     {
+      "id": "sd2_repair",
+      "display_name": "Repair SD2",
+      "kind": "tool",
+      "launch_profile": "internal:sd2-repair",
+      "confirm": true,
+      "visible": true,
+      "menu": "apps",
+      "device_specific": "bubble"
+    },
+    {
       "id": "network",
       "display_name": "Network",
       "kind": "settings",

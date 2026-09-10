@@ -1,0 +1,171 @@
+#!/bin/sh
+set -u
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+MEDIA_ROOT=${PLUMOS_SDCARD_ROOT:-/run/media/sd2}
+BB=${PLUMOS_BUSYBOX:-/bin/busybox}
+MOUNTS_FILE=${PLUMOS_MOUNTS_FILE:-/proc/mounts}
+MOUNT_HELPER=${PLUMOS_SD2_MOUNT_HELPER:-$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2}
+CHECKER=${PLUMOS_FAT_CHECKER:-$PLUMOS_ROOT/bin/plumos-fsck-fat}
+TIMEOUT=${PLUMOS_TIMEOUT:-timeout}
+STATE_DIR=$PLUMOS_ROOT/state/storage-health
+STATUS=$STATE_DIR/status
+LOG=$PLUMOS_ROOT/logs/storage-health.log
+CHECK_LOG=$STATE_DIR/fsck-repair.log
+LOCK=${PLUMOS_SD2_REPAIR_LOCK:-/run/plumos/sd2-repair.lock}
+mounted=1
+device=
+fstype=
+
+log() {
+    printf '%s\n' "$1" | "$BB" tee -a "$LOG" >/dev/null 2>&1 || true
+}
+
+mount_line() {
+    "$BB" awk -v path="$1" '$2 == path { print $1 "\t" $3 "\t" $4; exit }' \
+        "$MOUNTS_FILE" 2>/dev/null
+}
+
+device_disk() {
+    case "$1" in
+        */mmcblk*p[0-9]*) printf '%s\n' "${1%p*}" ;;
+        /dev/sd*[0-9]) printf '%s\n' "$1" | "$BB" sed 's/[0-9][0-9]*$//' ;;
+        *) printf '%s\n' "$1" ;;
+    esac
+}
+
+write_status() {
+    result=$1
+    evidence=$2
+    options=$3
+    now=$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf unknown)
+    media_key=$(printf '%s' "${device##*/}" | "$BB" sed 's/[^A-Za-z0-9_.-]/_/g')
+    tmp=$STATUS.new.$$
+    {
+        printf 'result=%s\n' "$result"
+        printf 'last_check=%s\n' "$now"
+        printf 'mount_path=%s\n' "$MEDIA_ROOT"
+        printf 'device=%s\n' "${device:-unknown}"
+        printf 'filesystem=%s\n' "${fstype:-unknown}"
+        printf 'mount_options=%s\n' "${options:-unknown}"
+        printf 'evidence=%s\n' "$evidence"
+    } >"$tmp"
+    "$BB" mv "$tmp" "$STATUS"
+    if [ -n "$device" ]; then
+        "$BB" cp "$STATUS" "$STATE_DIR/media-$media_key.status.new.$$"
+        "$BB" mv "$STATE_DIR/media-$media_key.status.new.$$" \
+            "$STATE_DIR/media-$media_key.status"
+    fi
+}
+
+cleanup() {
+    rc=$?
+    trap - EXIT HUP INT TERM
+    if [ "$mounted" -eq 0 ]; then
+        PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$MEDIA_ROOT" \
+            PLUMOS_SD2_ACCESS=ro "$BB" sh "$MOUNT_HELPER" start \
+            >>"$LOG" 2>&1 || true
+    fi
+    "$BB" rmdir "$LOCK" 2>/dev/null || true
+    exit "$rc"
+}
+
+trap cleanup EXIT HUP INT TERM
+"$BB" mkdir -p "$STATE_DIR" "$PLUMOS_ROOT/logs" "${LOCK%/*}"
+if ! "$BB" mkdir "$LOCK" 2>/dev/null; then
+    log 'sd2_repair=result-refused reason=already-running'
+    printf 'sd2_repair=result-refused reason=already-running\n' >&2
+    exit 1
+fi
+
+case "$MEDIA_ROOT" in
+    /run/media/sd2) ;;
+    *)
+        log "sd2_repair=result-refused reason=not-sd2 media=$MEDIA_ROOT"
+        printf 'sd2_repair=result-refused reason=not-sd2 media=%s\n' "$MEDIA_ROOT" >&2
+        exit 1
+        ;;
+esac
+
+line=$(mount_line "$MEDIA_ROOT")
+device=$(printf '%s\n' "$line" | "$BB" awk -F '\t' '{print $1}')
+fstype=$(printf '%s\n' "$line" | "$BB" awk -F '\t' '{print $2}')
+options=$(printf '%s\n' "$line" | "$BB" awk -F '\t' '{print $3}')
+if [ -z "$device" ]; then
+    write_status not_mounted 'SD2 is not mounted; no repair attempted' unknown
+    log 'sd2_repair=result-refused reason=not-mounted'
+    exit 1
+fi
+case "$fstype" in
+    vfat|msdos) ;;
+    *)
+        write_status unsupported 'SD2 is not FAT32; no repair attempted' "$options"
+        log "sd2_repair=result-refused reason=unsupported-filesystem filesystem=$fstype"
+        exit 1
+        ;;
+esac
+case "$device" in
+    /dev/*) ;;
+    *)
+        if [ "${PLUMOS_SD2_TEST_ALLOW_REGULAR:-0}" != 1 ] || [ ! -f "$device" ]; then
+            write_status refused 'SD2 device identity is unsafe; no repair attempted' "$options"
+            log "sd2_repair=result-refused reason=unsafe-device device=$device"
+            exit 1
+        fi
+        ;;
+esac
+storage_line=$(mount_line /storage)
+storage_device=$(printf '%s\n' "$storage_line" | "$BB" awk -F '\t' '{print $1}')
+if [ -n "$storage_device" ] && \
+    [ "$(device_disk "$device")" = "$(device_disk "$storage_device")" ]; then
+    write_status refused 'OS storage device refused; no repair attempted' "$options"
+    log "sd2_repair=result-refused reason=os-device device=$device"
+    exit 1
+fi
+if [ ! -x "$MOUNT_HELPER" ] || [ ! -x "$CHECKER" ]; then
+    write_status unavailable 'SD2 repair tool is not installed' "$options"
+    log 'sd2_repair=result-unavailable reason=helper-missing'
+    exit 1
+fi
+
+log "sd2_repair=stage-unmount device=$device media=$MEDIA_ROOT"
+if ! PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$MEDIA_ROOT" \
+    "$BB" sh "$MOUNT_HELPER" stop >>"$LOG" 2>&1; then
+    write_status repair_refused 'SD2 is in use; close transfers and try again' "$options"
+    log 'sd2_repair=result-refused reason=unmount-failed'
+    exit 1
+fi
+mounted=0
+
+log "sd2_repair=stage-check device=$device mode=automatic timeout=120"
+set +e
+"$TIMEOUT" 120 "$CHECKER" -a "$device" >"$CHECK_LOG.new.$$" 2>&1
+check_rc=$?
+set -e
+"$BB" mv "$CHECK_LOG.new.$$" "$CHECK_LOG"
+
+case "$check_rc" in
+    0) result=clean; evidence='FAT32 check completed; no repair was needed'; access=rw ;;
+    1) result=clean; evidence='FAT32 errors were repaired'; access=rw ;;
+    124|137) result=timeout; evidence='FAT32 repair timed out; remounted read-only'; access=ro ;;
+    *) result=dirty; evidence="FAT32 repair failed rc=$check_rc; remounted read-only"; access=ro ;;
+esac
+
+log "sd2_repair=stage-remount device=$device access=$access check_rc=$check_rc"
+if PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$MEDIA_ROOT" \
+    PLUMOS_SD2_ACCESS="$access" "$BB" sh "$MOUNT_HELPER" start \
+    >>"$LOG" 2>&1; then
+    mounted=1
+else
+    write_status dirty 'Repair finished but SD2 remount failed; reboot safely' unmounted
+    log "sd2_repair=result-failed reason=remount-failed check_rc=$check_rc"
+    exit 1
+fi
+new_line=$(mount_line "$MEDIA_ROOT")
+new_options=$(printf '%s\n' "$new_line" | "$BB" awk -F '\t' '{print $3}')
+write_status "$result" "$evidence" "${new_options:-$access}"
+"$BB" sync
+log "sd2_repair=result-$result device=$device check_rc=$check_rc access=$access"
+printf 'sd2_repair=result-%s device=%s check_rc=%s access=%s\n' \
+    "$result" "$device" "$check_rc" "$access"
+case "$check_rc" in 0|1) exit 0 ;; *) exit 1 ;; esac

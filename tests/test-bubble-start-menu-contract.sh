@@ -11,8 +11,8 @@ gg_boxart_rescue="$package/share/frontend/artwork-scraper/rescue/gamegear/Named_
 gg_title_rescue="$package/share/frontend/artwork-scraper/rescue/gamegear/Named_Titles.tsv"
 
 expected_start='["ui-settings","system-settings","network-settings","performance-settings","apps","help","reboot","shutdown"]'
-expected_apps='["scraping","file_manager","music_player","retroarch","pyxel_setup","portmaster","portmaster_update","ggfe"]'
-expected_apps_catalog='["scraping","file_manager","music_player","retroarch","pyxel_setup","portmaster","portmaster_update","thumbnail-plan","thumbnail-fetch","thumbnail-results","ggfe"]'
+expected_apps='["scraping","file_manager","music_player","retroarch","pyxel_setup","portmaster","portmaster_update","sd2_repair","ggfe"]'
+expected_apps_catalog='["scraping","file_manager","music_player","retroarch","pyxel_setup","portmaster","portmaster_update","thumbnail-plan","thumbnail-fetch","thumbnail-results","sd2_repair","ggfe"]'
 expected_apps_hidden='["thumbnail-plan","thumbnail-fetch","thumbnail-results"]'
 expected_legacy_hidden='["settings","network"]'
 
@@ -29,7 +29,10 @@ if [[ $(jq -c '.legacy_hidden_order' "$coverage") != "$expected_legacy_hidden" ]
 jq -e '.language == "en.lang"' "$system_defaults" >/dev/null
 # GGFE is the Game Gear frontend and exists only on Bubble; it is tracked
 # here rather than added to the common plumOS apps list.
-jq -e '.bubble_only_start_entries == [] and .bubble_only_apps_entries == ["ggfe"]' "$coverage" >/dev/null
+jq -e '.bubble_only_start_entries == [] and .bubble_only_apps_entries == ["sd2_repair", "ggfe"]' "$coverage" >/dev/null
+jq -e '.apps[] | select(.id == "sd2_repair") |
+    .launch_profile == "internal:sd2-repair" and .confirm == true and
+    .visible == true and .device_specific == "bubble"' "$apps" >/dev/null
 jq -e 'all(.start_entries[]; .status == "implemented") and
     all(.apps_entries[]; .status == "implemented") and
     ([.apps_entries[] | select(.visible == true) | .id] == .apps_order) and
@@ -57,7 +60,7 @@ jq -e '[.implemented_subroutes[].path] == [
     "$coverage" >/dev/null
 
 for id in scraping file_manager music_player retroarch pyxel_setup portmaster \
-    portmaster_update thumbnail-plan thumbnail-fetch thumbnail-results ggfe; do
+    portmaster_update thumbnail-plan thumbnail-fetch thumbnail-results sd2_repair ggfe; do
     jq -e --arg id "$id" '.apps[] | select(.id == $id) | (.available // true) == true' "$apps" >/dev/null
 done
 
@@ -71,6 +74,12 @@ done
 
 grep -Fq 'PLUMOS_BUSYBOX="$BB"' "$package/bin/plumos-frontend-launch"
 grep -Fq 'PLUMOS_BUSYBOX="$BB"' "$package/bin/plumos-controller-ui-bubble"
+grep -Fq '!menu_entry_confirmation_ready(ui, entry)' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -Fq '"internal:sd2-repair"' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -Fq '"Repairing SD2; do not remove the card or power off"' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
 if [[ $(wc -l < "$gg_boxart_rescue") -ne 2 ]]; then exit 1; fi
 if [[ $(wc -l < "$gg_title_rescue") -ne 2 ]]; then exit 1; fi
 grep -q $'^04302bbd\tEternal%20Legend' "$gg_boxart_rescue"

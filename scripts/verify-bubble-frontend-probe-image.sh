@@ -195,7 +195,7 @@ jq -e '.language == "en.lang"' \
 for entry in ui-settings system-settings network-settings performance-settings apps help reboot shutdown; do
     grep -q "\"id\": \"$entry\"" "$app/config/frontend/menus.json"
 done
-jq -e '.bubble_only_start_entries == [] and .bubble_only_apps_entries == ["ggfe"] and
+jq -e '.bubble_only_start_entries == [] and .bubble_only_apps_entries == ["sd2_repair", "ggfe"] and
     .apps_reference_match == ["plumOS-MF", "plumOS-V90S_v2-public"]' \
     "$app/config/frontend/start-menu-coverage.json" >/dev/null
 for helper in plumos-display-control plumos-network-control \

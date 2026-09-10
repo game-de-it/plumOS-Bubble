@@ -18,6 +18,8 @@ root=$out/plumos
 bin=$root/bin
 lib=$root/frontend/lib
 scraper_lib=$root/scraper/lib
+storage_tools=$root/storage-tools
+storage_tools_lib=$storage_tools/lib
 component=$root/components/frontend
 version=${PLUMOS_BUBBLE_VERSION:-0.1.0-dev}
 source_ref=$(git -c safe.directory="$repo_root" -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
@@ -32,7 +34,7 @@ cp -a "$repo_root/package/frontend-bubble/plumos/." "$root/"
 # update helper.  It is neither runtime input nor reproducible release data.
 find "$root" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
 find "$root" -depth -type d -name __pycache__ -empty -delete
-mkdir -p "$bin" "$lib" "$scraper_lib" "$component" "$root/state/frontend" \
+mkdir -p "$bin" "$lib" "$scraper_lib" "$storage_tools_lib" "$component" "$root/state/frontend" \
     "$root/config/frontend" "$root/config/system" "$root/logs"
 
 common=(-std=gnu99 -Os -pipe -Wall -Wextra -D_GNU_SOURCE)
@@ -185,6 +187,16 @@ EOF
 
 install_scraper_runtime
 
+# SD2 repair is an explicit Apps action, never a boot-time operation. Package
+# dosfstools with its own runtime so it does not depend on the vendor ABI.
+install -m 0755 /usr/sbin/fsck.fat "$storage_tools/fsck.fat"
+install -m 0755 /lib/aarch64-linux-gnu/ld-linux-aarch64.so.1 \
+    "$storage_tools_lib/ld-linux-aarch64.so.1"
+install -m 0755 /lib/aarch64-linux-gnu/libc.so.6 "$storage_tools_lib/libc.so.6"
+mkdir -p "$root/share/doc/storage-tools"
+install -m 0644 /usr/share/doc/dosfstools/copyright \
+    "$root/share/doc/storage-tools/dosfstools-copyright"
+
 cat >"$component/manifest.json" <<EOF
 {
   "name": "plumOS Bubble frontend",
@@ -232,6 +244,11 @@ cat >"$component/manifest.json" <<EOF
   "scraper_runtime": "scraper/lib",
   "cpu_backend": "bin/plumos-cpu-control",
   "start_menu_contract": "config/frontend/start-menu-coverage.json",
+  "storage_repair": {
+    "app": "bin/plumos-sd2-repair",
+    "checker": "storage-tools/fsck.fat",
+    "policy": "explicit-confirmation-unmount-repair-remount"
+  },
   "ggfe": {
     "binary": "bin/plumos-ggfe",
     "config": "config/frontend/ggfe.json",
@@ -240,8 +257,8 @@ cat >"$component/manifest.json" <<EOF
     "gpu_requirement": "none"
   },
   "start_menu_entries": 8,
-  "apps_menu_entries": 11,
-  "bubble_only_menu_entries": ["ggfe"],
+  "apps_menu_entries": 12,
+  "bubble_only_menu_entries": ["sd2_repair", "ggfe"],
   "settings_backends": ["display", "volume", "network", "network-services", "time-sync", "factory-reset", "storage-health", "cpu", "safe-power", "signed-runtime-update"],
   "cpu_policies": ["interactive", "performance", "ondemand", "schedutil", "conservative"],
   "reference_port": "plumOS-MF@0095017c39226ad1c22bf8df852202673075936d"
@@ -250,7 +267,7 @@ EOF
 printf '%s\n' "$version" >"$root/VERSION"
 (
     cd "$root"
-    find bin config factory-defaults fonts frontend/lib scraper share themes -type f \
+    find bin config factory-defaults fonts frontend/lib scraper storage-tools share themes -type f \
         ! -path 'bin/plumos-network-services' -print | LC_ALL=C sort |
         while IFS= read -r path; do sha256sum "$path"; done
     sha256sum components/frontend/manifest.json VERSION

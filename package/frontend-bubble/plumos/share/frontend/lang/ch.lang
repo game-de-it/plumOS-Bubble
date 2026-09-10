@@ -57,6 +57,11 @@ app.retroarch.name=RetroArch
 app.pyxel_setup.name=Pyxel 设置
 app.portmaster.name=PortMaster
 app.portmaster_update.name=更新 PortMaster
+app.sd2_repair.name=修复 SD2
+menu.status.press_a_again=再次按 A 运行
+sd2_repair.status.running=正在修复 SD2；请勿拔卡或关闭电源
+sd2_repair.status.finished=SD2 修复完成
+sd2_repair.status.failed=SD2 修复已安全停止
 pyxel_setup.running.installing=正在从 requirements.txt 安装模块
 
 scraping.title=媒体抓取

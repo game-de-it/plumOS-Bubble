@@ -80,7 +80,7 @@ jq -e --slurpfile policy "$rocknix_policy" '
 ' "$systems" >/dev/null
 
 for route in \
-    scraping file_manager music_player retroarch pyxel_setup portmaster portmaster_update; do
+    scraping file_manager music_player retroarch pyxel_setup portmaster portmaster_update sd2_repair; do
     jq -e --arg id "$route" '.apps[] | select(.id == $id and .visible == true)' \
         "$apps" >/dev/null
 done

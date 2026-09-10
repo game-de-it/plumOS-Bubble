@@ -58,6 +58,11 @@ app.retroarch.name=RetroArch
 app.pyxel_setup.name=Pyxel Setup
 app.portmaster.name=PortMaster
 app.portmaster_update.name=Update PortMaster
+app.sd2_repair.name=Repair SD2
+menu.status.press_a_again=Press A again to run
+sd2_repair.status.running=Repairing SD2; do not remove the card or power off
+sd2_repair.status.finished=SD2 repair finished
+sd2_repair.status.failed=SD2 repair stopped safely
 pyxel_setup.running.installing=Installing modules from requirements.txt
 
 scraping.title=Scraping

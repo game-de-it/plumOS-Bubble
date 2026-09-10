@@ -351,6 +351,10 @@
     再観測する。これによりscan中に初めて現れるFAT errorも警告状態へ残す。
   - passive observeではdirtyをclean扱いに戻さず、complete indexがあるdirty媒体はboot scanを
     省略する。既存indexと警告を即時表示し、明示的なread-only checkだけが状態を更新する。
+  - 起動時の自動修復は行わない方針を維持したまま、利用者が明示的に実行する
+    `Apps > SD2を修復`を追加した。A二度押し確認後だけROM/BIOS bindを解除し、SD2をunmountして
+    120秒制限の`fsck.fat -a`を実行する。成功時はrw、失敗時はroで再mountし、OS SD、非FAT、
+    使用中媒体を拒否するhost fixtureは合格。実機Apps導線での修復・ROM復帰・再起動確認を残す。
 
 ## P5: frontend and minimum game-path baseline
 

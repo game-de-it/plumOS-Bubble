@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
+RUNTIME=$PLUMOS_ROOT/storage-tools
+
+exec "$RUNTIME/lib/ld-linux-aarch64.so.1" \
+    --library-path "$RUNTIME/lib" \
+    "$RUNTIME/fsck.fat" "$@"

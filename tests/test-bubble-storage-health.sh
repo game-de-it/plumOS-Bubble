@@ -3,10 +3,14 @@ set -eu
 
 repo_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 helper=$repo_root/package/frontend-bubble/plumos/bin/plumos-storage-health
+repair=$repo_root/package/frontend-bubble/plumos/bin/plumos-sd2-repair
+checker=$repo_root/package/frontend-bubble/plumos/bin/plumos-fsck-fat
 launcher=$repo_root/package/frontend-bubble/plumos/bin/plumos-frontend-launch
 media_index=$repo_root/package/frontend-bubble/plumos/bin/plumos-library-index-media
 
 sh -n "$helper"
+sh -n "$repair"
+sh -n "$checker"
 sh -n "$media_index"
 grep -Fq 'observe >>"$LOG"' "$launcher"
 grep -Fq '[ "$MEDIA_ROOT" = /storage ]' "$helper"
@@ -26,6 +30,10 @@ if grep -Eq 'fsck\.(fat|vfat).*-[ary]|dosfsck.*-[ary]' "$helper"; then
     echo 'bubble_storage_health=result-failed reason=repair-option-present' >&2
     exit 1
 fi
+grep -Fq '"$CHECKER" -a "$device"' "$repair"
+grep -Fq 'PLUMOS_SD2_ACCESS="$access"' "$repair"
+grep -Fq 'reason=os-device' "$repair"
+grep -Fq 'reason=unmount-failed' "$repair"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM
@@ -106,4 +114,74 @@ env $media_env sh "$media_index" prepare >"$tmp/media-restore.log"
 grep -q 'library_media=preserved key=uuid-130C-1033 result=dirty source=cache' "$tmp/media-restore.log"
 grep -q '"id":"nes"' "$tmp/root/state/frontend/library-index.json"
 
-printf 'bubble_storage_health=result-ok startup_observe=yes media_state=isolated library_index=media-owned repair=never mounted_rw_check=refused\n'
+# Explicit repair is separate from passive observation. It unmounts the exact
+# FAT SD2, runs automatic repair with a bound, and restores rw only on success.
+repair_device=$tmp/sd2.img
+: >"$repair_device"
+cat >"$tmp/fake-mount-helper" <<'EOF'
+#!/bin/sh
+case ${1:-} in
+    stop)
+        [ "${PLUMOS_TEST_REPAIR_UNMOUNT_FAIL:-0}" != 1 ] || exit 1
+        : >"$PLUMOS_TEST_REPAIR_MOUNTS"
+        ;;
+    start)
+        printf '%s %s vfat %s 0 0\n' "$PLUMOS_TEST_REPAIR_DEVICE" \
+            "$PLUMOS_SDCARD_ROOT" "$PLUMOS_SD2_ACCESS" \
+            >"$PLUMOS_TEST_REPAIR_MOUNTS"
+        ;;
+    *) exit 2 ;;
+esac
+EOF
+cat >"$tmp/fake-checker" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >"$PLUMOS_TEST_REPAIR_ARGS"
+exit "${PLUMOS_TEST_REPAIR_RC:-0}"
+EOF
+cat >"$tmp/fake-timeout" <<'EOF'
+#!/bin/sh
+shift
+exec "$@"
+EOF
+chmod +x "$tmp/fake-mount-helper" "$tmp/fake-checker" "$tmp/fake-timeout"
+printf '%s /run/media/sd2 vfat rw 0 0\n' "$repair_device" >"$tmp/repair-mounts"
+repair_env="PLUMOS_ROOT=$tmp/root PLUMOS_SDCARD_ROOT=/run/media/sd2 PLUMOS_MOUNTS_FILE=$tmp/repair-mounts PLUMOS_BUSYBOX=$tmp/fake-busybox PLUMOS_SD2_MOUNT_HELPER=$tmp/fake-mount-helper PLUMOS_FAT_CHECKER=$tmp/fake-checker PLUMOS_TIMEOUT=$tmp/fake-timeout PLUMOS_SD2_REPAIR_LOCK=$tmp/repair-lock PLUMOS_SD2_TEST_ALLOW_REGULAR=1 PLUMOS_TEST_REPAIR_MOUNTS=$tmp/repair-mounts PLUMOS_TEST_REPAIR_DEVICE=$repair_device PLUMOS_TEST_REPAIR_ARGS=$tmp/repair-args"
+env $repair_env sh "$repair" >"$tmp/repair-ok.log"
+grep -q '^result=clean$' "$tmp/root/state/storage-health/status"
+grep -qx -- "-a $repair_device" "$tmp/repair-args"
+grep -q ' /run/media/sd2 vfat rw ' "$tmp/repair-mounts"
+
+# An uncorrected error is never remounted writable.
+printf '%s /run/media/sd2 vfat rw 0 0\n' "$repair_device" >"$tmp/repair-mounts"
+set +e
+env $repair_env PLUMOS_TEST_REPAIR_RC=4 sh "$repair" >"$tmp/repair-fail.log" 2>&1
+repair_rc=$?
+set -e
+test "$repair_rc" -ne 0
+grep -q '^result=dirty$' "$tmp/root/state/storage-health/status"
+grep -q ' /run/media/sd2 vfat ro ' "$tmp/repair-mounts"
+
+# The OS disk and a busy SD2 are rejected before any checker invocation.
+: >"$tmp/mmcblk1p3"
+: >"$tmp/mmcblk1p4"
+printf '%s /storage ext4 rw 0 0\n%s /run/media/sd2 vfat rw 0 0\n' \
+    "$tmp/mmcblk1p3" "$tmp/mmcblk1p4" >"$tmp/repair-mounts"
+set +e
+env $repair_env PLUMOS_TEST_REPAIR_DEVICE="$tmp/mmcblk1p4" \
+    sh "$repair" >"$tmp/repair-os-refused.log" 2>&1
+repair_rc=$?
+set -e
+test "$repair_rc" -ne 0
+grep -q 'reason=os-device' "$tmp/root/logs/storage-health.log"
+
+printf '%s /run/media/sd2 vfat rw 0 0\n' "$repair_device" >"$tmp/repair-mounts"
+set +e
+env $repair_env PLUMOS_TEST_REPAIR_UNMOUNT_FAIL=1 \
+    sh "$repair" >"$tmp/repair-busy.log" 2>&1
+repair_rc=$?
+set -e
+test "$repair_rc" -ne 0
+grep -q '^result=repair_refused$' "$tmp/root/state/storage-health/status"
+grep -q ' /run/media/sd2 vfat rw ' "$tmp/repair-mounts"
+
+printf 'bubble_storage_health=result-ok startup_observe=yes media_state=isolated library_index=media-owned automatic_repair=explicit-only mounted_rw_check=refused\n'

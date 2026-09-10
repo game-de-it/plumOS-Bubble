@@ -752,6 +752,8 @@ struct ui_state {
   size_t setting_count;
   char factory_reset_pending_target[16];
   long long factory_reset_pending_until_ms;
+  char menu_confirm_pending_id[64];
+  long long menu_confirm_pending_until_ms;
   struct wifi_network_entry wifi_networks[UI_MAX_WIFI_NETWORKS];
   size_t wifi_count;
   size_t wifi_cursor;
@@ -12586,6 +12588,54 @@ static int run_storage_health_check(struct ui_state *ui) {
   return 1;
 }
 
+static int run_sd2_repair(struct ui_state *ui) {
+  char script[PATH_MAX];
+  char log_path[PATH_MAX];
+  char cmd[UI_COMMAND_MAX];
+  size_t pos = 0;
+  int rc;
+
+  if (!ui ||
+      !join_path(script, sizeof(script), ui->plumos_root,
+                 "bin/plumos-sd2-repair") ||
+      !join_path(log_path, sizeof(log_path), ui->plumos_root,
+                 "logs/storage-health.log")) {
+    return 0;
+  }
+  if (!file_exists(script)) {
+    set_status(ui, "SD2 repair helper missing");
+    return 0;
+  }
+  cmd[0] = '\0';
+  if (!append_string(cmd, sizeof(cmd), &pos, "PLUMOS_ROOT=") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->plumos_root) ||
+      !append_string(cmd, sizeof(cmd), &pos, " PLUMOS_SDCARD_ROOT=") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->sdcard_root) ||
+      !append_string(cmd, sizeof(cmd), &pos, " ") ||
+      !append_runtime_script_invocation(cmd, sizeof(cmd), &pos, script) ||
+      !append_string(cmd, sizeof(cmd), &pos, " >>") ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, log_path) ||
+      !append_string(cmd, sizeof(cmd), &pos, " 2>&1")) {
+    set_status(ui, "SD2 repair command too long");
+    return 0;
+  }
+  set_status(ui, tr(ui, "sd2_repair.status.running",
+                    "Repairing SD2; do not remove the card or power off"));
+  render_ui(ui);
+  rc = run_runtime_shell_command(cmd);
+  load_storage_health_status(ui);
+  if (system_command_succeeded(rc)) {
+    snprintf(ui->status, sizeof(ui->status), "%s: %.96s",
+             tr(ui, "sd2_repair.status.finished", "SD2 repair finished"),
+             ui->device.storage_health);
+    return 1;
+  }
+  snprintf(ui->status, sizeof(ui->status), "%s: %.96s",
+           tr(ui, "sd2_repair.status.failed", "SD2 repair stopped safely"),
+           ui->device.storage_health);
+  return 0;
+}
+
 static int write_power_overlay_selection(struct ui_state *ui, const char *action) {
   const char *path = getenv("PLUMOS_POWER_MENU_SELECTION");
   FILE *fp;
@@ -14139,6 +14189,36 @@ static void clear_factory_reset_pending(struct ui_state *ui) {
   ui->factory_reset_pending_until_ms = 0;
 }
 
+static void clear_menu_confirm_pending(struct ui_state *ui) {
+  if (!ui) {
+    return;
+  }
+  ui->menu_confirm_pending_id[0] = '\0';
+  ui->menu_confirm_pending_until_ms = 0;
+}
+
+static int menu_entry_confirmation_ready(struct ui_state *ui,
+                                         const struct menu_entry *entry) {
+  long long now;
+
+  if (!ui || !entry || !entry->confirm) {
+    return 1;
+  }
+  now = current_time_ms();
+  if (strcmp(ui->menu_confirm_pending_id, entry->id) == 0 &&
+      ui->menu_confirm_pending_until_ms >= now) {
+    clear_menu_confirm_pending(ui);
+    return 1;
+  }
+  copy_string(ui->menu_confirm_pending_id,
+              sizeof(ui->menu_confirm_pending_id), entry->id);
+  ui->menu_confirm_pending_until_ms = now + 5000;
+  snprintf(ui->status, sizeof(ui->status), "%s %.96s",
+           tr(ui, "menu.status.press_a_again", "Press A again to run"),
+           entry->display_name);
+  return 0;
+}
+
 static int run_factory_reset_action(struct ui_state *ui, const char *target,
                                     const char *label) {
   char script[PATH_MAX];
@@ -14899,15 +14979,18 @@ static void handle_action_impl(struct ui_state *ui, enum ui_action action) {
       if (ui->menu_cursor > 0) {
         ui->menu_cursor--;
       }
+      clear_menu_confirm_pending(ui);
       return;
     }
     if (action == ACTION_DOWN) {
       if (ui->menu_cursor + 1 < ui->menu_count) {
         ui->menu_cursor++;
       }
+      clear_menu_confirm_pending(ui);
       return;
     }
     if (action == ACTION_B) {
+      clear_menu_confirm_pending(ui);
       if (strcmp(ui->menu_id, "apps") == 0) {
         if (!load_start_menu_entries(ui)) {
           set_status(ui, tr(ui, "menu.status.start_load_failed",
@@ -14931,6 +15014,10 @@ static void handle_action_impl(struct ui_state *ui, enum ui_action action) {
       if (!entry->available) {
         set_status(ui, tr(ui, "common.not_supported_on_device",
                           "This item remains visible for plumOS compatibility."));
+        return;
+      }
+      if (strcmp(entry->action, "internal:sd2-repair") == 0 &&
+          !menu_entry_confirmation_ready(ui, entry)) {
         return;
       }
       if (strcmp(entry->action, "internal:settings") == 0 ||
@@ -14958,6 +15045,8 @@ static void handle_action_impl(struct ui_state *ui, enum ui_action action) {
         open_scraping_screen(ui);
       } else if (strcmp(entry->action, "internal:thumbnail-results") == 0) {
         open_thumbnail_results_screen(ui);
+      } else if (strcmp(entry->action, "internal:sd2-repair") == 0) {
+        run_sd2_repair(ui);
       } else if (strcmp(entry->action, "system:sleep") == 0) {
         run_power_action(ui, "sleep", 0);
       } else if (strcmp(entry->action, "system:reboot") == 0) {
