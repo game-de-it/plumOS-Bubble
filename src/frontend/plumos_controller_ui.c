@@ -42,6 +42,11 @@ extern char **environ;
 static volatile sig_atomic_t g_terminate_requested = 0;
 static long long g_frame_stats_window_ms = 0;
 static unsigned int g_frame_stats_count = 0;
+static long long g_display_trace_last_present_us = 0;
+static long long g_display_trace_input_us = 0;
+static int g_display_trace_action = 0;
+static unsigned long g_display_trace_frame = 0;
+static FILE *g_display_trace_file = NULL;
 
 static long long current_time_ms(void);
 static long long current_time_us(void);
@@ -51,11 +56,40 @@ static void handle_terminate_signal(int signo) {
   g_terminate_requested = 1;
 }
 
-static void record_frame_stats(void) {
+static void record_frame_stats(int screen) {
   const char *path = getenv("PLUMOS_FRAME_STATS_PATH");
+  const char *display_trace_path = getenv("PLUMOS_DISPLAY_TRACE_PATH");
   long long now_ms;
+  long long now_us;
   long long elapsed_ms;
   FILE *f;
+
+  now_us = current_time_us();
+  if (display_trace_path && display_trace_path[0]) {
+    if (!g_display_trace_file) {
+      g_display_trace_file = fopen(display_trace_path, "a");
+      if (g_display_trace_file) {
+        setvbuf(g_display_trace_file, NULL, _IOLBF, 0);
+      }
+    }
+    if (g_display_trace_file) {
+      fprintf(g_display_trace_file,
+              "frame=%lu present_us=%lld interval_us=%lld screen=%d "
+              "input_to_present_us=%lld action=%d\n",
+              ++g_display_trace_frame, now_us,
+              g_display_trace_last_present_us > 0
+                  ? now_us - g_display_trace_last_present_us
+                  : 0,
+              screen,
+              g_display_trace_input_us > 0
+                  ? now_us - g_display_trace_input_us
+                  : 0,
+              g_display_trace_input_us > 0 ? g_display_trace_action : 0);
+    }
+    g_display_trace_last_present_us = now_us;
+    g_display_trace_input_us = 0;
+    g_display_trace_action = 0;
+  }
 
   if (!path || !path[0]) {
     return;
@@ -10860,7 +10894,7 @@ static void render_ui(struct ui_state *ui) {
     fflush(stdout);
   }
   if (!ui->render_failed) {
-    record_frame_stats();
+    record_frame_stats((int)ui->screen);
   }
 }
 
@@ -15740,6 +15774,10 @@ static void read_input_actions(struct ui_state *ui, int fd, int power_only,
       if (ev.value == 1 || ev.value == 2) {
         int repeat_interval_ms;
         *action = event_action;
+        if (event_action != ACTION_NONE) {
+          g_display_trace_input_us = current_time_us();
+          g_display_trace_action = (int)event_action;
+        }
         repeat_interval_ms = power_only ? 0 : action_repeat_interval_ms(ui, event_action);
         if (repeat_interval_ms > 0) {
           ui->repeat_action = event_action;
@@ -15774,6 +15812,8 @@ static void read_input_actions(struct ui_state *ui, int fd, int power_only,
           continue;
         }
         *action = event_action;
+        g_display_trace_input_us = current_time_us();
+        g_display_trace_action = (int)event_action;
         repeat_interval_ms = action_repeat_interval_ms(ui, event_action);
         if (repeat_interval_ms > 0) {
           ui->repeat_action = event_action;
