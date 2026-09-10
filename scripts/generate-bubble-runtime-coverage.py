@@ -42,7 +42,10 @@ def firmware(info: dict[str, str]) -> dict:
                 "description": info.get(f"firmware{index}_desc", path),
                 "optional": optional,
             })
-    if not files:
+    explicit_policy = info.get("firmware_policy", "")
+    if explicit_policy:
+        policy = explicit_policy
+    elif not files:
         policy = "none"
     elif any(not item["optional"] for item in files):
         policy = "required"

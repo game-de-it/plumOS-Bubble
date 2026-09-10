@@ -648,7 +648,12 @@
     media実装は`NullPlayer`でtone生成も未実装のため、BubbleではJava MEを非対応と確定した。
     `systems.json`では共通catalog/profileの由来を保持したまま`enabled=false`かつ
     `support.state=unsupported`とし、FE一覧、scan、物理matrixから除外する。
-    残る物理音声確認はAtari800、Numero、VeMUlatorの3 runtime。
+    Numeroの`Tetris.8xp`は実機でcoreのBIOSエラー画面まで正常描画した。固定sourceは
+    `ti83se.rom`、`ti83plus.rom`、`ti83.rom`のいずれか1つを要求するが、core infoからこの条件が
+    欠落していたため`required-any` BIOS metadataとして補正した。一方libretro実装はsample rateを
+    常に0へ固定し、audio callbackを呼ぶ経路がない。BIOS有無にかかわらず音声非対応であるため、
+    Numeroの物理音声確認はnot-applicableとして完了する。残る物理音声確認はAtari800、VeMUlatorの
+    2 runtime。
 
 ## P7: update, lifecycle and release
 

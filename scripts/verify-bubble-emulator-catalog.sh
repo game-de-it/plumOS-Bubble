@@ -146,6 +146,16 @@ jq -e --slurpfile systems "$systems" '
       (.state_supported | type) != "null"))
 ' "$coverage" >/dev/null
 
+jq -e '
+  .systems[] |
+  select(.system_id == "ti83") |
+  .routes[] |
+  select(.profile == "retroarch:numero" and
+         .bios.policy == "required-any" and
+         ([.bios.files[].path] | sort) ==
+           (["ti83.rom", "ti83plus.rom", "ti83se.rom"] | sort))
+' "$coverage" >/dev/null
+
 jq -e --slurpfile coverage "$coverage" '
   all(.systems[];
     .id as $system_id |

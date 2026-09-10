@@ -13005,21 +13005,21 @@
           "renderer": "software",
           "bios": {
             "root": "user:BIOS",
-            "policy": "optional",
+            "policy": "required-any",
             "files": [
               {
                 "path": "ti83se.rom",
-                "description": "ti83se.rom (TI-83 Silver Edition)",
+                "description": "TI-83 Silver Edition ROM (recommended)",
                 "optional": true
               },
               {
                 "path": "ti83plus.rom",
-                "description": "ti83plus.rom (TI-83 Plus)",
+                "description": "TI-83 Plus ROM",
                 "optional": true
               },
               {
                 "path": "ti83.rom",
-                "description": "ti83.rom (TI-83)",
+                "description": "TI-83 ROM",
                 "optional": true
               }
             ]

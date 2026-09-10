@@ -297,6 +297,7 @@ stage_scummvm_catalog_assets() {
 normalize_catalog_core_info() {
     local info="$PLUMOS_DIR/info/px68k_libretro.info"
     local normalized="$info.normalized"
+    local numero_info
 
     [ -f "$info" ] || return 0
     if ! awk '
@@ -317,6 +318,34 @@ normalize_catalog_core_info() {
         return 1
     fi
     mv "$normalized" "$info"
+
+    # Upstream Numero metadata omits the calculator ROMs even though the core
+    # refuses to boot without any one of these three files.  Keep this as an
+    # any-of requirement: ti83se.rom is preferred, not uniquely mandatory.
+    numero_info="$PLUMOS_DIR/info/numero_libretro.info"
+    normalized="$numero_info.normalized"
+    [ -f "$numero_info" ] || return 0
+    if ! awk '
+            !/^firmware(_policy|_count|[0-9]+_(desc|path|opt)) = / { print }
+        ' "$numero_info" >"$normalized"; then
+        rm -f "$normalized"
+        printf 'error: Numero firmware metadata was not normalized\n' >&2
+        return 1
+    fi
+    cat >>"$normalized" <<'EOF'
+firmware_policy = "required-any"
+firmware_count = 3
+firmware0_desc = "TI-83 Silver Edition ROM (recommended)"
+firmware0_path = "ti83se.rom"
+firmware0_opt = "true"
+firmware1_desc = "TI-83 Plus ROM"
+firmware1_path = "ti83plus.rom"
+firmware1_opt = "true"
+firmware2_desc = "TI-83 ROM"
+firmware2_path = "ti83.rom"
+firmware2_opt = "true"
+EOF
+    mv "$normalized" "$numero_info"
 }
 
 build_one() {
