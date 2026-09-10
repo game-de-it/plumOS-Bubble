@@ -754,6 +754,7 @@ struct ui_state {
   long long factory_reset_pending_until_ms;
   char menu_confirm_pending_id[64];
   long long menu_confirm_pending_until_ms;
+  int menu_footer_status;
   struct wifi_network_entry wifi_networks[UI_MAX_WIFI_NETWORKS];
   size_t wifi_count;
   size_t wifi_cursor;
@@ -8874,8 +8875,7 @@ static int ui_fbdev_reserves_footer_space(const struct ui_state *ui) {
   }
   switch (ui->screen) {
   case SCREEN_START_MENU:
-    return ui->menu_confirm_pending_id[0] != '\0' &&
-           ui->menu_confirm_pending_until_ms >= current_time_ms();
+    return ui->menu_footer_status && ui->status[0] != '\0';
   case SCREEN_SETTINGS:
   case SCREEN_CORE_SELECT:
   case SCREEN_WIFI_CONNECT:
@@ -9786,12 +9786,14 @@ static void render_start_menu(struct ui_state *ui) {
   if (ui->menu_count == 0) {
     ui_printf(ui, "(menu entry is empty)\n");
   }
-  if (ui->menu_confirm_pending_id[0] != '\0' &&
-      ui->menu_confirm_pending_until_ms >= current_time_ms()) {
+  if (ui->menu_footer_status && ui->status[0] != '\0') {
     ui_printf(ui, "footer1=%s\n", ui->status);
-    ui_printf(ui, "footer2=%s\n",
-              tr(ui, "menu.status.confirm_window",
-                 "Press A within 5 seconds; B cancels"));
+    if (ui->menu_confirm_pending_id[0] != '\0' &&
+        ui->menu_confirm_pending_until_ms >= current_time_ms()) {
+      ui_printf(ui, "footer2=%s\n",
+                tr(ui, "menu.status.confirm_window",
+                   "Press A within 5 seconds; B cancels"));
+    }
   } else if (ui->status[0]) {
     ui_printf(ui, "\nstatus: %s\n", ui->status);
   }
@@ -12598,14 +12600,18 @@ static int run_storage_health_check(struct ui_state *ui) {
 }
 
 static int run_sd2_repair(struct ui_state *ui) {
+  const char *sd2_mount = "/run/media/sd2";
   char script[PATH_MAX];
   char log_path[PATH_MAX];
   char cmd[UI_COMMAND_MAX];
   size_t pos = 0;
   int rc;
 
-  if (!ui ||
-      !join_path(script, sizeof(script), ui->plumos_root,
+  if (!ui) {
+    return 0;
+  }
+  ui->menu_footer_status = 1;
+  if (!join_path(script, sizeof(script), ui->plumos_root,
                  "bin/plumos-sd2-repair") ||
       !join_path(log_path, sizeof(log_path), ui->plumos_root,
                  "logs/storage-health.log")) {
@@ -12619,7 +12625,7 @@ static int run_sd2_repair(struct ui_state *ui) {
   if (!append_string(cmd, sizeof(cmd), &pos, "PLUMOS_ROOT=") ||
       !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->plumos_root) ||
       !append_string(cmd, sizeof(cmd), &pos, " PLUMOS_SDCARD_ROOT=") ||
-      !append_shell_quoted(cmd, sizeof(cmd), &pos, ui->sdcard_root) ||
+      !append_shell_quoted(cmd, sizeof(cmd), &pos, sd2_mount) ||
       !append_string(cmd, sizeof(cmd), &pos, " ") ||
       !append_runtime_script_invocation(cmd, sizeof(cmd), &pos, script) ||
       !append_string(cmd, sizeof(cmd), &pos, " >>") ||
@@ -14204,6 +14210,7 @@ static void clear_menu_confirm_pending(struct ui_state *ui) {
   }
   ui->menu_confirm_pending_id[0] = '\0';
   ui->menu_confirm_pending_until_ms = 0;
+  ui->menu_footer_status = 0;
 }
 
 static int menu_entry_confirmation_ready(struct ui_state *ui,
@@ -14222,6 +14229,7 @@ static int menu_entry_confirmation_ready(struct ui_state *ui,
   copy_string(ui->menu_confirm_pending_id,
               sizeof(ui->menu_confirm_pending_id), entry->id);
   ui->menu_confirm_pending_until_ms = now + 5000;
+  ui->menu_footer_status = 1;
   snprintf(ui->status, sizeof(ui->status), "%s %.96s",
            tr(ui, "menu.status.press_a_again", "Press A again to run"),
            entry->display_name);

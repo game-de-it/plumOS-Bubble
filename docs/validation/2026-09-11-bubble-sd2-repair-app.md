@@ -60,6 +60,13 @@ reduces the visible list window accordingly, and renders both the action and
 five-second confirmation window there. This keeps the destructive FAT write
 behind two A presses without relying on off-screen status text.
 
+The second device attempt reached the helper but exposed an argument wiring
+fault. The frontend's general `PLUMOS_SDCARD_ROOT` is `/storage`; forwarding it
+to the narrowly scoped repair helper correctly triggered its `not-sd2` refusal.
+The internal action now passes the fixed Bubble SD2 mount
+`/run/media/sd2`. Running and final results retain the reserved footer so both
+safe refusal and successful completion remain visible.
+
 Physical acceptance remains the Apps launch on the current dirty SD2, followed
 by a clean status, rw remount, unchanged filesystem identity, ROM visibility,
 and a normal reboot.

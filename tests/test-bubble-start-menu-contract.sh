@@ -78,9 +78,13 @@ grep -Fq '!menu_entry_confirmation_ready(ui, entry)' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
 grep -Fq 'case SCREEN_START_MENU:' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
-grep -Fq 'ui->menu_confirm_pending_until_ms >= current_time_ms()' \
+grep -Fq 'ui->menu_footer_status && ui->status[0]' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
 grep -Fq '"footer1=%s\n", ui->status' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -Fq 'const char *sd2_mount = "/run/media/sd2"' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -Fq 'append_shell_quoted(cmd, sizeof(cmd), &pos, sd2_mount)' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
 grep -q '^menu.status.confirm_window=' \
     "$package/share/frontend/lang/ja.lang"
