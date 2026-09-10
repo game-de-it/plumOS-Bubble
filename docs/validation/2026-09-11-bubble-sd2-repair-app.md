@@ -48,6 +48,18 @@ depending on the older StockOS userspace ABI.
 `tests/test-bubble-start-menu-contract.sh` fixes the Apps order, Bubble-only
 coverage, confirmation flag, internal action, and visible in-progress message.
 
+## Device confirmation visibility follow-up
+
+The first device attempt exposed a presentation fault before the checker ran:
+the Apps list consumed every available text row, while the confirmation status
+was appended after the list. The fbdev renderer therefore clipped `Press A
+again` below the physical screen and made the first A press appear inert.
+
+While confirmation is pending, START/Apps now reserves the fixed footer area,
+reduces the visible list window accordingly, and renders both the action and
+five-second confirmation window there. This keeps the destructive FAT write
+behind two A presses without relying on off-screen status text.
+
 Physical acceptance remains the Apps launch on the current dirty SD2, followed
 by a clean status, rw remount, unchanged filesystem identity, ROM visibility,
 and a normal reboot.

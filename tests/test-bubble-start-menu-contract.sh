@@ -76,6 +76,14 @@ grep -Fq 'PLUMOS_BUSYBOX="$BB"' "$package/bin/plumos-frontend-launch"
 grep -Fq 'PLUMOS_BUSYBOX="$BB"' "$package/bin/plumos-controller-ui-bubble"
 grep -Fq '!menu_entry_confirmation_ready(ui, entry)' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -Fq 'case SCREEN_START_MENU:' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -Fq 'ui->menu_confirm_pending_until_ms >= current_time_ms()' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -Fq '"footer1=%s\n", ui->status' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -q '^menu.status.confirm_window=' \
+    "$package/share/frontend/lang/ja.lang"
 grep -Fq '"internal:sd2-repair"' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
 grep -Fq '"Repairing SD2; do not remove the card or power off"' \
@@ -244,7 +252,7 @@ grep -q '^install_scraper_runtime()' \
     "$repo_root/scripts/build-bubble-frontend.sh"
 grep -q 'PLUMOS_SCRAPER_LIB_DIR' \
     "$repo_root/scripts/build-bubble-frontend.sh"
-grep -q 'find bin config factory-defaults fonts frontend/lib scraper share themes' \
+grep -q 'find bin config factory-defaults fonts frontend/lib scraper storage-tools share themes' \
     "$repo_root/scripts/build-bubble-frontend.sh"
 grep -q "print_status sftp running 'SFTP port 22'" \
     "$network_package/bin/plumos-network-services"

@@ -59,6 +59,7 @@ app.portmaster.name=PortMaster
 app.portmaster_update.name=Mettre PortMaster à jour
 app.sd2_repair.name=Réparer SD2
 menu.status.press_a_again=Appuyez à nouveau sur A pour exécuter
+menu.status.confirm_window=Appuyez sur A sous 5 secondes; B annule
 sd2_repair.status.running=Réparation de SD2; ne retirez pas la carte et n'éteignez pas
 sd2_repair.status.finished=Réparation de SD2 terminée
 sd2_repair.status.failed=Réparation de SD2 arrêtée en sécurité

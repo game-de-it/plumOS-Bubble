@@ -59,6 +59,7 @@ app.portmaster.name=PortMaster
 app.portmaster_update.name=更新 PortMaster
 app.sd2_repair.name=修复 SD2
 menu.status.press_a_again=再次按 A 运行
+menu.status.confirm_window=请在 5 秒内按 A；按 B 取消
 sd2_repair.status.running=正在修复 SD2；请勿拔卡或关闭电源
 sd2_repair.status.finished=SD2 修复完成
 sd2_repair.status.failed=SD2 修复已安全停止

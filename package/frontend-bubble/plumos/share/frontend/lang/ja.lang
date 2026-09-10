@@ -60,6 +60,7 @@ app.portmaster.name=PortMaster
 app.portmaster_update.name=PortMasterを更新
 app.sd2_repair.name=SD2を修復
 menu.status.press_a_again=もう一度Aを押して実行:
+menu.status.confirm_window=5秒以内にAで実行、Bでキャンセル
 sd2_repair.status.running=SD2を修復中です。カードを抜いたり電源を切らないでください
 sd2_repair.status.finished=SD2の修復が完了しました
 sd2_repair.status.failed=SD2の修復を安全に中止しました

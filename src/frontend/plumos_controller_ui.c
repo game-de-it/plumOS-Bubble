@@ -8873,6 +8873,9 @@ static int ui_fbdev_reserves_footer_space(const struct ui_state *ui) {
     return 0;
   }
   switch (ui->screen) {
+  case SCREEN_START_MENU:
+    return ui->menu_confirm_pending_id[0] != '\0' &&
+           ui->menu_confirm_pending_until_ms >= current_time_ms();
   case SCREEN_SETTINGS:
   case SCREEN_CORE_SELECT:
   case SCREEN_WIFI_CONNECT:
@@ -9783,7 +9786,13 @@ static void render_start_menu(struct ui_state *ui) {
   if (ui->menu_count == 0) {
     ui_printf(ui, "(menu entry is empty)\n");
   }
-  if (ui->status[0]) {
+  if (ui->menu_confirm_pending_id[0] != '\0' &&
+      ui->menu_confirm_pending_until_ms >= current_time_ms()) {
+    ui_printf(ui, "footer1=%s\n", ui->status);
+    ui_printf(ui, "footer2=%s\n",
+              tr(ui, "menu.status.confirm_window",
+                 "Press A within 5 seconds; B cancels"));
+  } else if (ui->status[0]) {
     ui_printf(ui, "\nstatus: %s\n", ui->status);
   }
 }
