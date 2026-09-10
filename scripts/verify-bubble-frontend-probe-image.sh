@@ -161,8 +161,11 @@ done
     "$app/bin/plumos-network-control"
 jq -e '.device == "bubble" and .user_media_included == false and
     .catalog_complete == true and .release_complete == false and
-    .publishable == false and .core_baseline == "all-114-source-records"' \
+    .publishable == true and (.non_publishable_reasons | length) == 0 and
+    .core_baseline == "all-114-source-records"' \
     "$app/manifest.json" >/dev/null
+"$repo_root/scripts/audit-bubble-release-content.py" \
+    --repo-root "$repo_root" --app-root "$app"
 PLUMOS_BUBBLE_APP_ROOT="$app" \
     "$repo_root/scripts/verify-bubble-emulator-catalog.sh"
 LD_LIBRARY_PATH="$app/emulator/lib" \
