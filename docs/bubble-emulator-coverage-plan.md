@@ -43,7 +43,7 @@ to `pico8`, and `snes` to `sfc`.
 | `_etc` | Treat as a container of additional common systems. Add explicit nested aliases; never scan the whole tree as one system. |
 | `msx2` | Map to the common `msx` system while preserving the source directory. |
 | `bios` | BIOS source only. Mount/read as user media; never list as games or include in managed checksums. |
-| `3ds` | No common plumOS/RK3566 runtime exists. Keep a visible `unsupported` system state; do not silently hide it or claim Citra support. |
+| `3ds` | Exclude from the Bubble catalog and scanning. RK3566 is outside the product performance target for 3DS, so do not expose or claim a 3DS runtime. |
 | `01` | Foreign handheld/application management tree, including saves and configuration. Exclude from game scanning and never mutate it. |
 
 The typoed `_etc/viretualboy` directory must be handled as an explicit alias

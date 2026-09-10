@@ -2039,14 +2039,6 @@
       "reference_extensions": [],
       "required_extensions": [],
       "excluded_extensions": []
-    },
-    {
-      "system_id": "3ds",
-      "state": "not_in_reference",
-      "rocknix_ids": [],
-      "reference_extensions": [],
-      "required_extensions": [],
-      "excluded_extensions": []
     }
   ]
 }

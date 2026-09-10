@@ -22,7 +22,7 @@ PLUMOS_BUBBLE_PICOARCH_RGB565_OVERRIDES=$picoarch_rgb565_overrides \
 jq -e '.scan_excluded_directories == ["save", "saves", "state", "states", "cache"]' \
     "$systems" >/dev/null
 
-test "$(jq '.systems | length' "$systems")" -eq 98
+test "$(jq '.systems | length' "$systems")" -eq 97
 test "$(jq '[.systems[].launch_profiles[]] | length' "$systems")" -eq 196
 test "$(jq '[.systems[].launch_profiles[] | select(startswith("retroarch:")) | sub("^retroarch:"; "")] | unique | length' "$systems")" -eq 116
 test "$(jq '[.systems[].launch_profiles[] | select(startswith("picoarch:")) | sub("^picoarch:"; "")] | unique | length' "$systems")" -eq 20
@@ -94,13 +94,7 @@ for alias in \
         "$systems" >/dev/null
 done
 
-jq -e '
-  .systems[] |
-  select(.id == "3ds" and
-         (.launch_profiles | length) == 0 and
-         .support.state == "unsupported" and
-         .support.todo == "BUB-P6-01")
-' "$systems" >/dev/null
+jq -e 'all(.systems[]; .id != "3ds")' "$systems" >/dev/null
 jq -e '
   .systems[] |
   select(.id == "j2me" and
@@ -123,7 +117,7 @@ jq -e --slurpfile systems "$systems" '
   .version == 2 and
   .device == "bubble" and
   .release_complete == false and
-  .catalog.systems == 98 and
+  .catalog.systems == 97 and
   .catalog.launch_profile_occurrences == 196 and
   .catalog.source_libretro_cores == 114 and
   ((.systems | map(.system_id) | sort) ==
@@ -249,4 +243,4 @@ EOF
 fi
 
 printf '%s\n' \
-    'bubble_emulator_catalog=result-ok systems=98 profiles=196 retroarch_ids=116 picoarch_ids=20 standalone_ids=5 release_complete=no'
+    'bubble_emulator_catalog=result-ok systems=97 profiles=196 retroarch_ids=116 picoarch_ids=20 standalone_ids=5 release_complete=no'

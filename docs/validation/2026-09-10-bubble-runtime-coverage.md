@@ -26,10 +26,13 @@ ownershipを、frontendの各launch profile occurrenceへ機械可読に固定�
 `tests/test-bubble-runtime-coverage.sh`はビルド済みapp-layerから一時manifestを再生成し、checked-in
 manifestとbyte単位で比較した。その後、catalogとartifactの双方向検証を実行した。
 
+同日後続のBubble機種固有判断により、可視unsupportedだった3DSをcatalogとscanから除外した。
+以下はその判断を反映した現在の97-system contractであり、196 route自体は変わらない。
+
 ```text
 bubble_picoarch_rgb565_matrix=result-ok routes=20 rgb565=18 core_byteswap=6 route_overrides=5 xrgb8888=2 compat=1
-bubble_emulator_catalog=result-ok systems=98 profiles=196 retroarch_ids=116 picoarch_ids=20 standalone_ids=5 release_complete=no
-bubble_runtime_coverage=result-ok systems=98 profiles=196 core_records=114
+bubble_emulator_catalog=result-ok systems=97 profiles=196 retroarch_ids=116 picoarch_ids=20 standalone_ids=5 release_complete=no
+bubble_runtime_coverage=result-ok systems=97 profiles=196 core_records=114
 ```
 
 196 routeのlicense状態はpackaged 194、DraSticのredistribution-unresolved 1、PortMasterの

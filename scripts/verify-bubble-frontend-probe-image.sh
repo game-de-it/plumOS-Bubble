@@ -142,7 +142,7 @@ grep -q '^frontend=cpu-drm-dumb-buffer$' "$verify/plumos-image.manifest"
 grep -q '^retroarch=software-plain-drm-and-hardware-kms-egl-gles-rgui$' \
     "$verify/plumos-image.manifest"
 grep -q '^core_baseline=all-114-source-records$' "$verify/plumos-image.manifest"
-grep -q '^catalog_systems=98$' "$verify/plumos-image.manifest"
+grep -q '^catalog_systems=97$' "$verify/plumos-image.manifest"
 grep -q '^catalog_launch_profile_occurrences=196$' "$verify/plumos-image.manifest"
 grep -q '^user_media_included=no$' "$verify/plumos-image.manifest"
 grep -q '^partition_expansion=first-boot-p3-to-8192MiB$' "$verify/plumos-image.manifest"

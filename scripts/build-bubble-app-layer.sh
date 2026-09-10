@@ -100,7 +100,7 @@ cat >"$root/manifest.json" <<EOF
   "core_baseline": "all-114-source-records",
   "catalog_complete": true,
   "release_complete": false,
-  "catalog_systems": 98,
+  "catalog_systems": 97,
   "catalog_launch_profile_occurrences": 196,
   "coverage_manifest": "config/frontend/runtime-coverage.json",
   "mutable_paths": ["config/frontend/settings.json", "config/system/settings.json", "config/retroarch", "logs", "state", "saves", "states"],

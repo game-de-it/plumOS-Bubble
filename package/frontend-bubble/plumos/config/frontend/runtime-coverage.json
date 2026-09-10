@@ -8,7 +8,7 @@
     "core_info": "info/*_libretro.info"
   },
   "catalog": {
-    "systems": 98,
+    "systems": 97,
     "launch_profile_occurrences": 196,
     "source_libretro_cores": 114
   },
@@ -13809,29 +13809,6 @@
           "state_supported": false
         }
       ]
-    },
-    {
-      "system_id": "3ds",
-      "directory_aliases": [
-        {
-          "name": "3ds",
-          "source": "rom2",
-          "priority": 10
-        }
-      ],
-      "extensions": [
-        "3ds",
-        "cci",
-        "cxi",
-        "cia"
-      ],
-      "default_launch_profile": "",
-      "support": {
-        "state": "unsupported",
-        "reason": "no-common-plumos-rk3566-runtime",
-        "todo": "BUB-P6-01"
-      },
-      "routes": []
     }
   ],
   "release_complete": false,

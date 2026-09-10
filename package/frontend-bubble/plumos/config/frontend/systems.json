@@ -5370,48 +5370,6 @@
         "enabled": false,
         "reason": "validation_route"
       }
-    },
-    {
-      "id": "3ds",
-      "display_name": "Nintendo 3DS",
-      "short_name": "3DS",
-      "sort_order": 495,
-      "hardware": "portable",
-      "enabled": true,
-      "pinned": false,
-      "directory_aliases": [
-        {
-          "name": "3ds",
-          "source": "rom2",
-          "priority": 10
-        }
-      ],
-      "extensions": [
-        "3ds",
-        "cci",
-        "cxi",
-        "cia"
-      ],
-      "artwork": {
-        "lookup": [
-          {
-            "root": "sdcard",
-            "path": "Images/3ds"
-          }
-        ]
-      },
-      "launch_profiles": [],
-      "default_launch_profile": "",
-      "default_cpu_policy": "ondemand",
-      "support": {
-        "state": "unsupported",
-        "reason": "no-common-plumos-rk3566-runtime",
-        "todo": "BUB-P6-01"
-      },
-      "scraper": {
-        "enabled": false,
-        "reason": "unsupported_runtime"
-      }
     }
   ],
   "catalog_baseline": {

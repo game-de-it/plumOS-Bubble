@@ -426,11 +426,11 @@
 - [x] `BUB-P6-00` 利用者ROMセットをread-onlyで棚卸しし、ファイル内容を取り込まず
   top-level 33 directoryと共通plumOS catalogの対応境界を記録する。
   - 27 directoryは直接対応し、`ATARI`と`_etc`は複数systemを内包、`msx2`はMSXへ対応する。
-    `bios`はgame scan対象外、`01`は他環境の管理tree、`3ds`は共通runtime未対応として扱う。
+    `bios`はgame scan対象外、`01`は他環境の管理tree、`3ds`はRK3566の製品性能対象外としてcatalogとscanから除外する。
 - [x] `BUB-P6-01` MF v1.0.4 (`0095017`) の97 system / 196 launch profileを
   Bubble共通catalog baselineとして固定し、ROMセットのnested aliasを追加する。
-  - 97 common systemに可視`3ds: unsupported`を加えた98 system、196 profile、
-    `ATARI`/`_etc`/`msx2`のnested aliasをhost verifierで固定済み。実機一覧確認を残す。
+  - 97 common system / 196 profileと`ATARI`/`_etc`/`msx2`のnested aliasをhost verifierで固定済み。
+    3DSはRK3566の製品性能対象外という機種固有方針によりcatalogとscanから除外する。
 - [x] `BUB-P6-02` catalogの114 source core、116 RetroArch core id、alias binaryを
   pinned sourceからBubble用に再現buildし、全coreをcomponent manifestへ収録する。
   - software core 108件をplain DRM baselineへ接続し、GLES必須6件はBubble GPU runtimeへ隔離する。
@@ -459,7 +459,7 @@
     PFS既存30fps設定を60へ戻した物理確認は未完了。
 - [x] `BUB-P6-04` package済みcoreからFE導線、FE導線からlauncher/coreを双方向検証し、
   実行不能な導線も`未実装`/`未対応`理由付きで表示する。QuickNES-only app-layerはreleaseを拒否する。
-  - 98 system / 196 profile / RetroArch 116 id / PicoArch 20 id / standalone 5 idと
+  - 97 system / 196 profile / RetroArch 116 id / PicoArch 20 id / standalone 5 idと
     visible app launcherをhostで双方向検証済み。app-layerは7 component必須、
     `all-114-source-records`以外を拒否し、`release_complete=false`/`publishable=false`を固定した。
   - STARTおよびAppsをA30/MF/MMF/V90S/XU20と再監査。Bubble独自項目は双方0件、Apps 10項目は
@@ -469,7 +469,7 @@
 - [x] `BUB-P6-05` BIOS requirement、content extension、renderer、loader/library、license、
   save/state pathをcoreごとのmachine-readable coverage manifestへ固定する。
   - A30保存版`es_systems.cfg`を起点にしつつ、公式ROCKNIX `next`の139 system定義
-    (`5526743`)へ更新追従できる拡張子policyとsource auditを追加した。Bubble 98 systemの
+    (`5526743`)へ更新追従できる拡張子policyとsource auditを追加した。Bubble 97 systemの
     全てをpolicyへ収録し、18 systemへ52拡張子を追加、共有directory衝突やlauncher非対応の
     30拡張子は理由付き除外とした。実機の隔離fixtureでは52/52を認識し、ROM SD 4,745 fileは
     read-only棚卸しのみ実施した。各実形式のcore起動確認と残りcoverage項目は継続する。
@@ -480,7 +480,7 @@
     root/通常subdirectoryの`.bin`は収録したまま`SAVE`以下だけを除外するhost fixtureを追加済み。
     source `7deab58`をclean image実機へ反映し、Mega Drive 153件を21 msで走査、
     正規`.bin`を維持したまま`EDMD/SAVE`由来は0件であることを確認した。
-  - schema 2の`runtime-coverage.json`を98 system / 196 launch profile occurrenceへ展開した。
+  - schema 2の`runtime-coverage.json`を97 system / 196 launch profile occurrenceへ展開した。
     各routeにBIOS policy/file、catalog/core対応拡張子、renderer、binary、runtime別loader/library・
     save/state ownership、license evidenceを固定。114 source core manifest、standalone manifest、
     libretro info、実在license/binaryから再生成してbyte一致を検証するhost gateを追加し合格した。
@@ -549,7 +549,8 @@
   - direct-root走査でROM SDのFATから`invalid start cluster`、`corrupted directory`を実機検出。
     自動fsckは行わず、scanを180秒で打ち切って既存indexを保全しFEを起動する。
     SDの退避・ホストfsck・再走査は利用者と媒体変更境界を確定してから行う。
-  - volume persistent/runtime/softvolを全て0にして98 system / 196 profileを機械走査。
+  - 当時の可視unsupported 3DSを含む98 system / 196 profileについて、
+    volume persistent/runtime/softvolを全て0にして機械走査。
     clean contentの再試験を合算して89導線起動、BlueMSX 1導線失敗、DraStic 1導線visible
     unsupported、clean content不足またはexternal 105導線。未試験導線は削除していない。
     MSX標準は合格したfMSXへ変更し、BlueMSXも失敗理由付きで選択肢を維持する。
@@ -702,7 +703,7 @@
     config/save/state/log/user media/credentialを除外。factory resetは明示選択されたcategoryだけ復元する。
 - [ ] `BUB-P7-05` clean cloneからimageを再現し、source completeness、license、secret/ROM/BIOS混入gateを通す。
   - source `eadb7f6`からprivate hardware-validation imageを全component再buildし、p1/p2/p3
-    再抽出、filesystem、first-boot中断再開、全component checksum、98 system/196 profile、
+    再抽出、filesystem、first-boot中断再開、全component checksum、当時の98 system/196 profile、
     114 core loadをhost合格。live機の約5.1 GiBのvalidation stateは含めず、seed stateは28 KiB、
     logs/saves/statesは空、Wi-Fi personalizationとuser ROMは未収録。captured MaliとDraSticの
     再配布境界が未解決のためpublishable=noを維持し、source/license gate全体はopenとする。
@@ -739,7 +740,7 @@
 - [x] QuickNES単独の物理試験をここで打ち切り、正式partition provisioningを先に完成させる。
   その後、97-system catalog、全core、PicoArch/standalone/Pyxel/PortsとFE導線を一括packageし、
   host coverage gateに合格してからROM総合試験へ進む。
-  - 全runtimeのhost build、98 system / 196 profileの導線検証、114/114 core load smoke、
+  - 全runtimeのhost build、当時の98 system / 196 profileの導線検証、114/114 core load smoke、
     1.8 GiB app-layer checksumまで合格。first-boot p3拡張とp4生成もhost fixture合格。
     personalized full-stack validation imageのpartition/app-layer readbackも全合格し、旧imageを削除済み。
     実機first bootでp3=8 GiB拡張、p4作成は完了したが進捗画面は表示されなかった。

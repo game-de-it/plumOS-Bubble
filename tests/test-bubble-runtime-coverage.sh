@@ -16,4 +16,4 @@ cmp "$coverage" "$generated"
 PLUMOS_BUBBLE_APP_ROOT=$app_root \
     "$repo_root/scripts/verify-bubble-emulator-catalog.sh"
 
-printf '%s\n' 'bubble_runtime_coverage=result-ok systems=98 profiles=196 core_records=114'
+printf '%s\n' 'bubble_runtime_coverage=result-ok systems=97 profiles=196 core_records=114'
