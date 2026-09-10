@@ -20,6 +20,7 @@ lib=$root/frontend/lib
 scraper_lib=$root/scraper/lib
 storage_tools=$root/storage-tools
 storage_tools_lib=$storage_tools/lib
+storage_tools_gconv=$storage_tools/gconv
 component=$root/components/frontend
 version=${PLUMOS_BUBBLE_VERSION:-0.1.0-dev}
 source_ref=$(git -c safe.directory="$repo_root" -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf unknown)
@@ -34,7 +35,8 @@ cp -a "$repo_root/package/frontend-bubble/plumos/." "$root/"
 # update helper.  It is neither runtime input nor reproducible release data.
 find "$root" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
 find "$root" -depth -type d -name __pycache__ -empty -delete
-mkdir -p "$bin" "$lib" "$scraper_lib" "$storage_tools_lib" "$component" "$root/state/frontend" \
+mkdir -p "$bin" "$lib" "$scraper_lib" "$storage_tools_lib" \
+    "$storage_tools_gconv" "$component" "$root/state/frontend" \
     "$root/config/frontend" "$root/config/system" "$root/logs"
 
 common=(-std=gnu99 -Os -pipe -Wall -Wextra -D_GNU_SOURCE)
@@ -193,9 +195,15 @@ install -m 0755 /usr/sbin/fsck.fat "$storage_tools/fsck.fat"
 install -m 0755 /lib/aarch64-linux-gnu/ld-linux-aarch64.so.1 \
     "$storage_tools_lib/ld-linux-aarch64.so.1"
 install -m 0755 /lib/aarch64-linux-gnu/libc.so.6 "$storage_tools_lib/libc.so.6"
+install -m 0644 /usr/lib/aarch64-linux-gnu/gconv/GBK.so \
+    "$storage_tools_gconv/GBK.so"
+install -m 0644 /usr/lib/aarch64-linux-gnu/gconv/gconv-modules.d/gconv-modules-extra.conf \
+    "$storage_tools_gconv/gconv-modules"
 mkdir -p "$root/share/doc/storage-tools"
 install -m 0644 /usr/share/doc/dosfstools/copyright \
     "$root/share/doc/storage-tools/dosfstools-copyright"
+install -m 0644 /usr/share/doc/libc6/copyright \
+    "$root/share/doc/storage-tools/glibc-copyright"
 
 cat >"$component/manifest.json" <<EOF
 {
@@ -247,7 +255,8 @@ cat >"$component/manifest.json" <<EOF
   "storage_repair": {
     "app": "bin/plumos-sd2-repair",
     "checker": "storage-tools/fsck.fat",
-    "policy": "explicit-confirmation-unmount-repair-remount"
+    "policy": "explicit-confirmation-unmount-repair-remount",
+    "codepage_policy": "inherit-active-sd2-mount"
   },
   "ggfe": {
     "binary": "bin/plumos-ggfe",

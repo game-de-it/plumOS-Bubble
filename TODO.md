@@ -354,7 +354,10 @@
   - 起動時の自動修復は行わない方針を維持したまま、利用者が明示的に実行する
     `Apps > SD2を修復`を追加した。A二度押し確認後だけROM/BIOS bindを解除し、SD2をunmountして
     120秒制限の`fsck.fat -a`を実行する。成功時はrw、失敗時はroで再mountし、OS SD、非FAT、
-    使用中媒体を拒否するhost fixtureは合格。実機Apps導線での修復・ROM復帰・再起動確認を残す。
+    使用中媒体を拒否するhost fixtureは合格。実機ではdirty bit修復とrw再mountを確認した。
+    初回はmountのCP936をfsck既定CP850で誤解釈して日本語ROM 3件の短縮名を変更したため、
+    ROMセットとのSHA-256一致後に元名へ復元し、mount codepage継承とCP936 gconv同梱を追加した。
+    通常再起動後のclean維持とROM表示確認を残す。
 
 ## P5: frontend and minimum game-path baseline
 

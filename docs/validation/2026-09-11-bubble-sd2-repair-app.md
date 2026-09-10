@@ -31,9 +31,10 @@ An interrupted frontend process has an EXIT/signal cleanup path that attempts a
 read-only remount. Existing boot-time behavior remains observation-only: this
 feature does not reintroduce automatic startup repair.
 
-The dosfstools executable, loader, libc, and Debian copyright record are a
-self-contained `storage-tools` runtime in the frontend component. This avoids
-depending on the older StockOS userspace ABI.
+The dosfstools executable, loader, libc, required gconv module, and Debian
+dosfstools/glibc copyright records are a self-contained `storage-tools` runtime
+in the frontend component. This avoids depending on the older StockOS
+userspace ABI.
 
 ## Host validation
 
@@ -66,6 +67,19 @@ to the narrowly scoped repair helper correctly triggered its `not-sd2` refusal.
 The internal action now passes the fixed Bubble SD2 mount
 `/run/media/sd2`. Running and final results retain the reserved footer so both
 safe refusal and successful completion remain visible.
+
+The first successful repair returned `check_rc=1`, cleared the dirty bit, and
+restored all SD2 mounts read-write. It also exposed a codepage mismatch:
+dosfstools defaulted to CP850 while Bubble mounts this card with CP936, so three
+valid Japanese ROM short names were classified as invalid and renamed to
+`FSCK0000.*`. Their contents matched the source ROM set byte-for-byte and were
+restored as `ソニックドリフト.gg`, `ソニックドリフト２.gg`, and
+`ソロモンの鍵.nes`; no `FSCK*` files remain.
+
+The repair helper now extracts `codepage=` from the active SD2 mount and passes
+it through `fsck.fat -c`. The private runtime includes glibc's GBK/CP936 gconv
+module and uses the built-in `C.UTF-8` locale, preventing a CP850 interpretation
+from corrupting DBCS short names on later repairs.
 
 Physical acceptance remains the Apps launch on the current dirty SD2, followed
 by a clean status, rw remount, unchanged filesystem identity, ROM visibility,

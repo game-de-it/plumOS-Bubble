@@ -16,6 +16,7 @@ LOCK=${PLUMOS_SD2_REPAIR_LOCK:-/run/plumos/sd2-repair.lock}
 mounted=1
 device=
 fstype=
+codepage=850
 
 log() {
     printf '%s\n' "$1" | "$BB" tee -a "$LOG" >/dev/null 2>&1 || true
@@ -91,6 +92,12 @@ line=$(mount_line "$MEDIA_ROOT")
 device=$(printf '%s\n' "$line" | "$BB" awk -F '\t' '{print $1}')
 fstype=$(printf '%s\n' "$line" | "$BB" awk -F '\t' '{print $2}')
 options=$(printf '%s\n' "$line" | "$BB" awk -F '\t' '{print $3}')
+mounted_codepage=$(printf '%s\n' "$options" | "$BB" tr ',' '\n' | \
+    "$BB" sed -n 's/^codepage=//p' | "$BB" head -n 1)
+case "$mounted_codepage" in
+    ''|*[!0-9]*) ;;
+    *) codepage=$mounted_codepage ;;
+esac
 if [ -z "$device" ]; then
     write_status not_mounted 'SD2 is not mounted; no repair attempted' unknown
     log 'sd2_repair=result-refused reason=not-mounted'
@@ -137,9 +144,10 @@ if ! PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_SDCARD_ROOT="$MEDIA_ROOT" \
 fi
 mounted=0
 
-log "sd2_repair=stage-check device=$device mode=automatic timeout=120"
+log "sd2_repair=stage-check device=$device mode=automatic timeout=120 codepage=$codepage"
 set +e
-"$TIMEOUT" 120 "$CHECKER" -a "$device" >"$CHECK_LOG.new.$$" 2>&1
+"$TIMEOUT" 120 "$CHECKER" -a -c "$codepage" "$device" \
+    >"$CHECK_LOG.new.$$" 2>&1
 check_rc=$?
 set -e
 "$BB" mv "$CHECK_LOG.new.$$" "$CHECK_LOG"

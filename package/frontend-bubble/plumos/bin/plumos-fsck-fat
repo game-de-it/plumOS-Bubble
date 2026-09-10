@@ -3,6 +3,8 @@ set -eu
 
 PLUMOS_ROOT=${PLUMOS_ROOT:-/storage/plumos}
 RUNTIME=$PLUMOS_ROOT/storage-tools
+export GCONV_PATH=$RUNTIME/gconv
+export LC_ALL=C.UTF-8
 
 exec "$RUNTIME/lib/ld-linux-aarch64.so.1" \
     --library-path "$RUNTIME/lib" \
