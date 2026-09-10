@@ -138,3 +138,22 @@ da933d082861d50291e27caa819f5c9eb25eb3b292cf7a51ff4dc2a704391b8b  configs/retroa
 - 現在の基準: `SEGA-HCCFL-B3`
 - B3から時間応答を外す比較: `B3 - temporal response`
 - B3から一要素を変更する比較: `B3 +/- <補正名>`
+
+### B3由来の出荷プリセット調整
+
+B3の構造、時間応答、panel/optics shaderは維持したまま、実機上で調整した
+色・明暗パラメータを次回SDイメージのfull presetへ明示的に固定する。
+`shader-sega-hccfl-b3`タグは既知の復帰点として変更せず、以下をタグ後の
+出荷プリセット調整として扱う。
+
+```text
+gg_black=0.12     gg_white=0.97      gg_sat=0.85
+gg_bluesat=1.20   gg_blueweak=0.15   gg_gamma=1.35
+gg_tint=0.55      gg_bright=1.40     gg_backlight=0.90
+```
+
+実機から読み戻したファイルと配布元の一致を確認した識別子:
+
+```text
+e5396c1e6b74dd3b4dc5be618285e9868b291bfddb7d9c7febba73f6d6cc4635  configs/retroarch/shaders/gamegear-lcd.glslp
+```

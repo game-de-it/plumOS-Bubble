@@ -38,6 +38,15 @@ cp configs/retroarch/shaders/gamegear-lcd.glslp \
 panel_shader=configs/retroarch/shaders/gamegear-lcd-panel.glsl
 response_shader=configs/retroarch/shaders/gamegear-lcd-response.glsl
 grep -Fq 'feedback_pass = "0"' configs/retroarch/shaders/gamegear-lcd.glslp
+grep -Fq 'gg_black = "0.12"' configs/retroarch/shaders/gamegear-lcd.glslp
+grep -Fq 'gg_white = "0.97"' configs/retroarch/shaders/gamegear-lcd.glslp
+grep -Fq 'gg_sat = "0.85"' configs/retroarch/shaders/gamegear-lcd.glslp
+grep -Fq 'gg_bluesat = "1.20"' configs/retroarch/shaders/gamegear-lcd.glslp
+grep -Fq 'gg_blueweak = "0.15"' configs/retroarch/shaders/gamegear-lcd.glslp
+grep -Fq 'gg_gamma = "1.35"' configs/retroarch/shaders/gamegear-lcd.glslp
+grep -Fq 'gg_tint = "0.55"' configs/retroarch/shaders/gamegear-lcd.glslp
+grep -Fq 'gg_bright = "1.40"' configs/retroarch/shaders/gamegear-lcd.glslp
+grep -Fq 'gg_backlight = "0.90"' configs/retroarch/shaders/gamegear-lcd.glslp
 grep -Fq 'uniform sampler2D FeedbackTexture;' "$response_shader"
 grep -Fq '#define gg_rise 0.62' "$response_shader"
 grep -Fq '#define gg_trail_frames 12.0' "$response_shader"
