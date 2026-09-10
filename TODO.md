@@ -641,6 +641,9 @@
   - 既存の機械matrix、表示分類別試験、過去問題29 profile、代表runtimeの物理確認を、利用者判断で
     display/rotation/aspect/menu/exit/FE復帰の完了証跡として受理する。未完了範囲はAtari800、
     FreeChaF、SquirrelJME、Numero、VeMUlatorの音声確認だけに限定し、他routeの試験を繰り返さない。
+  - FreeChaFは`sl31253.bin`/`sl31254.bin`の正規MD5一致BIOSをuser-owned BIOS領域へ配置後、
+    `tents_CF.bin`を実機FE導線から起動し、利用者がゲーム起動、操作、speaker音声を合格確認した。
+    残る物理音声確認はAtari800、SquirrelJME、Numero、VeMUlatorの4 runtime。
 
 ## P7: update, lifecycle and release
 

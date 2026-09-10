@@ -118,6 +118,27 @@ does not prove speaker output or subjective sound correctness. Those five
 routes, PPSSPP visual output, the 45 routes without geometry logs, and every
 route's physical controls/return path remain device-observation acceptance.
 
+### 2026-09-10 bounded physical audio follow-up
+
+The first `tents_CF.bin` run entered RetroArch's dummy-core menu immediately.
+The route and content path were correct, but the log showed that FreeChaF had
+fallen back to its experimental HLE BIOS and stopped on unsupported function
+`0xd0`. Existing user-owned `sl31253.bin` and `sl31254.bin` images were found
+outside this repository, matched the core-info MD5 values, and were copied only
+to the device-owned BIOS directory. No BIOS was added to the repository or
+managed application layer.
+
+On the next normal FE launch, the log requested only the optional Channel F II
+BIOS, initialized 306x192 at 60 Hz and 44100 Hz audio, and did not report the
+HLE error. The user confirmed that the game started and that controls and
+speaker audio were normal. FreeChaF physical audio is accepted. Source
+`0b6d144` also disables the dummy-core fallback for bounded FE-launched
+RetroArch sessions, so a future core-requested shutdown returns display
+ownership to the FE instead of exposing an empty RetroArch menu. The deployed
+frontend component passed 218 checks and the complete application layer passed
+12,461 checks; rollback material is retained under
+`state/app-deploy/0b6d144-freechaf/`.
+
 ## Reports and device post-condition
 
 Source reports, in merge order:
