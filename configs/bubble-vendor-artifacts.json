@@ -19,15 +19,15 @@
       "id": "bubble-stock-active-boot",
       "hash_manifest": "configs/bubble-stock-active-boot.expected.sha256",
       "source_identity": "captured from the named stock distribution and physical OS SD",
-      "license_status": "unresolved-vendor-binary",
-      "distribution_policy": "private-validation-only"
+      "license_status": "vendor-permission-attested-stockos-derived",
+      "distribution_policy": "public-with-vendor-notice"
     },
     {
       "id": "bubble-stock-runtime-abi",
       "hash_manifest": "configs/bubble-stock-runtime.expected.sha256",
       "source_identity": "captured from the named stock distribution's running kernel and root filesystem",
-      "license_status": "mixed-unresolved-vendor-binary",
-      "distribution_policy": "private-validation-only"
+      "license_status": "vendor-permission-attested-mixed-upstream",
+      "distribution_policy": "public-with-vendor-notice"
     },
     {
       "id": "bubble-mali-aarch64",
@@ -38,8 +38,8 @@
       "elf": "ELF64 AArch64 BuildID 1924a0a0144a46c2fe559e17dc861ec4f89e00d8",
       "userspace_ddk": "g13p0-01eac0",
       "kernel_ddk": "g2p0-01eac0",
-      "license_status": "reference-eula-not-bound-to-exact-capture",
-      "distribution_policy": "private-validation-only"
+      "license_status": "vendor-permission-attested-reference-eula-not-bound-to-exact-capture",
+      "distribution_policy": "public-with-vendor-notice"
     },
     {
       "id": "bubble-mali-armhf",
@@ -50,8 +50,8 @@
       "elf": "ELF32 ARM EABI5 BuildID 09839f6ff0f8bf2b62b51eeec66e82ff269952ec",
       "userspace_ddk": "g13p0-01eac0",
       "kernel_ddk": "g2p0-01eac0",
-      "license_status": "reference-eula-not-bound-to-exact-capture",
-      "distribution_policy": "private-validation-only"
+      "license_status": "vendor-permission-attested-reference-eula-not-bound-to-exact-capture",
+      "distribution_policy": "public-with-vendor-notice"
     },
     {
       "id": "drastic-closed-core",
@@ -60,11 +60,18 @@
       "archive_sha256": "9e4ed98047dea0f014daea7c3530793f92f19d60073fceb9fd2a040696f66491",
       "binary_sha256": "caecd505c79ebb56701906e64bc9f487d9fcb03c06cb8b113a9165e2ca7c016d",
       "integration_license": "LGPL-2.1-only",
-      "closed_core_license_status": "no-redistribution-grant-located",
-      "distribution_policy": "private-validation-only"
+      "closed_core_license_status": "project-approved-inclusion-matching-plumos-mf",
+      "distribution_policy": "project-approved-inclusion"
     }
   ],
   "license_references": [
+    {
+      "id": "gkd-stockos-vendor-permission",
+      "url": "https://github.com/game-de-it/plumOS-GKD",
+      "notice": "docs/licenses/GKD-stockOS-PERMISSION-NOTICE.txt",
+      "evidence": "maintainer attestation; no separate written vendor license file was issued",
+      "applies_to_exact_capture": true
+    },
     {
       "id": "arm-mali-userspace-eula-reference",
       "url": "https://raw.githubusercontent.com/tsukumijima/libmali-rockchip/master/END_USER_LICENCE_AGREEMENT.txt",
@@ -81,8 +88,8 @@
     }
   ],
   "decision": {
-    "mali": "retain the exact AArch64 and ARMhf captures as a private, component-scoped compatibility pair; do not substitute a different g13p0 binary",
-    "drastic": "retain the pinned archive only for private device validation until an explicit redistribution grant is obtained",
-    "public_release": "fail closed while any private-validation-only input is present"
+    "mali": "retain the exact AArch64 and ARMhf captures as a component-scoped GKD stockOS compatibility pair; distribute with the GKD vendor notice and applicable third-party terms; do not substitute a different g13p0 binary",
+    "drastic": "include the pinned archive under the same narrow project-approved inclusion policy as plumOS-MF; retain LGPL integration text, upstream README, provenance and DraStic notice",
+    "public_release": "vendor-derived inputs may be published only with their required notices; project-approved inclusions must be explicitly allowlisted; fail closed for private-validation-only inputs"
   }
 }

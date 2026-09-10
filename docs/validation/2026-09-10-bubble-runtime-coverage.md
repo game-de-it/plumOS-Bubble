@@ -35,7 +35,8 @@ bubble_emulator_catalog=result-ok systems=97 profiles=196 retroarch_ids=116 pico
 bubble_runtime_coverage=result-ok systems=97 profiles=196 core_records=114
 ```
 
-196 routeのlicense状態はpackaged 194、DraSticのredistribution-unresolved 1、PortMasterの
+196 routeのlicense状態はpackaged 194、DraSticのproject-approved-inclusion 1、PortMasterの
 runtime-managed/per-port 1。BIOS policyはnone 78、optional 95、required 21、DraSticの
-packaged-with-user-override 1、PortMasterのport-specific 1である。未解決licenseとvendor Maliは
-release blockerとして残すため、coverageが完全でも`release_complete=false`を維持する。
+packaged-with-user-override 1、PortMasterのport-specific 1である。vendor/Mali/DraSticのlicense
+boundaryはNOTICEとallowlistで解消したが、P7-05からP7-08のrelease gateが残るため
+`release_complete=false`を維持する。

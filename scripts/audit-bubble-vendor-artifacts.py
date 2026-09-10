@@ -40,9 +40,10 @@ def expected_hashes(path: Path) -> dict[str, str]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--require-publishable", action="store_true")
+    parser.add_argument("--policy", type=Path, default=POLICY)
     args = parser.parse_args()
 
-    data = json.loads(POLICY.read_text(encoding="utf-8"))
+    data = json.loads(args.policy.read_text(encoding="utf-8"))
     if data.get("schema") != 1 or data.get("device") != "bubble":
         fail("policy-schema")
     inputs = data.get("inputs", [])
@@ -56,9 +57,28 @@ def main() -> None:
         if not item.get("source_identity") and not item.get("source_url"):
             fail(f"missing-source-{item['id']}")
         if item.get("distribution_policy") not in {
-            "redistributable", "private-validation-only"
+            "redistributable", "public-with-vendor-notice",
+            "project-approved-inclusion", "private-validation-only"
         }:
             fail(f"missing-policy-{item['id']}")
+
+    approved_exceptions = {"drastic-closed-core"}
+    for item in inputs:
+        if (item["distribution_policy"] == "project-approved-inclusion"
+                and item["id"] not in approved_exceptions):
+            fail(f"unapproved-exception-{item['id']}")
+
+    required_notices = [
+        ROOT / "LICENSE",
+        ROOT / "THIRD_PARTY_NOTICES.md",
+        ROOT / "docs/licenses/GKD-stockOS-PERMISSION-NOTICE.txt",
+        ROOT / "docs/licenses/bubble-vendor-runtime-NOTICE.txt",
+        ROOT / "docs/licenses/drastic-upstream-NOTICE.txt",
+        ROOT / "docs/licenses/bubble-runtime-license-inventory.tsv",
+    ]
+    if any(not path.is_file() or path.stat().st_size == 0
+           for path in required_notices):
+        fail("required-notice")
 
     tracked = subprocess.run(
         ["git", "-C", str(ROOT), "ls-files", str(ARTIFACT_ROOT)],

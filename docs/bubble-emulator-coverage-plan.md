@@ -87,10 +87,11 @@ and at least one representative lifecycle test for its runtime family.
 Six core records require GLES: Flycast, Flycast Xtreme, SwanStation Xtreme,
 Mupen64Plus-Next, ParaLLEl N64, and YabaSanshiro. They may be packaged only in
 a GPU-scoped component. All six now pass AArch64 host load-smoke with the
-hash-pinned Bubble stock Mali capture, but that capture is explicitly limited
-to local-device validation. Vendor Mali provenance/license, redistribution,
-physical rendering, and kernel-DDK compatibility remain gates; a future open
-GPU route may replace that dependency.
+hash-pinned Bubble stock Mali capture. The exact capture is distributed under
+the GKD vendor permission attested by the maintainer, with the GKD/vendor and
+third-party notices retained; it is not covered by the plumOS MIT License.
+Physical rendering and kernel-DDK compatibility remain runtime gates; a future
+open GPU route may replace that dependency.
 
 ### PicoArch
 
@@ -103,10 +104,10 @@ audio recovery, menu/exit policy, and component-scoped libraries.
 
 All five standalone routes need Bubble-specific display, input, audio, and
 session wrappers. PCSX-ReARMed, YabaSanshiro, PPSSPP, and OpenBOR now have
-host-built Bubble components. DraStic retains a visible route but is rejected
-with an explicit unsupported message because Bubble lacks the `/dev/miyooio`
-input bridge expected by the verified prebuilt integration; its closed-binary
-redistribution decision is also unresolved. Pyxel and PortMaster have
+host-built Bubble components. DraStic uses the Bubble event2 bridge and is
+packaged under the same narrowly allowlisted project-approved inclusion policy
+as plumOS-MF; LGPL integration text, upstream README, provenance and its
+separate notice remain mandatory. Pyxel and PortMaster have
 checksum-verified host components, with PortMaster using a compatibility
 profile that remains pending per-port physical validation.
 

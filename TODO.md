@@ -484,8 +484,9 @@
     各routeにBIOS policy/file、catalog/core対応拡張子、renderer、binary、runtime別loader/library・
     save/state ownership、license evidenceを固定。114 source core manifest、standalone manifest、
     libretro info、実在license/binaryから再生成してbyte一致を検証するhost gateを追加し合格した。
-    DraStic再配布、PortMaster per-port license、vendor Maliは機械可読な未解決状態のまま残し、
-    release可否は`BUB-P3-02`、`BUB-P4-D05`、`BUB-P7-05`で継続する。
+    当時はDraStic再配布、PortMaster per-port license、vendor Maliを機械可読な未解決状態として
+    release blockerに保持した。2026-09-10にGKD vendor permissionのmaintainer attestationと、
+    MF同等のDraStic project-approved inclusionへ更新し、license blockerを解消した。
 - [x] `BUB-P6-06` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。
   - MF/V90S/Pixel2のPortMaster履歴を再監査し、GUI restart marker、component-owned
     Bash/patcher/LOVE、font/cairo/audio/transitive DSO、`pgrep -f`、GPTokeYB所有権付き停止、
@@ -705,8 +706,13 @@
   - source `eadb7f6`からprivate hardware-validation imageを全component再buildし、p1/p2/p3
     再抽出、filesystem、first-boot中断再開、全component checksum、当時の98 system/196 profile、
     114 core loadをhost合格。live機の約5.1 GiBのvalidation stateは含めず、seed stateは28 KiB、
-    logs/saves/statesは空、Wi-Fi personalizationとuser ROMは未収録。captured MaliとDraSticの
-    再配布境界が未解決のためpublishable=noを維持し、source/license gate全体はopenとする。
+    logs/saves/statesは空、Wi-Fi personalizationとuser ROMは未収録。
+  - 2026-09-10、project maintainerがGKD Bubble vendorからstockOS由来物の利用・再配布許可を
+    得ていることをattestationとして記録した（個別の書面license fileは未発行）。plumOS独自部分は
+    MIT、GKD/stockOS由来物はGKD/vendor/upstream terms、Maliを含む第三者権利は各権利者に留保する。
+    DraSticはMFと同じ`project-approved inclusion`として狭くallowlistし、LGPL integration、upstream
+    README、pinned provenance、専用NOTICEの同梱を必須化した。license由来のpublish blockerは解消。
+    P7-05はclean-clone source completenessとsecret/ROM/BIOS gateの再実行が残るためopenを維持する。
 - [ ] `BUB-P7-06` SD write/readback、cold boot 3回、warm reboot、rollback、全hardware acceptanceを完了する。
 - [ ] `BUB-P7-07` release candidateを利用者が物理確認し、未解決項目を明示する。
 - [ ] `BUB-P7-08` 利用者の明示承認後だけreleaseを公開し、公開assetを再downloadしてchecksumを確認する。

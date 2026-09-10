@@ -1,5 +1,5 @@
 # 2026-09-01 Bubble stockOS-based CFW runtime ABI inputs.
-# Captures are analysis-only until provenance and redistribution rights are resolved.
+# Captures are distributed only with the recorded GKD vendor and upstream notices.
 451239de032024550908580f81f361eb68d21a604f54a13c30b028c41ff437c3  config.gz
 5ea527f8ab546914f1aecd4cc5674e1ac4243847b18badce68aaa89d8f9e72ac  runtime.dtb
 fd8abaada4aed3ef140e778e344316a1727b0c8d7d9d83d0aee51e3d008297f4  modules/bcmdhd.ko

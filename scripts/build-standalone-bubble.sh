@@ -83,6 +83,8 @@ for path in \
     "$DRASTIC_BUILD_PATCH" \
     "$DRASTIC_MMAP_COMPAT" \
     "$ROOT_DIR/docs/licenses/bubble-vendor-runtime-NOTICE.txt" \
+    "$ROOT_DIR/docs/licenses/GKD-stockOS-PERMISSION-NOTICE.txt" \
+    "$ROOT_DIR/docs/licenses/drastic-upstream-NOTICE.txt" \
     "$PPSSPP_PATCH" \
     "$OPENBOR_PATCH"; do
     [ -e "$path" ] || {
@@ -93,9 +95,9 @@ done
 
 [ "${PLUMOS_BUBBLE_INCLUDE_CAPTURED_VENDOR_GPU:-0}" = 1 ] || {
     printf '%s\n' \
-        'error: captured vendor GPU runtime is required for local hardware validation' \
-        'set PLUMOS_BUBBLE_INCLUDE_CAPTURED_VENDOR_GPU=1 only for a private development image' \
-        'the resulting package is not release eligible' >&2
+        'error: captured vendor GPU runtime is required for Bubble hardware support' \
+        'set PLUMOS_BUBBLE_INCLUDE_CAPTURED_VENDOR_GPU=1 to include the hash-pinned GKD stockOS runtime' \
+        'the GKD vendor and third-party notices must remain in the package' >&2
     exit 1
 }
 
@@ -238,6 +240,10 @@ install -m 0644 "$DRASTIC_BUILD/upstream-release-readme.txt" \
     "$PLUMOS_DIR/licenses/drastic-upstream-release-readme.txt"
 install -m 0644 "$ROOT_DIR/docs/licenses/bubble-vendor-runtime-NOTICE.txt" \
     "$PLUMOS_DIR/licenses/bubble-vendor-runtime-NOTICE.txt"
+install -m 0644 "$ROOT_DIR/docs/licenses/GKD-stockOS-PERMISSION-NOTICE.txt" \
+    "$PLUMOS_DIR/licenses/GKD-stockOS-PERMISSION-NOTICE.txt"
+install -m 0644 "$ROOT_DIR/docs/licenses/drastic-upstream-NOTICE.txt" \
+    "$PLUMOS_DIR/licenses/drastic-upstream-NOTICE.txt"
 rsync -a "$PPSSPP_BUILD/runtime/" \
     "$PLUMOS_DIR/emulator/standalone/ppsspp/"
 install -m 0644 "$PPSSPP_BUILD/LICENSE.txt" \
@@ -281,8 +287,8 @@ cat >"$PLUMOS_DIR/components/standalone/manifest.json" <<EOF
   "external_runtime": ["/dev/dri/card0", "/dev/mali0"],
   "captured_vendor_gpu": {
     "source": "Bubble stockOS read-only capture",
-    "distribution": "local-device-validation-only",
-    "release_eligible": false,
+    "distribution": "public-with-gkd-vendor-notice",
+    "release_eligible": true,
     "aarch64_sha256": "$(sha256sum "$VENDOR_MALI_AARCH64" | awk '{print $1}')",
     "armhf_sha256": "$(sha256sum "$VENDOR_MALI_ARMHF" | awk '{print $1}')"
   },
@@ -304,6 +310,7 @@ cat >"$PLUMOS_DIR/components/standalone/manifest.json" <<EOF
       "id": "drastic",
       "binary": "emulator/standalone/drastic/drastic",
       "core_source": "closed-release-blob",
+      "license_status": "project-approved-inclusion-matching-plumos-mf",
       "integration": "verified-prebuilt-armhf-sdl2-input-video",
       "runtime": "package-local-armhf",
       "renderer": "aarch64-gles-runner-with-armhf-shared-memory-producer",
@@ -349,6 +356,8 @@ EOF
         licenses/steward-fu-nds-LGPL-2.1 \
         licenses/drastic-upstream-release-readme.txt \
         licenses/bubble-vendor-runtime-NOTICE.txt \
+        licenses/GKD-stockOS-PERMISSION-NOTICE.txt \
+        licenses/drastic-upstream-NOTICE.txt \
         licenses/ppsspp-LICENSE.txt \
         licenses/openbor-LICENSE \
         licenses/openbor-SDL2-gfx-copyright \

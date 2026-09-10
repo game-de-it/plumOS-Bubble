@@ -1,0 +1,6 @@
+# runtime_id	origin	license_family	evidence	status
+vendor-runtime	GKD Bubble stockOS and upstream projects	GKD/vendor/upstream terms	docs/licenses/GKD-stockOS-PERMISSION-NOTICE.txt; docs/licenses/bubble-vendor-runtime-NOTICE.txt	vendor-approved distribution
+plumos-bubble	plumOS-Bubble contributors	MIT	LICENSE; THIRD_PARTY_NOTICES.md	complete
+mali-runtime	GKD Bubble stockOS capture; Arm Mali	vendor permission and applicable upstream terms	docs/licenses/GKD-stockOS-PERMISSION-NOTICE.txt; configs/bubble-vendor-artifacts.json	vendor-approved distribution
+drastic-integration	steward-fu/nds	LGPL-2.1-only	licenses/steward-fu-nds-LGPL-2.1	complete
+drastic-standalone	steward-fu/nds integration and DraStic binary	LGPL-2.1 integration, DraStic separate	docs/licenses/drastic-upstream-NOTICE.txt	project-approved inclusion

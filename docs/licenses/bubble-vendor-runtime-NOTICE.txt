@@ -1,10 +1,18 @@
 Bubble vendor runtime status notice
 
-The exact boot, kernel, firmware, module and Mali files used for private GKD
+The exact boot, kernel, firmware, module and Mali files used for GKD
 Bubble hardware validation were captured from MINIPLUS / BBG v5.3 2024-10-15.
 They are not plumOS-authored files and are not stored in this Git repository.
 Their identities and capture procedures are recorded in
 configs/bubble-vendor-artifacts.json.
+
+The project maintainer created and publicly released the plumOS-GKD stockOS
+reference and attests that the GKD Bubble vendor granted permission to use and
+redistribute the stockOS-derived files required by plumOS-Bubble. No separate
+written license file was issued. The stockOS distribution and GKD-authored
+material remain the property of GKD and are outside the plumOS-Bubble MIT
+License. Third-party rights contained in stockOS remain with their respective
+owners. See GKD-stockOS-PERMISSION-NOTICE.txt.
 
 The captured Mali userspace reports g13p0-01eac0 while the preserved kernel
 reports g2p0-01eac0. This exact pair is retained because it has passed Bubble
@@ -12,13 +20,14 @@ hardware validation. Substitution with another g13p0 library is not allowed by
 the build contract.
 
 An ARM Mali userspace EULA published with a public Rockchip libmali collection
-allows redistribution subject to its conditions, but the public binaries
-checked during this audit do not match the exact Bubble captures. The project
-therefore does not claim that the reference EULA is bound to these captures.
-The captures remain private-validation-only pending source-vendor confirmation
-or another applicable redistribution grant.
+does not identify these exact captures, so it is retained only as a reference.
+Publication of the exact GKD stockOS capture instead relies on the vendor
+permission attested above. This does not relicense Arm software or override
+rights and conditions held by Arm or other third parties.
 
 The steward-fu/nds integration source is LGPL-2.1-only. Its release contains a
-separately authored, closed DraStic executable. No separate redistribution
-grant for that executable was located, so the executable and its packaged BIOS
-remain private-validation-only.
+separately authored, closed DraStic executable. DraStic is included under the
+same narrowly scoped, project-approved release policy used by plumOS-MF. The
+LGPL and MIT licenses do not apply to the closed executable; its pinned
+provenance, integration license, upstream README and DraStic notice must remain
+with every distribution.

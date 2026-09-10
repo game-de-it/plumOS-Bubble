@@ -98,6 +98,10 @@ printf '%s\n' "$version" > "$rootfs/etc/plumos-system-version"
 install -m 0644 "$repo_root/LICENSE" "$rootfs/usr/share/licenses/plumOS-MIT.txt"
 install -m 0644 "$repo_root/docs/licenses/minimal-system-NOTICE.txt" \
     "$rootfs/usr/share/licenses/NOTICE.txt"
+install -m 0644 "$repo_root/docs/licenses/GKD-stockOS-PERMISSION-NOTICE.txt" \
+    "$rootfs/usr/share/licenses/GKD-stockOS-PERMISSION-NOTICE.txt"
+install -m 0644 "$repo_root/THIRD_PARTY_NOTICES.md" \
+    "$rootfs/usr/share/licenses/THIRD_PARTY_NOTICES.md"
 install -m 0644 /usr/share/doc/busybox-static/copyright \
     "$rootfs/usr/share/licenses/debian/busybox-static-copyright"
 dpkg-query -W -f='${Version}\n' busybox-static > "$rootfs/usr/share/licenses/debian/busybox-static-version"

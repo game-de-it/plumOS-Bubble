@@ -2,7 +2,7 @@
   "schema": 1,
   "source": "TODO.md",
   "open_gates": {
-    "BUB-P7-05": "license-provenance",
+    "BUB-P7-05": "clean-clone-source-content-gate",
     "BUB-P7-06": "release-hardware",
     "BUB-P7-07": "release-acceptance",
     "BUB-P7-08": "release-approval"

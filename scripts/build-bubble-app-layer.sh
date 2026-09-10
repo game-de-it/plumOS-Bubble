@@ -69,7 +69,16 @@ cp -a "$repo_root/output/pyxel/bubble/plumos/." "$root/"
 cp -a "$repo_root/output/portmaster/bubble/plumos/." "$root/"
 find "$root" -name .DS_Store -type f -delete
 mkdir -p "$root/config/frontend" "$root/config/system" "$root/config/retroarch" \
-    "$root/state/frontend" "$root/logs" "$root/saves" "$root/states"
+    "$root/state/frontend" "$root/logs" "$root/saves" "$root/states" "$root/licenses"
+install -m 0644 "$repo_root/LICENSE" "$root/licenses/plumOS-MIT.txt"
+install -m 0644 "$repo_root/THIRD_PARTY_NOTICES.md" \
+    "$root/licenses/THIRD_PARTY_NOTICES.md"
+install -m 0644 "$repo_root/docs/licenses/GKD-stockOS-PERMISSION-NOTICE.txt" \
+    "$root/licenses/GKD-stockOS-PERMISSION-NOTICE.txt"
+install -m 0644 "$repo_root/docs/licenses/drastic-upstream-NOTICE.txt" \
+    "$root/licenses/drastic-upstream-NOTICE.txt"
+install -m 0644 "$repo_root/docs/licenses/bubble-runtime-license-inventory.tsv" \
+    "$root/licenses/RUNTIME_LICENSE_INDEX.tsv"
 printf 'bubble-stockos-r1\n' >"$root/COMPAT_VENDOR"
 printf '1\n' >"$root/RUNTIME_ABI"
 
@@ -81,6 +90,11 @@ for component in \
     frontend nextcommander music-player network-services retroarch libretro-cores picoarch standalone pyxel portmaster; do
     (cd "$root" && sha256sum -c "components/$component/checksums.sha256")
 done
+# Older cached standalone builds own the prior vendor notice in their component
+# checksum. Verify the component first, then replace that policy document with
+# the repository-current release notice before generating the global checksum.
+install -m 0644 "$repo_root/docs/licenses/bubble-vendor-runtime-NOTICE.txt" \
+    "$root/licenses/bubble-vendor-runtime-NOTICE.txt"
 LD_LIBRARY_PATH="$root/emulator/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
     python3 "$repo_root/scripts/smoke-load-libretro-cores-bubble.py" \
     --root "$root" >"$out/libretro-core-load-smoke.log"
@@ -105,9 +119,10 @@ cat >"$root/manifest.json" <<EOF
   "coverage_manifest": "config/frontend/runtime-coverage.json",
   "mutable_paths": ["config/frontend/settings.json", "config/system/settings.json", "config/retroarch", "logs", "state", "saves", "states"],
   "user_media_included": false,
-  "managed_firmware_assets": ["blueMSX C-BIOS", "DraStic packaged BIOS (non-release-eligible)"],
-  "publishable": false,
-  "non_publishable_reasons": ["captured vendor Mali provenance does not bind an applicable redistribution grant", "closed DraStic executable has no located redistribution grant"]
+  "managed_firmware_assets": ["blueMSX C-BIOS", "DraStic packaged BIOS (project-approved inclusion)"],
+  "license_policy": "MIT for plumOS-authored material; GKD/vendor/upstream terms for stockOS-derived material; DraStic project-approved inclusion matching plumOS-MF",
+  "publishable": true,
+  "non_publishable_reasons": []
 }
 EOF
 (

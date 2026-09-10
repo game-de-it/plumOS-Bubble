@@ -175,7 +175,7 @@ if [ -n "$app_root" ]; then
         --systems "$systems" --app-root "$app_root" --output "$generated_coverage"
     cmp "$coverage" "$generated_coverage"
 
-    jq -r '.systems[].routes[] | select(.license.status == "packaged") | .license.path' \
+    jq -r '.systems[].routes[] | select(.license.status == "packaged" or .license.status == "project-approved-inclusion") | .license.path' \
         "$coverage" | sort -u | while IFS= read -r license_path; do
         test -f "$app_root/$license_path" || {
             printf 'error: missing packaged license evidence: %s\n' "$license_path" >&2

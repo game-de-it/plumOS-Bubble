@@ -5220,9 +5220,9 @@
             "files": []
           },
           "license": {
-            "declared": "closed-prebuilt-unresolved",
-            "status": "redistribution-unresolved",
-            "path": "licenses/drastic-upstream-release-readme.txt"
+            "declared": "DraStic-separate",
+            "status": "project-approved-inclusion",
+            "path": "licenses/drastic-upstream-NOTICE.txt"
           },
           "save_supported": true,
           "state_supported": true
@@ -13813,9 +13813,9 @@
   ],
   "release_complete": false,
   "release_blockers": [
-    "BUB-P3-02",
-    "BUB-P4-D05",
     "BUB-P7-05",
+    "BUB-P7-06",
+    "BUB-P7-07",
     "BUB-P7-08"
   ]
 }

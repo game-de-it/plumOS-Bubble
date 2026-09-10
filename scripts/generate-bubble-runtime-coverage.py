@@ -130,7 +130,7 @@ def main() -> int:
     standalone_license = {
         "pcsx_rearmed": "licenses/pcsx-rearmed-standalone-COPYING",
         "yabasanshiro": "licenses/yabasanshiro-LICENSE",
-        "drastic": "licenses/drastic-upstream-release-readme.txt",
+        "drastic": "licenses/drastic-upstream-NOTICE.txt",
         "ppsspp": "licenses/ppsspp-LICENSE.txt",
         "openbor": "licenses/openbor-LICENSE",
     }
@@ -187,7 +187,7 @@ def main() -> int:
                     "binary": emulator["binary"],
                     "renderer": emulator["renderer"],
                     "bios": standalone_bios[route_id],
-                    "license": {"declared": "closed-prebuilt-unresolved" if route_id == "drastic" else "see-packaged-evidence", "status": "redistribution-unresolved" if route_id == "drastic" else "packaged", "path": license_path},
+                    "license": {"declared": "DraStic-separate" if route_id == "drastic" else "see-packaged-evidence", "status": "project-approved-inclusion" if route_id == "drastic" else "packaged", "path": license_path},
                     "save_supported": True,
                     "state_supported": route_id != "openbor",
                 })
@@ -239,7 +239,7 @@ def main() -> int:
         "ownership_policies": ownership,
         "systems": covered_systems,
         "release_complete": False,
-        "release_blockers": ["BUB-P3-02", "BUB-P4-D05", "BUB-P7-05", "BUB-P7-08"],
+        "release_blockers": ["BUB-P7-05", "BUB-P7-06", "BUB-P7-07", "BUB-P7-08"],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

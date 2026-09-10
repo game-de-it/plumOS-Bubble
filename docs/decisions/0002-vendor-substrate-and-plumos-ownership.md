@@ -14,7 +14,7 @@ PortMaster/Pyxelの利用者データ、p4、SD2はdevice/user-ownedであり更
 - raw sectors 0..32767 のRockchip boot prefix
 - kernel、DTB/DTBO、external initramfs、kernel module/firmwareのmatching set
 - stock kernel ABIへ結合するcaptured Mali userspace
-- 再配布条件が未確定なstandalone vendor runtime
+- GKD/vendor/upstream termsまたは個別project policyで管理するstandalone vendor runtime
 
 System Updateはp1のinactive System slotだけを対象とし、full readback hash後にatomicな
 pending metadataをcommitする。boot/kernel/DTB/module/initramfsの変更は独立recoveryが
@@ -28,14 +28,14 @@ pending metadataをcommitする。boot/kernel/DTB/module/initramfsの変更は�
   boot、p3 managed runtime、p4 user/update、optional SD2の役割を固定している。
 - `docs/plumos-bubble-runtime-update.md` が署名、staging、journal、rollback、health gateと
   mutable data除外を規定している。
-- clean image verifierはcaptured vendor artifactを含むprivate imageを
-  `publishable=no`として拒否境界に置く。
+- clean image verifierはvendor artifactのhash、必須NOTICE、個別distribution policyを
+  公開境界として検証する。
 
 ## Consequences
 
-実機から採取したバイナリが動作に必要でも、それをplumOSのsource completenessや
-再配布許可と同一視しない。private hardware validationは継続できるが、license/source
-identityが閉じるまで公開release gateは通らない。
+実機から採取したバイナリが動作に必要でも、それをplumOSのsource completenessやMIT適用と
+同一視しない。GKD stockOS由来物はmaintainerがattestしたvendor permissionと必須NOTICE、
+第三者物は各upstream terms、DraSticはMFと同じ狭いproject-approved inclusionで管理する。
 
 live deployでは変更componentと対応metadataだけをstagingし、実機上でhash検証後に
 切り替える。実機のmutable fileをhost build結果へ合わせるために上書きしない。
