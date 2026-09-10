@@ -12,6 +12,9 @@ grep -q 'frontend_validation_hold=released' "$launcher"
 grep -q 'frontend_validation_hold=continue owner=supervisor' "$launcher"
 grep -q 'PLUMOS_DISPLAY_TRACE_ENABLE' "$repo_root/package/frontend-bubble/plumos/bin/plumos-controller-ui-bubble"
 grep -q 'PLUMOS_DISPLAY_TRACE_PATH' "$repo_root/package/frontend-bubble/plumos/bin/plumos-controller-ui-bubble"
+grep -q 'ui_animation_cpu_boost(ui)' "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -q 'ui_animation_cpu_restore(ui)' "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -q 'frontend_animation_cpu=boost governor=performance' "$repo_root/src/frontend/plumos_controller_ui.c"
 hold_block=$(sed -n '/if \[ -e "$VALIDATION_HOLD" \]; then/,/^fi$/p' "$launcher")
 if printf '%s\n' "$hold_block" | grep -q 'exit 0'; then
     printf 'validation hold still exits its PID 1-owned launcher\n' >&2

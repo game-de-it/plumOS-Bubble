@@ -784,6 +784,8 @@ struct ui_state {
   enum ui_action repeat_action;
   unsigned int repeat_key_code;
   long long repeat_next_ms;
+  struct cpu_policy_snapshot animation_cpu_snapshot;
+  int animation_cpu_boosted;
   long long sdcard_cleanup_last_ms;
   pid_t rom_scan_refresh_pid;
   long long rom_scan_refresh_last_ms;
@@ -9102,6 +9104,39 @@ static long ui_graphic_top_transition_duration_ms(const struct ui_state *ui) {
   return duration;
 }
 
+static int ui_animation_cpu_boost(struct ui_state *ui) {
+  if (!ui || !runtime_device_is_bubble()) {
+    return 0;
+  }
+  if (ui->animation_cpu_boosted) {
+    return 1;
+  }
+  save_cpu_policy_snapshot(&ui->animation_cpu_snapshot);
+  if (!ui->animation_cpu_snapshot.saved ||
+      !write_text_file_line(
+          "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
+          "performance")) {
+    restore_cpu_policy_snapshot(&ui->animation_cpu_snapshot);
+    memset(&ui->animation_cpu_snapshot, 0,
+           sizeof(ui->animation_cpu_snapshot));
+    return 0;
+  }
+  ui->animation_cpu_boosted = 1;
+  fprintf(stderr, "frontend_animation_cpu=boost governor=performance\n");
+  return 1;
+}
+
+static void ui_animation_cpu_restore(struct ui_state *ui) {
+  if (!ui || !ui->animation_cpu_boosted) {
+    return;
+  }
+  restore_cpu_policy_snapshot(&ui->animation_cpu_snapshot);
+  ui->animation_cpu_boosted = 0;
+  memset(&ui->animation_cpu_snapshot, 0,
+         sizeof(ui->animation_cpu_snapshot));
+  fprintf(stderr, "frontend_animation_cpu=restore\n");
+}
+
 static void ui_start_graphic_top_transition(struct ui_state *ui,
                                             size_t from_cursor,
                                             size_t to_cursor) {
@@ -9121,6 +9156,7 @@ static void ui_start_graphic_top_transition(struct ui_state *ui,
   if (duration <= 0) {
     return;
   }
+  (void)ui_animation_cpu_boost(ui);
   ui->top_transition_from_cursor = from_cursor;
   ui->top_transition_from_page = from_page;
   ui->top_transition_to_page = to_page;
@@ -9204,6 +9240,7 @@ static void ui_start_gallery_transition(struct ui_state *ui, size_t from_cursor,
   if (!ui || from_cursor == to_cursor || ui->rom_count == 0) {
     return;
   }
+  (void)ui_animation_cpu_boost(ui);
   ui->gallery_transition_from_cursor = from_cursor;
   ui->gallery_transition_to_cursor = to_cursor;
   ui->gallery_transition_start_ms = current_time_ms();
@@ -10895,6 +10932,9 @@ static void render_ui(struct ui_state *ui) {
   }
   if (!ui->render_failed) {
     record_frame_stats((int)ui->screen);
+  }
+  if (!ui->top_transition_active && !ui->gallery_transition_active) {
+    ui_animation_cpu_restore(ui);
   }
 }
 
@@ -16730,6 +16770,7 @@ int main(int argc, char **argv) {
   } else {
     exit_code = run_event_loop(&ui, event_path);
   }
+  ui_animation_cpu_restore(&ui);
   if (ui.renderer_mali || ui.renderer_fbdev || ui.renderer_mmf_gfx) {
     shutdown_ui_renderer(&ui);
   }
