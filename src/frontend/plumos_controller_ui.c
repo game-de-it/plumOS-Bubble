@@ -12826,7 +12826,8 @@ static int append_scraping_runner_loop(char *cmd, size_t cmd_size, size_t *pos,
     return 0;
   }
   if (fetch_mode) {
-    if (!append_string(cmd, cmd_size, pos, "; do PLUMOS_THUMBNAIL_PROGRESS=1")) {
+    if (!append_string(cmd, cmd_size, pos,
+                       "; do PLUMOS_THUMBNAIL_PROGRESS=1 PLUMOS_THUMBNAIL_SERVER_FALLBACK=1")) {
       return 0;
     }
     if (fetch_timeout &&
@@ -12987,7 +12988,7 @@ static int run_scraping_action(struct ui_state *ui) {
     fetch_timeout = "12";
   }
   if (!fetch_retry) {
-    fetch_retry = "0";
+    fetch_retry = "2";
   }
   kind = scraping_selected_kind(ui);
   target_count = ui->scraping_choice_cursor == 0 ? ui->scraping_choice_count : (size_t)1;

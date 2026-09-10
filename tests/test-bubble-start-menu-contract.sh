@@ -92,6 +92,10 @@ grep -Fq '"internal:sd2-repair"' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
 grep -Fq '"Repairing SD2; do not remove the card or power off"' \
     "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -Fq 'PLUMOS_THUMBNAIL_SERVER_FALLBACK=1' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
+grep -Fq 'fetch_retry = "2"' \
+    "$repo_root/src/frontend/plumos_controller_ui.c"
 if [[ $(wc -l < "$gg_boxart_rescue") -ne 2 ]]; then exit 1; fi
 if [[ $(wc -l < "$gg_title_rescue") -ne 2 ]]; then exit 1; fi
 grep -q $'^04302bbd\tEternal%20Legend' "$gg_boxart_rescue"
