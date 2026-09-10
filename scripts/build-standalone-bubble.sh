@@ -2,6 +2,44 @@
 set -euo pipefail
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+TOOLS_IMAGE="${PLUMOS_BUBBLE_STANDALONE_TOOLS_IMAGE:-${PLUMOS_BUBBLE_DOCKER_IMAGE:-plumos-bubble-core-tools:dev}}"
+
+if [[ ${1:-} != --inside ]]; then
+    mode=()
+    if [[ ${1:-} == --assemble-only ]]; then
+        mode=(--assemble-only)
+    elif [[ -n ${1:-} ]]; then
+        printf 'error: unknown standalone build option: %s\n' "$1" >&2
+        exit 2
+    fi
+    source_epoch="${SOURCE_DATE_EPOCH:-$(
+        git -C "$ROOT_DIR" show -s --format=%ct HEAD
+    )}"
+    exec docker run --rm --platform linux/arm64 \
+        -e SOURCE_DATE_EPOCH="$source_epoch" \
+        -e PLUMOS_BUBBLE_INCLUDE_CAPTURED_VENDOR_GPU="${PLUMOS_BUBBLE_INCLUDE_CAPTURED_VENDOR_GPU:-0}" \
+        -v "$ROOT_DIR:/work" -w /work "$TOOLS_IMAGE" \
+        ./scripts/build-standalone-bubble.sh --inside "${mode[@]}"
+fi
+
+# The standalone package is a composition of five independently pinned
+# runtimes.  Build every input here so a clean checkout cannot accidentally
+# depend on artifacts left by an earlier developer build.
+case ${2:-} in
+    '')
+        "$ROOT_DIR/scripts/build-pcsx-rearmed-bubble.sh"
+        "$ROOT_DIR/scripts/build-yabasanshiro-bubble.sh"
+        "$ROOT_DIR/scripts/build-drastic-bubble.sh"
+        "$ROOT_DIR/scripts/build-ppsspp-bubble.sh"
+        "$ROOT_DIR/scripts/build-openbor-bubble.sh"
+        ;;
+    --assemble-only) ;;
+    *)
+        printf 'error: unknown standalone inside option: %s\n' "$2" >&2
+        exit 2
+        ;;
+esac
+
 OUT_ROOT="$ROOT_DIR/${PLUMOS_BUBBLE_STANDALONE_OUT:-output/standalone/bubble}"
 PLUMOS_DIR="$OUT_ROOT/plumos"
 PACKAGE_ROOT="$ROOT_DIR/package/standalone-bubble/plumos"

@@ -18,11 +18,14 @@ ROM_SUFFIXES = {
     ".gg", ".iso", ".n64", ".nds", ".nes", ".pbp", ".sfc", ".smc",
     ".sms", ".v64", ".z64",
 }
-PRIVATE_KEY_MARKERS = (
-    b"-----BEGIN OPENSSH PRIVATE KEY-----",
-    b"-----BEGIN RSA PRIVATE KEY-----",
-    b"-----BEGIN EC PRIVATE KEY-----",
-    b"-----BEGIN PRIVATE KEY-----",
+# Assemble these at runtime so the audit does not match its own source while it
+# still detects the exact PEM armour in tracked and packaged files.
+PRIVATE_KEY_MARKERS = tuple(
+    b"-----BEGIN " + key_type + b"-----"
+    for key_type in (
+        b"OPENSSH PRIVATE KEY", b"RSA PRIVATE KEY", b"EC PRIVATE KEY",
+        b"PRIVATE KEY",
+    )
 )
 ALLOWED_APP_ARCHIVES = {
     "apps/portmaster/upstream/PortMaster/pylibs.zip",

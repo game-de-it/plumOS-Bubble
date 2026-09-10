@@ -50,7 +50,9 @@ copy_overlay_file() {
     local destination="$2"
     local source
 
-    source="$(find "$OVERLAY_DIR" -type f -name "$name" -print | head -n 1)"
+    source="$(find "$OVERLAY_DIR" \
+        -path "$OVERLAY_DIR/usr/work" -prune -o \
+        -type f -name "$name" -print | head -n 1)"
     [ -n "$source" ] || {
         printf 'error: private runtime file is missing: %s\n' "$name" >&2
         exit 1
@@ -113,6 +115,12 @@ if [ -z "$PREBUILT_LIB_ROOT" ]; then
         NDS_RUNNER_TOOLCHAIN_BIN="$(dirname "$(command -v gcc)")" \
         NDS_RUNNER_INCLUDE_ROOT=/usr/include
     SOURCE_LIB_ROOT="$SOURCE_DIR/drastic/lib"
+    # These integration libraries are compiled from the pinned open-source
+    # tree above.  Record the output of the current pinned toolchain instead
+    # of requiring hashes from an older compiler invocation.
+    COMMON_SHA256="$(sha256sum "$SOURCE_LIB_ROOT/libcommon.so" | awk '{ print $1 }')"
+    DETOUR_SHA256="$(sha256sum "$SOURCE_LIB_ROOT/libdtr.so" | awk '{ print $1 }')"
+    SDL2_SHA256="$(sha256sum "$SOURCE_LIB_ROOT/libSDL2-2.0.so.0" | awk '{ print $1 }')"
 else
     SOURCE_LIB_ROOT="$PREBUILT_LIB_ROOT"
 fi

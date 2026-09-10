@@ -93,8 +93,12 @@ git -C "$BUILD_ROOT/frontend/libpicofe" apply "$PICOFE_PATCH"
         --enable-dynamic \
         --dynarec=ari64
     make clean
-    make -j"$JOBS"
-    make -C plugins/gpu-gles -j"$JOBS"
+    # gpu-gles uses PREFIX for its SDL 1.2 include/library lookup instead of
+    # SDL_CONFIG.  Point it at the just-built sdl12-compat staging tree so a
+    # clean build cannot fall back to a host /usr/local or plugins/gpu-gles/lib.
+    make -j"$JOBS" PREFIX="$SDL12_ROOT/install-bubble/"
+    make -C plugins/gpu-gles -j"$JOBS" \
+        PREFIX="$SDL12_ROOT/install-bubble/"
 )
 
 file "$BUILD_ROOT/pcsx" | grep -q 'ELF 64-bit.*ARM aarch64'
