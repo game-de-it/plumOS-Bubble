@@ -17,6 +17,7 @@ runtime=$tmp/run
 mkdir -p "$root/bin" "$root/cores" \
     "$root/factory-defaults/retroarch" "$root/factory-defaults/shaders" \
     "$rom_root/nes" "$rom_root/n64" "$rom_root/gamegear" \
+    "$rom_root/atari800" "$rom_root/atari5200" \
     "$rom_root/megadrive" \
     "$rom_root/easyrpg/ValidGame" "$rom_root/easyrpg/InvalidGame" "$runtime"
 cp package/frontend-bubble/plumos/bin/plumos-retroarch-launch \
@@ -90,10 +91,13 @@ grep -Fq 'vTex - vec2(0.0, texel.y)).rgb;' "$panel_shader"
 : >"$root/cores/parallel_n64_libretro.so"
 : >"$root/cores/easyrpg_libretro.so"
 : >"$root/cores/genesis_plus_gx_libretro.so"
+: >"$root/cores/atari800_libretro.so"
 : >"$rom_root/nes/test.nes"
 : >"$rom_root/n64/test.z64"
 : >"$rom_root/gamegear/test.gg"
 : >"$rom_root/megadrive/test.md"
+: >"$rom_root/atari800/test.xfd"
+: >"$rom_root/atari5200/test.a52"
 : >"$rom_root/easyrpg/ValidGame/RPG_RT.ldb"
 
 cat >"$root/bin/retroarch" <<'EOF'
@@ -162,6 +166,30 @@ test -d "$root/state/retroarch/nes"
 ! grep -q '^config_save_on_exit = ' "$tmp/software.append"
 ! grep -qx -- --set-shader "$tmp/software.args"
 ! find "$runtime/retroarch" -type f -name 'launch.*.cfg' -print -quit | grep -q .
+
+run_launcher "$tmp/atari800" --system atari800 \
+    --core "$root/cores/atari800_libretro.so" \
+    --rom "$rom_root/atari800/test.xfd"
+atari800_options="$root/config/retroarch/config/Atari800/Atari800-atari800.opt"
+grep -qx 'global_core_options = "true"' "$tmp/atari800.append"
+grep -qx "core_options_path = \"$atari800_options\"" "$tmp/atari800.append"
+grep -qx 'atari800_ntscpal = "PAL"' "$atari800_options"
+grep -qx 'atari800_system = "Modern XL/XE(1088K)"' "$atari800_options"
+
+run_launcher "$tmp/atari5200" --system atari5200 \
+    --core "$root/cores/atari800_libretro.so" \
+    --rom "$rom_root/atari5200/test.a52"
+atari5200_options="$root/config/retroarch/config/Atari800/Atari800-atari5200.opt"
+grep -qx "core_options_path = \"$atari5200_options\"" "$tmp/atari5200.append"
+grep -qx 'atari800_ntscpal = "NTSC"' "$atari5200_options"
+grep -qx 'atari800_system = "5200"' "$atari5200_options"
+
+# Existing user core options are mutable state and must never be overwritten.
+printf '%s\n' 'atari800_system = "800XL (64K)"' >"$atari800_options"
+run_launcher "$tmp/atari800-preserve" --system atari800 \
+    --core "$root/cores/atari800_libretro.so" \
+    --rom "$rom_root/atari800/test.xfd"
+grep -qx 'atari800_system = "800XL (64K)"' "$atari800_options"
 
 # Game Gear owns a system-specific GLSL preset. It must select KMS/EGL/GLES
 # even with the software core and RGUI, without turning shaders on globally or

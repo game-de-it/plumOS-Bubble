@@ -193,6 +193,44 @@ case "$shader_preset:$core_id:$menu_driver" in
         } >"$append_config"
         ;;
 esac
+# Atari800's upstream default is the original 48K Atari 400/800. Modern
+# XL/XE software such as Yoomp detects that machine as incompatible and stops
+# at its own "computer crashed" screen. Match the established plumOS A30
+# route contract while preserving any option file the user has already edited.
+if [ "$core_id" = atari800 ]; then
+    atari_options_dir="$PLUMOS_ROOT/config/retroarch/config/Atari800"
+    atari_options="$atari_options_dir/Atari800-$system.opt"
+    case "$system" in
+        atari800|atari5200)
+            $BB mkdir -p "$atari_options_dir"
+            if [ ! -s "$atari_options" ]; then
+                {
+                    printf '%s\n' 'atari800_artifacting = "disabled"'
+                    printf '%s\n' 'atari800_cassboot = "disabled"'
+                    printf '%s\n' 'atari800_internalbasic = "disabled"'
+                    printf '%s\n' 'atari800_keyboard = "poll"'
+                    if [ "$system" = atari5200 ]; then
+                        printf '%s\n' 'atari800_ntscpal = "NTSC"'
+                        printf '%s\n' 'atari800_opt1 = "enabled"'
+                        printf '%s\n' 'atari800_system = "5200"'
+                    else
+                        printf '%s\n' 'atari800_ntscpal = "PAL"'
+                        printf '%s\n' 'atari800_opt1 = "disabled"'
+                        printf '%s\n' 'atari800_system = "Modern XL/XE(1088K)"'
+                    fi
+                    printf '%s\n' 'atari800_opt2 = "disabled"'
+                    printf '%s\n' 'atari800_resolution = "336x240"'
+                    printf '%s\n' 'atari800_sioaccel = "enabled"'
+                } >"$atari_options.next"
+                $BB sync
+                $BB mv "$atari_options.next" "$atari_options"
+                $BB sync
+            fi
+            printf '%s\n' 'global_core_options = "true"' >>"$append_config"
+            printf 'core_options_path = "%s"\n' "$atari_options" >>"$append_config"
+            ;;
+    esac
+fi
 if [ -n "$shader_preset" ]; then
     # GLSL is unavailable on the plain-DRM video driver. Keep the persistent
     # cfg unchanged and enable it only for this Game Gear launch; sharing a
