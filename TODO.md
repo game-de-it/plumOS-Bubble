@@ -702,7 +702,7 @@
 - [x] `BUB-P7-04` factory defaultとactive user configを分離し、update/factory reset policyを確定する。
   - Runtime update inventoryはfactory-defaultsと静的frontend/standalone configだけを管理し、active
     config/save/state/log/user media/credentialを除外。factory resetは明示選択されたcategoryだけ復元する。
-- [ ] `BUB-P7-05` clean cloneからimageを再現し、source completeness、license、secret/ROM/BIOS混入gateを通す。
+- [x] `BUB-P7-05` clean cloneからimageを再現し、source completeness、license、secret/ROM/BIOS混入gateを通す。
   - source `eadb7f6`からprivate hardware-validation imageを全component再buildし、p1/p2/p3
     再抽出、filesystem、first-boot中断再開、全component checksum、当時の98 system/196 profile、
     114 core loadをhost合格。live機の約5.1 GiBのvalidation stateは含めず、seed stateは28 KiB、
@@ -712,7 +712,15 @@
     MIT、GKD/stockOS由来物はGKD/vendor/upstream terms、Maliを含む第三者権利は各権利者に留保する。
     DraSticはMFと同じ`project-approved inclusion`として狭くallowlistし、LGPL integration、upstream
     README、pinned provenance、専用NOTICEの同梱を必須化した。license由来のpublish blockerは解消。
-    P7-05はclean-clone source completenessとsecret/ROM/BIOS gateの再実行が残るためopenを維持する。
+    その後、通常のdetached cloneで全componentを再構築し、standaloneの旧prebuilt依存を解消した。
+    97 system/196 profile、114 core、PicoArch 20 route、standalone 5 runtime、PortMasterを統合し、
+    app-layerと生成imageの独立展開checksum検証に合格。content auditはsource 515 files、app-layer
+    12459 files、承認済みfirmware 17、user media 0、private key 0で合格した。生成した
+    `0.1.0-rc1-full-stack-validation.img`はSHA-256
+    `4988ca40ee0125298d433759dbec7dadb6b0c5b656ccdb18854e4558f77cd22e`、personalized=no。
+    host-candidate validation image自体は意図的にpublishable=noのままとし、物理SD acceptanceは
+    P7-06、利用者確認はP7-07、明示承認後の公開はP7-08で追跡する。詳細は
+    `docs/validation/2026-09-10-bubble-release-clean-build.md`。
 - [ ] `BUB-P7-06` SD write/readback、cold boot 3回、warm reboot、rollback、全hardware acceptanceを完了する。
 - [ ] `BUB-P7-07` release candidateを利用者が物理確認し、未解決項目を明示する。
 - [ ] `BUB-P7-08` 利用者の明示承認後だけreleaseを公開し、公開assetを再downloadしてchecksumを確認する。
