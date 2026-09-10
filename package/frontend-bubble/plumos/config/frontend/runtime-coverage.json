@@ -13282,7 +13282,6 @@
       ],
       "extensions": [
         "vms",
-        "vmi",
         "dci",
         "bin"
       ],
@@ -13298,7 +13297,6 @@
           "ownership_policy": "retroarch",
           "content_extensions": [
             "vms",
-            "vmi",
             "dci",
             "bin"
           ],

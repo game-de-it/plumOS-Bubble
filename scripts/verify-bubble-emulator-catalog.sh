@@ -112,6 +112,13 @@ jq -e '
          .support.todo == "BUB-P6-10" and
          .scraper.reason == "unsupported_runtime")
 ' "$systems" >/dev/null
+jq -e '
+  .systems[] |
+  select(.id == "vmu" and
+         (.extensions | sort) == (["bin", "dci", "vms"] | sort) and
+         (.extensions | index("vmi")) == null and
+         .launch_profiles == ["retroarch:vemulator"])
+' "$systems" >/dev/null
 jq -e --slurpfile systems "$systems" '
   .version == 2 and
   .device == "bubble" and

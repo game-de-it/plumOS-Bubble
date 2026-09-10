@@ -654,6 +654,9 @@
     常に0へ固定し、audio callbackを呼ぶ経路がない。BIOS有無にかかわらず音声非対応であるため、
     Numeroの物理音声確認はnot-applicableとして完了する。残る物理音声確認はAtari800、VeMUlatorの
     2 runtime。
+  - VeMUlatorの既存`ANIMTEST.VMI`は108 byteの転送metadataだけで対応する`.VMS`本体がなく、
+    固定coreも`.vmi`を有効contentとして宣言していない。`.vmi`をFE scan対象から除外し、
+    `.vms`/`.bin`/`.dci`だけを公開する。物理音声確認には音声を生成する有効なVMU homebrewを使う。
 
 ## P7: update, lifecycle and release
 

@@ -139,6 +139,14 @@ frontend component passed 218 checks and the complete application layer passed
 12,461 checks; rollback material is retained under
 `state/app-deploy/0b6d144-freechaf/`.
 
+The supplied VMU `ANIMTEST.VMI` is only a 108-byte Dreamcast transfer descriptor;
+its referenced `ANIMTEST.VMS` executable payload is absent. The pinned VeMUlator
+core advertises only `vms`, `bin`, and `dci`, so exposing `vmi` in the Bubble FE
+created a selectable item that could never exercise the runtime. The catalog now
+matches the core contract and excludes `vmi`. The original device-owned descriptor
+is preserved. Physical audio acceptance still requires a valid sound-producing VMU
+program launched through the normal FE route.
+
 ## Reports and device post-condition
 
 Source reports, in merge order:
