@@ -228,6 +228,12 @@ esac
 printf 'system_directory = "%s"\n' "$system_directory" >>"$append_config"
 [ "$no_content" -eq 0 ] || \
     printf '%s\n' 'core_set_supports_no_game_enable = "true"' >>"$append_config"
+# FE-launched sessions have no useful standalone RetroArch state after a core
+# requests shutdown.  Loading the dummy core leaves the user in an empty RA
+# menu (and keeps display ownership away from the FE), which is especially
+# confusing when content rejects an experimental BIOS fallback.  Let the core
+# shutdown terminate this bounded session so the frontend can resume.
+printf '%s\n' 'load_dummy_on_core_shutdown = "false"' >>"$append_config"
 # Keep each bounded route's verbose log in its route-specific file.  The
 # shared plumOS cfg otherwise redirects every core into one retroarch.log,
 # which makes mechanical per-core failure and geometry attribution ambiguous.
