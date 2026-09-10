@@ -30,6 +30,10 @@ export LD_LIBRARY_PATH="$PLUMOS_FRONTEND_LIB_DIR"
 export PLUMOS_INPUT_TRACE_PATH=${PLUMOS_INPUT_TRACE_PATH:-$PLUMOS_ROOT/logs/input-events.log}
 export PLUMOS_ACTION_TRACE_PATH=${PLUMOS_ACTION_TRACE_PATH:-$PLUMOS_ROOT/logs/frontend-actions.log}
 export PLUMOS_FRAME_STATS_PATH=${PLUMOS_FRAME_STATS_PATH:-$PLUMOS_ROOT/logs/frontend-frame-stats.log}
+display_trace_enable=${PLUMOS_DISPLAY_TRACE_ENABLE:-$RUNTIME_ROOT/validation/frontend-display-trace}
+if [ -e "$display_trace_enable" ]; then
+    export PLUMOS_DISPLAY_TRACE_PATH=${PLUMOS_DISPLAY_TRACE_PATH:-$RUNTIME_ROOT/frontend-display-trace.log}
+fi
 
 set -- --renderer fbdev --fb "$PLUMOS_FB" --event "$controller" "$@"
 [ -z "$power" ] || set -- "$@" --power-event "$power"
