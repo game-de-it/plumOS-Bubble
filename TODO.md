@@ -643,7 +643,12 @@
     FreeChaF、SquirrelJME、Numero、VeMUlatorの音声確認だけに限定し、他routeの試験を繰り返さない。
   - FreeChaFは`sl31253.bin`/`sl31254.bin`の正規MD5一致BIOSをuser-owned BIOS領域へ配置後、
     `tents_CF.bin`を実機FE導線から起動し、利用者がゲーム起動、操作、speaker音声を合格確認した。
-    残る物理音声確認はAtari800、SquirrelJME、Numero、VeMUlatorの4 runtime。
+    SquirrelJMEは`Cento.jar`とupstream同梱ゲーム`Squirrel Quarrel`の双方がcontent実行前に
+    `JVM Exec Error`となり、固定commitのcoreが要求するBootRAMも生成不能だった。さらに同commitの
+    media実装は`NullPlayer`でtone生成も未実装のため、BubbleではJava MEを非対応と確定した。
+    `systems.json`では共通catalog/profileの由来を保持したまま`enabled=false`かつ
+    `support.state=unsupported`とし、FE一覧、scan、物理matrixから除外する。
+    残る物理音声確認はAtari800、Numero、VeMUlatorの3 runtime。
 
 ## P7: update, lifecycle and release
 

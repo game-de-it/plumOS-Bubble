@@ -4096,7 +4096,7 @@
       "short_name": "J2ME",
       "sort_order": 670,
       "hardware": "app",
-      "enabled": true,
+      "enabled": false,
       "pinned": false,
       "directory_aliases": [
         {
@@ -4149,9 +4149,14 @@
       ],
       "default_launch_profile": "retroarch:squirreljme",
       "default_cpu_policy": "ondemand",
+      "support": {
+        "state": "unsupported",
+        "reason": "squirreljme-runtime-cannot-boot-supported-content-or-produce-audio",
+        "todo": "BUB-P6-10"
+      },
       "scraper": {
         "enabled": false,
-        "reason": "frontend_policy_pending"
+        "reason": "unsupported_runtime"
       }
     },
     {

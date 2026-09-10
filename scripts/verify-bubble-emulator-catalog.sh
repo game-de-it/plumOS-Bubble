@@ -101,6 +101,17 @@ jq -e '
          .support.state == "unsupported" and
          .support.todo == "BUB-P6-01")
 ' "$systems" >/dev/null
+jq -e '
+  .systems[] |
+  select(.id == "j2me" and
+         .enabled == false and
+         .launch_profiles == ["retroarch:squirreljme"] and
+         .default_launch_profile == "retroarch:squirreljme" and
+         .support.state == "unsupported" and
+         .support.reason == "squirreljme-runtime-cannot-boot-supported-content-or-produce-audio" and
+         .support.todo == "BUB-P6-10" and
+         .scraper.reason == "unsupported_runtime")
+' "$systems" >/dev/null
 jq -e --slurpfile systems "$systems" '
   .version == 2 and
   .device == "bubble" and

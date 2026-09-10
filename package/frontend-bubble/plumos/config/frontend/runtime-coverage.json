@@ -11710,7 +11710,9 @@
       ],
       "default_launch_profile": "retroarch:squirreljme",
       "support": {
-        "state": "supported"
+        "state": "unsupported",
+        "reason": "squirreljme-runtime-cannot-boot-supported-content-or-produce-audio",
+        "todo": "BUB-P6-10"
       },
       "routes": [
         {
