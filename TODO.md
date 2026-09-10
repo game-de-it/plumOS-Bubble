@@ -167,7 +167,12 @@
   - 起動中FEをread-only DRM probeで100 ms間隔60回採取し、failure 0、double buffer FB 158/159を
     29/31回、前後ともFE PID 338が単独ownerと確認。既存のmenu/game barrier完了、複数回のRGUI復帰、
     5分間表示、終了後FE再取得と合わせcompletionを合格とする。
-- [ ] `BUB-P4-D03` 640x480 panel の実 refresh、scroll pacing、input-to-visible response を測定する。
+- [x] `BUB-P4-D03` 640x480 panel の実 refresh、scroll pacing、input-to-visible response を測定する。
+  - 通常FEのblocking DRM page-flip完了を実機計測し、実refreshは60.042 Hz、連続操作46 frameは
+    31 intervalが16.7 ms、14 intervalが33.3 ms（平均45.766 fps相当）だった。
+  - 物理入力readから対応frameのpage-flip完了までは16.3-38.1 ms、中央値30.9 ms。
+    panel走査を含むvisible-window推定は16.3-54.8 msで、LCD素子応答は含めない。
+    詳細は`docs/validation/2026-09-10-bubble-display-pacing.md`。
 - [x] `BUB-P4-D04` fbdev/DRM handoff、FE/game/menu、終了後のscanout ownershipを物理確認する。
 - [ ] `BUB-P4-D05` vendor `libmali` のlicense、redistribution、DDK/kernel ABIを監査し、採用・隔離・不採用を決定する。
 
