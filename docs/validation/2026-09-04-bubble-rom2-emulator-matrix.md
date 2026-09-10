@@ -147,6 +147,14 @@ matches the core contract and excludes `vmi`. The original device-owned descript
 is preserved. Physical audio acceptance still requires a valid sound-producing VMU
 program launched through the normal FE route.
 
+For physical audio acceptance, the openly published SoundDemo VMS was staged
+temporarily in the device-owned ROM area and discovered as the only valid VMU
+item. The normal FE route launched VeMUlator at 48x32, 60 Hz and 32768 Hz. ALSA
+was `RUNNING`, with `hw_ptr=611472` and `appl_ptr=613813`, and the user confirmed
+that the buzzer beep was audible through the speaker. VeMUlator physical audio
+is accepted. The test VMS is not part of the managed application layer and is
+removed after the runtime exits.
+
 ## Reports and device post-condition
 
 Source reports, in merge order:

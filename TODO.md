@@ -657,6 +657,8 @@
   - VeMUlatorの既存`ANIMTEST.VMI`は108 byteの転送metadataだけで対応する`.VMS`本体がなく、
     固定coreも`.vmi`を有効contentとして宣言していない。`.vmi`をFE scan対象から除外し、
     `.vms`/`.bin`/`.dci`だけを公開する。物理音声確認には音声を生成する有効なVMU homebrewを使う。
+    一時配置した`SoundDemo.vms`を通常FE導線から起動し、32768 Hz ALSA PCMの進行と利用者による
+    speakerビープ音の実聴を確認した。VeMUlator音声は合格。残る物理音声確認はAtari800のみ。
 
 ## P7: update, lifecycle and release
 
