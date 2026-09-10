@@ -129,7 +129,10 @@
 
 - [x] `BUB-P3-01` clean container から AArch64 Bubble System を再現 build する。
   - full Systemに先立つminimal diagnostic Systemは専用arm64 containerから再現build済み。
-- [ ] `BUB-P3-02` vendor artifact を hash、source identity、license、capture procedure 付きの外部入力として固定する。
+- [x] `BUB-P3-02` vendor artifact を hash、source identity、license、capture procedure 付きの外部入力として固定する。
+  - `configs/bubble-vendor-artifacts.json`へstock identity、expected hash、license status、
+    guarded capture procedure、private/public policyを固定した。binaryはGit外に隔離し、localに
+    存在する場合は`audit-bubble-vendor-artifacts.py`がexact hash/sizeを検証する。
 - [x] `BUB-P3-03` read-only System A/B、atomic slot metadata、checksum verification を実装する。
   - development slot切替とinactive image readbackは実機合格。現状のseed-level
     `SYSTEM.manifest`/`plumos-image.manifest`は元seedを表すため、正式updaterではslot-scoped
@@ -177,7 +180,10 @@
     終了後に保存済みgovernorへ戻す対策後は、連続166 frameを60.000 fps、33.3 ms落ち0回で確認。
     利用者の目視でも滑らかなscrollを確認し、idle復帰後は`ondemand`へ戻った。
 - [x] `BUB-P4-D04` fbdev/DRM handoff、FE/game/menu、終了後のscanout ownershipを物理確認する。
-- [ ] `BUB-P4-D05` vendor `libmali` のlicense、redistribution、DDK/kernel ABIを監査し、採用・隔離・不採用を決定する。
+- [x] `BUB-P4-D05` vendor `libmali` のlicense、redistribution、DDK/kernel ABIを監査し、採用・隔離・不採用を決定する。
+  - userspace `g13p0-01eac0`とkernel `g2p0-01eac0`の非一致を確認したが、exact pairは実機検証済み。
+    private検証へ隔離採用し、別blobへの置換と公開releaseへの収録は不採用とした。公開EULAを
+    exact captureへ結び付ける根拠がないため、再配布可能とは推定しない。詳細はADR 0004。
 
 ### Input
 

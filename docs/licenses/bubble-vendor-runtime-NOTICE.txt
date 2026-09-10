@@ -1,0 +1,24 @@
+Bubble vendor runtime status notice
+
+The exact boot, kernel, firmware, module and Mali files used for private GKD
+Bubble hardware validation were captured from MINIPLUS / BBG v5.3 2024-10-15.
+They are not plumOS-authored files and are not stored in this Git repository.
+Their identities and capture procedures are recorded in
+configs/bubble-vendor-artifacts.json.
+
+The captured Mali userspace reports g13p0-01eac0 while the preserved kernel
+reports g2p0-01eac0. This exact pair is retained because it has passed Bubble
+hardware validation. Substitution with another g13p0 library is not allowed by
+the build contract.
+
+An ARM Mali userspace EULA published with a public Rockchip libmali collection
+allows redistribution subject to its conditions, but the public binaries
+checked during this audit do not match the exact Bubble captures. The project
+therefore does not claim that the reference EULA is bound to these captures.
+The captures remain private-validation-only pending source-vendor confirmation
+or another applicable redistribution grant.
+
+The steward-fu/nds integration source is LGPL-2.1-only. Its release contains a
+separately authored, closed DraStic executable. No separate redistribution
+grant for that executable was located, so the executable and its packaged BIOS
+remain private-validation-only.

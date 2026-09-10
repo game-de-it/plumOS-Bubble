@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "device": "bubble",
+  "stock_identity": {
+    "distribution": "MINIPLUS / BBG v5.3 2024-10-15",
+    "kernel_release": "4.19.193-g5a07852a55cf-dirty",
+    "capture_date": "2026-09-01",
+    "capture_record": "docs/validation/2026-09-01-bubble-read-only-inventory.md"
+  },
+  "capture": {
+    "boot_prefix": "scripts/capture-bubble-stock-prefix-macos.sh",
+    "boot_files": "scripts/capture-bubble-stock-boot-files.sh",
+    "runtime": "scripts/capture-bubble-vendor-runtime-over-ssh.sh",
+    "output_root": "artifacts/vendor/bubble-stock-source",
+    "tracked": false
+  },
+  "inputs": [
+    {
+      "id": "bubble-stock-active-boot",
+      "hash_manifest": "configs/bubble-stock-active-boot.expected.sha256",
+      "source_identity": "captured from the named stock distribution and physical OS SD",
+      "license_status": "unresolved-vendor-binary",
+      "distribution_policy": "private-validation-only"
+    },
+    {
+      "id": "bubble-stock-runtime-abi",
+      "hash_manifest": "configs/bubble-stock-runtime.expected.sha256",
+      "source_identity": "captured from the named stock distribution's running kernel and root filesystem",
+      "license_status": "mixed-unresolved-vendor-binary",
+      "distribution_policy": "private-validation-only"
+    },
+    {
+      "id": "bubble-mali-aarch64",
+      "path": "runtime/gpu/libmali-aarch64.so.1.9.0",
+      "source_identity": "captured from /usr/lib/libmali.so.1.9.0 in the named stock distribution",
+      "sha256": "56e37253ef3c217932aa947734399203614dfa6046a077444d4c76fd29ea5be2",
+      "size": 43489296,
+      "elf": "ELF64 AArch64 BuildID 1924a0a0144a46c2fe559e17dc861ec4f89e00d8",
+      "userspace_ddk": "g13p0-01eac0",
+      "kernel_ddk": "g2p0-01eac0",
+      "license_status": "reference-eula-not-bound-to-exact-capture",
+      "distribution_policy": "private-validation-only"
+    },
+    {
+      "id": "bubble-mali-armhf",
+      "path": "runtime/gpu/libmali-armhf.so.1.9.0",
+      "source_identity": "captured from the ARMhf runtime in the named stock distribution",
+      "sha256": "bbe45b17ec872897a0039a685ba25e87ea8fa2244f3a36648c37acf9fdb55d34",
+      "size": 42431936,
+      "elf": "ELF32 ARM EABI5 BuildID 09839f6ff0f8bf2b62b51eeec66e82ff269952ec",
+      "userspace_ddk": "g13p0-01eac0",
+      "kernel_ddk": "g2p0-01eac0",
+      "license_status": "reference-eula-not-bound-to-exact-capture",
+      "distribution_policy": "private-validation-only"
+    },
+    {
+      "id": "drastic-closed-core",
+      "source_url": "https://github.com/steward-fu/nds/releases/download/final-china-devices/drastic_miyoo-flip_20251104.zip",
+      "source_ref": "b88e6b75963106c0bd54dfe112f860c6bdbfe593",
+      "archive_sha256": "9e4ed98047dea0f014daea7c3530793f92f19d60073fceb9fd2a040696f66491",
+      "binary_sha256": "caecd505c79ebb56701906e64bc9f487d9fcb03c06cb8b113a9165e2ca7c016d",
+      "integration_license": "LGPL-2.1-only",
+      "closed_core_license_status": "no-redistribution-grant-located",
+      "distribution_policy": "private-validation-only"
+    }
+  ],
+  "license_references": [
+    {
+      "id": "arm-mali-userspace-eula-reference",
+      "url": "https://raw.githubusercontent.com/tsukumijima/libmali-rockchip/master/END_USER_LICENCE_AGREEMENT.txt",
+      "sha256": "a78acc73de9909efb879800d4daa4640c4aaa55cd751238a133954aba15e4285",
+      "applies_to_exact_capture": false,
+      "reason": "the captured Bubble binaries do not match the public g13p0 GBM binaries checked during the audit"
+    },
+    {
+      "id": "steward-fu-nds-integration-license",
+      "url": "https://github.com/steward-fu/nds/blob/b88e6b75963106c0bd54dfe112f860c6bdbfe593/LICENSE",
+      "license": "LGPL-2.1-only",
+      "applies_to_exact_capture": false,
+      "reason": "it covers integration source and does not relicense the separately authored DraStic executable"
+    }
+  ],
+  "decision": {
+    "mali": "retain the exact AArch64 and ARMhf captures as a private, component-scoped compatibility pair; do not substitute a different g13p0 binary",
+    "drastic": "retain the pinned archive only for private device validation until an explicit redistribution grant is obtained",
+    "public_release": "fail closed while any private-validation-only input is present"
+  }
+}

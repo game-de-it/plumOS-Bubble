@@ -2,10 +2,6 @@
   "schema": 1,
   "source": "TODO.md",
   "open_gates": {
-    "BUB-P3-02": "license-provenance",
-    "BUB-P4-D03": "display-instrumentation",
-    "BUB-P4-D05": "license-provenance",
-    "BUB-P6-10": "physical-runtime-matrix",
     "BUB-P7-05": "license-provenance",
     "BUB-P7-06": "release-hardware",
     "BUB-P7-07": "release-acceptance",

@@ -107,7 +107,7 @@ cat >"$root/manifest.json" <<EOF
   "user_media_included": false,
   "managed_firmware_assets": ["blueMSX C-BIOS", "DraStic packaged BIOS (non-release-eligible)"],
   "publishable": false,
-  "non_publishable_reasons": ["physical route matrix pending", "captured vendor Mali license pending", "DraStic physical acceptance pending", "3DS has no runtime"]
+  "non_publishable_reasons": ["captured vendor Mali provenance does not bind an applicable redistribution grant", "closed DraStic executable has no located redistribution grant"]
 }
 EOF
 (

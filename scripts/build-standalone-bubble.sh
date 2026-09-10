@@ -82,6 +82,7 @@ for path in \
     "$YABASANSHIRO_SCHED_OTHER_PATCH" \
     "$DRASTIC_BUILD_PATCH" \
     "$DRASTIC_MMAP_COMPAT" \
+    "$ROOT_DIR/docs/licenses/bubble-vendor-runtime-NOTICE.txt" \
     "$PPSSPP_PATCH" \
     "$OPENBOR_PATCH"; do
     [ -e "$path" ] || {
@@ -235,6 +236,8 @@ install -m 0644 "$DRASTIC_BUILD/integration-LICENSE" \
     "$PLUMOS_DIR/licenses/steward-fu-nds-LGPL-2.1"
 install -m 0644 "$DRASTIC_BUILD/upstream-release-readme.txt" \
     "$PLUMOS_DIR/licenses/drastic-upstream-release-readme.txt"
+install -m 0644 "$ROOT_DIR/docs/licenses/bubble-vendor-runtime-NOTICE.txt" \
+    "$PLUMOS_DIR/licenses/bubble-vendor-runtime-NOTICE.txt"
 rsync -a "$PPSSPP_BUILD/runtime/" \
     "$PLUMOS_DIR/emulator/standalone/ppsspp/"
 install -m 0644 "$PPSSPP_BUILD/LICENSE.txt" \
@@ -345,6 +348,7 @@ EOF
         licenses/yabasanshiro-LICENSE \
         licenses/steward-fu-nds-LGPL-2.1 \
         licenses/drastic-upstream-release-readme.txt \
+        licenses/bubble-vendor-runtime-NOTICE.txt \
         licenses/ppsspp-LICENSE.txt \
         licenses/openbor-LICENSE \
         licenses/openbor-SDL2-gfx-copyright \
