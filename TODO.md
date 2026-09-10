@@ -173,6 +173,9 @@
   - 物理入力readから対応frameのpage-flip完了までは16.3-38.1 ms、中央値30.9 ms。
     panel走査を含むvisible-window推定は16.3-54.8 msで、LCD素子応答は含めない。
     詳細は`docs/validation/2026-09-10-bubble-display-pacing.md`。
+  - `ondemand`では45.766 fpsだったが、TOP/Gallery animation中だけ`performance`へ昇速し
+    終了後に保存済みgovernorへ戻す対策後は、連続166 frameを60.000 fps、33.3 ms落ち0回で確認。
+    利用者の目視でも滑らかなscrollを確認し、idle復帰後は`ondemand`へ戻った。
 - [x] `BUB-P4-D04` fbdev/DRM handoff、FE/game/menu、終了後のscanout ownershipを物理確認する。
 - [ ] `BUB-P4-D05` vendor `libmali` のlicense、redistribution、DDK/kernel ABIを監査し、採用・隔離・不採用を決定する。
 

@@ -37,3 +37,23 @@ high-speed camera and is intentionally not included in that estimate.
 After capture, the tmpfs enable marker was removed and the instrumented process
 was terminated normally. PID 1 started exactly one ordinary frontend without
 `PLUMOS_DISPLAY_TRACE_PATH`; no validation hold or second renderer remained.
+
+## Animation-scoped CPU fix
+
+An A/B measurement isolated the missed vblanks to CPU frequency policy. With
+the same frontend held at the RK3566 maximum frequency under `performance`, a
+109-frame active run presented at 59.998 frames/s: all 108 intervals completed
+in one vblank and none took two. Input-read to presentation median also fell
+from 30.9 ms to 16.5 ms.
+
+Commit `a717463` therefore keeps the configured `ondemand` policy while idle,
+saves it when a TOP or Gallery animation starts, applies `performance` only for
+the animation, and restores the saved policy after the final presentation.
+The user reported that scrolling was visually smooth after deployment. A final
+instrumented run contained a 166-frame active segment at 60.000 frames/s, with
+all 165 intervals in the 16.7 ms vblank band and no 33.3 ms intervals. The log
+showed paired `boost`/`restore` events, and a delayed readback confirmed the
+governor had settled back to `ondemand`.
+
+The trace marker was then removed and PID 1 started one normal frontend without
+the trace environment. Frontend component checksum verification still passed.
