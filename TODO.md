@@ -603,7 +603,7 @@
   - 物理captureをsource of truth、全runtime設定の機械照合を割当証明とし、PicoArch、RetroArch、
     DraStic、PPSSPP、PortMaster/SDL系の代表実操作、Function1 menu、exit、volume/powerを合格とする。
     content固有の操作差は入力map gateへ重複させず`BUB-P6-10`の未網羅routeだけで追跡する。
-- [ ] `BUB-P6-10` 全system/coreをdisplay分類し、向き・content/menu rotation・aspect・audioを実機確認する。
+- [x] `BUB-P6-10` 全system/coreをdisplay分類し、向き・content/menu rotation・aspect・audioを実機確認する。
   - horizontal、vertical arcade、rotated handheld、square、wide、dual-screen、GLES経路を分離し、
     QuickNES一件の合格を他coreへ一般化しない。未試験導線はFEから消さず理由付きで維持する。
   - runtime logのframe/aspect/rotation/viewport/scanoutとPyxel fitを機械検査するverifierを追加。
@@ -659,6 +659,12 @@
     `.vms`/`.bin`/`.dci`だけを公開する。物理音声確認には音声を生成する有効なVMU homebrewを使う。
     一時配置した`SoundDemo.vms`を通常FE導線から起動し、32768 Hz ALSA PCMの進行と利用者による
     speakerビープ音の実聴を確認した。VeMUlator音声は合格。残る物理音声確認はAtari800のみ。
+  - Atari800は最初、core既定のAtari 400/800 48KでXL/XE向け`Yoomp`を起動してゲーム側の
+    `computer crashed`画面へ入った。さらにStockOSのread-only `/root`へ`.atari800.cfg`を書けず、
+    CPU継続・audio XRUNとなっていた。RetroArch routeごとのwritable HOMEを追加し、A30と同じ
+    system別core option（Atari 8-bitはPAL/Modern XL-XE 1088K、5200はNTSC/5200）を、既存の
+    user optionを上書きせずseedするよう修正した。再試験でYoompは46秒以上正常動作し、利用者が
+    speaker音声を合格確認した。これで限定されていた全runtime物理音声確認を完了する。
 
 ## P7: update, lifecycle and release
 

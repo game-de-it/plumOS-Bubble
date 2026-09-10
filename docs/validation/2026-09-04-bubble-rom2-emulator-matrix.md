@@ -155,6 +155,21 @@ that the buzzer beep was audible through the speaker. VeMUlator physical audio
 is accepted. The test VMS is not part of the managed application layer and is
 removed after the runtime exits.
 
+Atari800 initially reached Yoomp's own `computer crashed` screen rather than
+terminating. The first run also exposed an independent integration fault:
+Atari800 attempted to create `/root/.atari800.cfg` on StockOS's read-only root,
+then kept consuming CPU while ALSA remained in XRUN. The launcher now gives each
+RetroArch system a writable HOME below `state/retroarch/`. Bubble also adopts
+the established A30 per-system Atari800 options without overwriting an existing
+user `.opt`: Atari 8-bit uses PAL with Modern XL/XE 1088K, while Atari 5200 uses
+NTSC with the 5200 machine profile.
+
+With the corrected route, Yoomp ran normally for more than 46 seconds at
+336x240, 59.92 Hz and 44100 Hz. The user confirmed normal speaker audio. This
+accepts Atari800 and completes the deliberately narrowed physical-audio matrix;
+Numero was classified audio-inapplicable from source, while FreeChaF and
+VeMUlator were physically accepted separately.
+
 ## Reports and device post-condition
 
 Source reports, in merge order:
