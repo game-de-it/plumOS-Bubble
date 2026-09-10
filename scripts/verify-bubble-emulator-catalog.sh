@@ -101,13 +101,72 @@ jq -e '
          .support.state == "unsupported" and
          .support.todo == "BUB-P6-01")
 ' "$systems" >/dev/null
-jq -e '
+jq -e --slurpfile systems "$systems" '
+  .version == 2 and
+  .device == "bubble" and
   .release_complete == false and
-  .route_overrides["retroarch:quicknes"].release_sufficient == false and
-  .unsupported_systems["3ds"].state == "unsupported"
+  .catalog.systems == 98 and
+  .catalog.launch_profile_occurrences == 196 and
+  .catalog.source_libretro_cores == 114 and
+  ((.systems | map(.system_id) | sort) ==
+   ($systems[0].systems | map(.id) | sort)) and
+  ([.systems[].routes[]] | length) == 196 and
+  ([.systems[].routes[].profile] | map(select(startswith("retroarch:"))) | map(sub("^retroarch:"; "")) | unique | length) == 116 and
+  ([.systems[].routes[].profile] | map(select(startswith("picoarch:"))) | map(sub("^picoarch:"; "")) | unique | length) == 20 and
+  ([.systems[].routes[].profile] | map(select(startswith("standalone:"))) | map(sub("^standalone:"; "")) | unique | length) == 5 and
+  all(.systems[];
+    (.system_id | length) > 0 and
+    (.directory_aliases | length) > 0 and
+    (.extensions | type) == "array" and
+    (.default_launch_profile as $default |
+      ((.routes | length) == 0 or ([.routes[].profile] | index($default)) != null)) and
+    all(.routes[];
+      (.profile | length) > 0 and
+      (.renderer | length) > 0 and
+      (.binary | length) > 0 and
+      (.ownership_policy as $policy | . as $route |
+        ($policy | length) > 0 and
+        ($route.content_extensions | type) == "array") and
+      (.bios.policy | length) > 0 and
+      (.bios.files | type) == "array" and
+      (.license.status | length) > 0 and
+      (.license.path | length) > 0 and
+      (.save_supported | type) != "null" and
+      (.state_supported | type) != "null"))
 ' "$coverage" >/dev/null
 
+jq -e --slurpfile coverage "$coverage" '
+  all(.systems[];
+    .id as $system_id |
+    (.launch_profiles | sort) ==
+      ($coverage[0].systems[] | select(.system_id == $system_id) |
+       [.routes[].profile] | sort) and
+    (.extensions | sort) ==
+      ($coverage[0].systems[] | select(.system_id == $system_id) |
+       .extensions | sort))
+' "$systems" >/dev/null
+
 if [ -n "$app_root" ]; then
+    generated_coverage=$(mktemp "${TMPDIR:-/tmp}/bubble-runtime-coverage.XXXXXX")
+    trap 'rm -f "$generated_coverage"' EXIT HUP INT TERM
+    "$repo_root/scripts/generate-bubble-runtime-coverage.py" \
+        --systems "$systems" --app-root "$app_root" --output "$generated_coverage"
+    cmp "$coverage" "$generated_coverage"
+
+    jq -r '.systems[].routes[] | select(.license.status == "packaged") | .license.path' \
+        "$coverage" | sort -u | while IFS= read -r license_path; do
+        test -f "$app_root/$license_path" || {
+            printf 'error: missing packaged license evidence: %s\n' "$license_path" >&2
+            exit 1
+        }
+    done
+    jq -r '.systems[].routes[].binary' "$coverage" | sort -u | while IFS= read -r binary; do
+        test -e "$app_root/$binary" || {
+            printf 'error: coverage binary is absent: %s\n' "$binary" >&2
+            exit 1
+        }
+    done
+
     test -x "$app_root/bin/retroarch"
     test -x "$app_root/bin/plumos-retroarch-launch"
     jq -r '.systems[].launch_profiles[] | select(startswith("retroarch:")) | sub("^retroarch:"; "")' \

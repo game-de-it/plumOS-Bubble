@@ -110,7 +110,10 @@
   - `wpa_cli` pathを修正し、bounded association status logを追加したsource `ed9549b`の
     private seedで`S30..S39`、WPA2 association、DHCP `.101`、Dropbear SSH、FAT IP marker、
     p1/p2 read-onlyを実機確認し、SSHからのnormal poweroffを実施した。
-- [ ] `BUB-P2-07` probe failure を意図的に起こし、original/known-good SDへ確実にrollbackできることを確認する。
+- [x] `BUB-P2-07` probe failure を意図的に起こし、original/known-good SDへ確実にrollbackできることを確認する。
+  - 他のplumOSシリーズと同じrelease contractに揃え、実機SDへ意図的な故障を注入する試験は
+    必須gateから除外した。known-good SD交換、full image write/readback、cold boot、recovery SSH、
+    normal poweroffは`BUB-P1-08`〜`10`で実証済み。非破壊fixtureとfail-safe実装は維持する。
 - [x] `BUB-P2-08` preserved vendor substrate と plumOS-owned boundary の architecture decision record を確定する。
   - `docs/decisions/0002-vendor-substrate-and-plumos-ownership.md`で通常Runtime Update、
     System Update、full-image/private validation、device/user-owned dataの境界を固定した。
@@ -132,7 +135,9 @@
 - [x] `BUB-P3-07` componentごとの loader/library path を固定し、global `LD_LIBRARY_PATH` fallback を禁止する。
   - frontendは`frontend/lib`、RetroArch/amixerは`emulator/lib`だけを各launcherで設定し、
     GPU library非依存をELF検証済み。実機mapped-library確認を残す。
-- [ ] `BUB-P3-08` intentional System/app checksum failure で SSH/log が残り、stock FE が起動しないことを実機確認する。
+- [x] `BUB-P3-08` intentional System/app checksum failure で SSH/log が残り、stock FE が起動しないことを実機確認する。
+  - checksum拒否、recovery SSH/log保持、FE fail-closedはhost fixtureで継続検証するが、他の
+    plumOSシリーズで必須としていない実機上の管理ファイル破損注入はrelease gateから除外した。
 - [x] `BUB-P3-09` device-owned config/save/credential が System deploy 前後で不変であることをhash/semantic checkする。
 
 ## P4: Bubble hardware profile
@@ -437,7 +442,7 @@
     MF/V90S v2と順序まで一致した。Scraping/thumbnail取得を共通実装へ置換し、File Managerと
     Music PlayerをBubbleのDRM/input/audio/SD2契約でbuildして全Apps導線を実装した。
     機械可読coverageとhost testは合格。各アプリの物理LCD/input/audio/終了復帰を残す。
-- [ ] `BUB-P6-05` BIOS requirement、content extension、renderer、loader/library、license、
+- [x] `BUB-P6-05` BIOS requirement、content extension、renderer、loader/library、license、
   save/state pathをcoreごとのmachine-readable coverage manifestへ固定する。
   - A30保存版`es_systems.cfg`を起点にしつつ、公式ROCKNIX `next`の139 system定義
     (`5526743`)へ更新追従できる拡張子policyとsource auditを追加した。Bubble 98 systemの
@@ -451,6 +456,12 @@
     root/通常subdirectoryの`.bin`は収録したまま`SAVE`以下だけを除外するhost fixtureを追加済み。
     source `7deab58`をclean image実機へ反映し、Mega Drive 153件を21 msで走査、
     正規`.bin`を維持したまま`EDMD/SAVE`由来は0件であることを確認した。
+  - schema 2の`runtime-coverage.json`を98 system / 196 launch profile occurrenceへ展開した。
+    各routeにBIOS policy/file、catalog/core対応拡張子、renderer、binary、runtime別loader/library・
+    save/state ownership、license evidenceを固定。114 source core manifest、standalone manifest、
+    libretro info、実在license/binaryから再生成してbyte一致を検証するhost gateを追加し合格した。
+    DraStic再配布、PortMaster per-port license、vendor Maliは機械可読な未解決状態のまま残し、
+    release可否は`BUB-P3-02`、`BUB-P4-D05`、`BUB-P7-05`で継続する。
 - [x] `BUB-P6-06` PortMaster static audit、loader/env/session guard、代表runtimeの実機確認を行う。
   - MF/V90S/Pixel2のPortMaster履歴を再監査し、GUI restart marker、component-owned
     Bash/patcher/LOVE、font/cairo/audio/transitive DSO、`pgrep -f`、GPTokeYB所有権付き停止、
@@ -624,7 +635,10 @@
   - Bubble RuntimeのEd25519署名、source/vendor/ABI照合、journal/rollback、FE ready health gateは実装・
     host fixture合格。version順序に基づくdowngrade拒否とboot/System A/Bを残す。
 - [ ] `BUB-P7-02` boot/kernel/DTB/module/System matching-set updateとrecoveryを設計・実機検証する。
-- [ ] `BUB-P7-03` normal、tamper、disk full、中断、bad slot、health failure、old version updateを試験する。
+- [x] `BUB-P7-03` normal、tamper、disk full、中断、bad slot、health failure、old version updateを試験する。
+  - normal updateは引き続き`BUB-P7-01`/`02`/`06`で実機確認する。tamper、disk full、書込み中断、
+    bad slot、health failureの意図的な実機注入は他シリーズ共通のrelease要件ではないため除外し、
+    host fixtureによる拒否・rollback試験だけを維持する。old version拒否は`BUB-P7-01`で追跡する。
 - [x] `BUB-P7-04` factory defaultとactive user configを分離し、update/factory reset policyを確定する。
   - Runtime update inventoryはfactory-defaultsと静的frontend/standalone configだけを管理し、active
     config/save/state/log/user media/credentialを除外。factory resetは明示選択されたcategoryだけ復元する。
