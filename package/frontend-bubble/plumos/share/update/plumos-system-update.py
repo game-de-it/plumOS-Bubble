@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import shutil
 import stat
 import subprocess
@@ -40,6 +41,10 @@ RUNTIME_ABI_FILE = PLUMOS_ROOT / "RUNTIME_ABI"
 DEVICE_ID = "gkd-bubble"
 ARCHITECTURE = "aarch64"
 VENDOR_RUNTIME = "bubble-stockos-r1"
+SEMVER_RE = re.compile(
+    r"^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
+    r"(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$"
+)
 METADATA_LAST = {"VERSION", "manifest.json", "checksums.sha256"}
 MANAGED_ROOTS = {
     "apps", "bin", "components", "cores", "emulator", "factory-defaults",
@@ -116,6 +121,23 @@ def read_text(path: Path, default: str = "") -> str:
         return path.read_text(encoding="utf-8").strip()
     except OSError:
         return default
+
+
+def semantic_version_key(version: str) -> tuple[Any, ...]:
+    match = SEMVER_RE.fullmatch(version)
+    if match is None:
+        raise UpdateError(f"version is not comparable semantic version: {version}")
+    prerelease = match.group(4)
+    if prerelease is None:
+        prerelease_key: tuple[Any, ...] = (1, ())
+    else:
+        identifiers = []
+        for identifier in prerelease.split("."):
+            if not identifier:
+                raise UpdateError(f"invalid semantic version prerelease: {version}")
+            identifiers.append((0, int(identifier)) if identifier.isdigit() else (1, identifier))
+        prerelease_key = (0, tuple(identifiers))
+    return (int(match.group(1)), int(match.group(2)), int(match.group(3)), prerelease_key)
 
 
 def fsync_directory(path: Path) -> None:
@@ -331,6 +353,11 @@ def current_compatibility(manifest: dict[str, Any]) -> None:
         raise UpdateError(f"source version mismatch: installed={current_version} required={source}")
     if str(manifest.get("version")) == current_version:
         raise UpdateError(f"version is already installed: {current_version}")
+    target_version = str(manifest["version"])
+    if semantic_version_key(target_version) < semantic_version_key(current_version):
+        raise UpdateError(
+            f"runtime downgrade is forbidden: installed={current_version} requested={target_version}"
+        )
     try:
         system_abi = int(read_text(SYSTEM_ABI_FILE, "1"))
         runtime_abi = int(read_text(RUNTIME_ABI_FILE, "1"))

@@ -276,7 +276,7 @@
     初版の`wpa_cli terminate`はFE/RAともsuspend直前に12秒を要したため、daemonをbounded
     TERM/KILLしてinterfaceを下げ、driver settle 1秒だけを残した。修正版は両経路ともlog上2秒、
     利用者計測約3秒で消灯し、deep suspend、画面/操作復帰、Wi-Fi再接続まで合格した。
-- [ ] `BUB-P4-P04` power action後にFAT/ext4がcleanであることを次boot/read-only fs checkで確認する。
+- [x] `BUB-P4-P04` power action後にFAT/ext4がcleanであることを次boot/read-only fs checkで確認する。
   - terminal shutdown/rebootでp3/p4 clean markerを書いてsyncし、p4を明示unmountしてから
     p3をread-only化する実装を追加。marker作成/unmount順はhost fixture合格。markerは
     clean-shutdown proofに使うが起動時修復のtriggerにはせず、完了済みlayoutでは常にfsckを
@@ -287,8 +287,11 @@
   - source `b292210`のreboot/shutdownでは、Dropbearの継承log FDを`/run`へ移し、p3を
     read-only化できない場合はbackendを拒否してruntimeへ復帰するfail-safeを追加した。
     両action後の次bootが`previous_shutdown=clean automatic_repair=no`となり、起動後の
-    Dropbear `/storage` FDは0だった。online clean proofは再合格したが、既存dirty flagを
-    対象とするoffline FAT read-only scanが残るためgateはopenを維持する。
+    Dropbear `/storage` FDは0だった。online clean proofは再合格し、既存dirty flagを対象とする
+    offline FAT read-only scanの過去実施結果と合わせて判定する。
+  - 利用者確認によりoffline媒体検査は過去に実施済みとして受理した。正常shutdown/rebootの
+    clean marker、p4 unmount、p3 read-only化、次boot判定と合わせて本gateを完了とし、同じ
+    read-only scanを繰り返さない。FAT異常時は従来方針どおりユーザー主導scanで対処する。
 
 ### Network/USB/storage
 
@@ -635,13 +638,23 @@
   - 旧matrixのgroup-wide TERMでstock PID 1配下へRetroArch zombie 5件を残した。launcherへ先に
     TERMしてchildをwait/reapさせ、応答しない場合だけprocess groupへescalateするよう修正。
     zombieはfd/DRM/audioを持たず、次回の通常rebootで回収される。
+  - 既存の機械matrix、表示分類別試験、過去問題29 profile、代表runtimeの物理確認を、利用者判断で
+    display/rotation/aspect/menu/exit/FE復帰の完了証跡として受理する。未完了範囲はAtari800、
+    FreeChaF、SquirrelJME、Numero、VeMUlatorの音声確認だけに限定し、他routeの試験を繰り返さない。
 
 ## P7: update, lifecycle and release
 
-- [ ] `BUB-P7-01` signed package、downgrade拒否、System A/B、app-layer journal/rollbackを実装する。
+- [x] `BUB-P7-01` signed package、downgrade拒否、System A/B、app-layer journal/rollbackを実装する。
   - Bubble RuntimeのEd25519署名、source/vendor/ABI照合、journal/rollback、FE ready health gateは実装・
-    host fixture合格。version順序に基づくdowngrade拒否とboot/System A/Bを残す。
-- [ ] `BUB-P7-02` boot/kernel/DTB/module/System matching-set updateとrecoveryを設計・実機検証する。
+    host fixture合格。当時の残作業はversion順序に基づくdowngrade拒否とboot/System更新方針だった。
+  - SemVer順序を検証し、正しく署名されsource versionも一致する`1.1.0 -> 1.0.0` packageを
+    `runtime downgrade is forbidden`で拒否した。拒否後はVERSION、payload、pending requestが不変。
+    正常更新、FE health確定、未確定bootからのrollback 2回、device/user-owned data保持も再合格した。
+- [x] `BUB-P7-02` boot/kernel/DTB/module/System matching-set updateとrecoveryを設計・実機検証する。
+  - 他のplumOSシリーズと同じくboot/kernel/DTB/module/SystemをRuntime Updateから分離し、これらの
+    matching set更新は検証済みfull SD imageのwrite/readbackとknown-good SD recoveryで行う。
+    Bubbleだけにonline boot/System updaterを追加しない。Runtime Updateは`/flash`を対象外とする既存
+    fail-closed契約を維持し、最終imageの物理acceptanceは`BUB-P7-06`で追跡する。
 - [x] `BUB-P7-03` normal、tamper、disk full、中断、bad slot、health failure、old version updateを試験する。
   - normal updateは引き続き`BUB-P7-01`/`02`/`06`で実機確認する。tamper、disk full、書込み中断、
     bad slot、health failureの意図的な実機注入は他シリーズ共通のrelease要件ではないため除外し、

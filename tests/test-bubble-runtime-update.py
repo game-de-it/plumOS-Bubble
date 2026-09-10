@@ -20,6 +20,12 @@ def run(command: list[str], *, env: dict[str, str] | None = None) -> subprocess.
     return subprocess.run(command, check=True, text=True, capture_output=True, env=env)
 
 
+def run_rejected(command: list[str], expected: str, *, env: dict[str, str]) -> None:
+    result = subprocess.run(command, check=False, text=True, capture_output=True, env=env)
+    assert result.returncode != 0
+    assert expected in result.stderr
+
+
 def write_runtime(root: Path, version: str, payload: str, *, deleted_file: bool) -> None:
     (root / "bin").mkdir(parents=True)
     (root / "config/frontend").mkdir(parents=True)
@@ -71,6 +77,7 @@ def main() -> None:
         installed = temp / "installed"
         version_11 = temp / "runtime-1.1.0"
         version_12 = temp / "runtime-1.2.0"
+        version_10 = temp / "runtime-1.0.0-downgrade"
         user_root = temp / "user"
         inbox = user_root / "updates"
         packages = temp / "packages"
@@ -82,6 +89,7 @@ def main() -> None:
         write_runtime(installed, "1.0.0", "runtime-one", deleted_file=True)
         write_runtime(version_11, "1.1.0", "runtime-two", deleted_file=False)
         write_runtime(version_12, "1.2.0", "runtime-three", deleted_file=False)
+        write_runtime(version_10, "1.0.0", "runtime-downgrade", deleted_file=False)
         inbox.mkdir(parents=True)
         packages.mkdir()
         system_abi.write_text("1\n", encoding="ascii")
@@ -135,6 +143,23 @@ def main() -> None:
         result = json.loads((installed / "update-state/last-result.json").read_text())
         assert result["result"] == "runtime_healthy"
 
+        # A correctly signed package with an exact source version must still be
+        # rejected when its target version is older than the installed Runtime.
+        downgrade = build_package(
+            version_10, packages, key, "1.0.0", "1.1.0", version_11
+        )
+        inbox_downgrade = inbox / downgrade.name
+        shutil.copy2(downgrade, inbox_downgrade)
+        before_probe = (installed / "bin/runtime-probe").read_bytes()
+        run_rejected(
+            updater + ["request", str(inbox_downgrade)],
+            "runtime downgrade is forbidden: installed=1.1.0 requested=1.0.0",
+            env=env,
+        )
+        assert (installed / "VERSION").read_text().strip() == "1.1.0"
+        assert (installed / "bin/runtime-probe").read_bytes() == before_probe
+        assert not (installed / "update-state/request.json").exists()
+
         package_12 = build_package(
             version_12, packages, key, "1.2.0", "1.1.0", version_11
         )
@@ -151,7 +176,7 @@ def main() -> None:
             '{"preserve":"user-setting"}'
         )
 
-        print("bubble_runtime_update=result-ok signature=ed25519 rollback=2 persistence=ok")
+        print("bubble_runtime_update=result-ok signature=ed25519 downgrade=rejected rollback=2 persistence=ok")
 
 
 if __name__ == "__main__":

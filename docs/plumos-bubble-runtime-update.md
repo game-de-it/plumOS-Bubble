@@ -10,6 +10,7 @@ packages without overwriting user-owned state.
 - Target: `gkd-bubble`, `aarch64`, vendor runtime `bubble-stockos-r1`
 - Signature: Ed25519 over canonical `META/manifest.json`
 - Compatibility: installed source version, system ABI and runtime ABI must match
+- Version order: comparable SemVer only; an equal or older target is rejected before a request is recorded
 - The frontend action verifies and records the newest compatible package before
   invoking the normal safe reboot helper. It does not copy arbitrary files.
 
@@ -59,3 +60,6 @@ Bootloader, kernel, DTB, kernel modules and the stock System image are not
 Runtime files. They remain full-image updates until Bubble's matching-set A/B
 System layout and recovery acceptance are completed; Runtime packages cannot
 write `/flash`.
+
+Bubble follows the other plumOS series by shipping those immutable boot files as
+a verified full SD image rather than adding a Bubble-only online boot updater.
