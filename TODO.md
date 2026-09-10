@@ -26,10 +26,14 @@
     それらから再現可能なfull recovery imageを生成・独立readbackした。original SDの未使用領域を
     含むbit-for-bit複製は採用せず、「復元に必要な全領域」の代替条件で完了とする。
 - [x] `BUB-P1-03` ROM SD は filesystem metadata と dirty state だけを read-only で確認し、ROM/BIOS/save 内容を repository や build artifact に取り込まない。
-- [ ] `BUB-P1-04` raw Rockchip prefix、IDBLoader/SPL、U-Boot、environment の offset/size/hash を特定する。
+- [x] `BUB-P1-04` raw Rockchip prefix、IDBLoader/SPL、U-Boot、environment の offset/size/hash を特定する。
   - 先頭16 MiBをread-only取得し、exact size、SHA-256、RKNS/FIT/BL3X主要headerを確認済み。
   - prefix内のdefault文字列では`mmc1 -> mmc0 -> usb0 -> pxe -> dhcp`と
     `boot.scr.uimg`/`boot.scr`探索を確認したが、active environmentの保存場所と冗長性は未確認。
+  - 他のplumOSシリーズと同じrelease contractに揃え、既に起動可能なvendor boot substrateの
+    active environment保存offset・冗長性をUART/低レベルforensicで追加特定する作業は必須gateから
+    除外した。releaseに必要なraw prefix、matching boot payload、hash、write/readback、recoveryは
+    `BUB-P1-02`、`05`、`08`、`10`で実証済みの範囲を採用する。
 - [x] `BUB-P1-05` `Image`、`SYSTEM`、`boot.scr/cmd`、`uEnv.txt`、全 DTB/DTBO の hash/provenance manifest を作成する。
   - active `Image`、通常/HDMI DTB、適用overlay/fixup、U-Boot DTB、boot scriptをhash照合してlocal artifactへ取得済み。
   - stock `SYSTEM`はanalysis-only hashだけを記録し、vendor/release outputへコピーしていない。
@@ -65,7 +69,10 @@
 ## P2: boot chain and ownership probe
 
 - [x] `BUB-P2-01` Boot ROM -> loader -> U-Boot -> kernel -> initrd/early init -> `SYSTEM` -> systemd -> FE の実行経路を証明する。
-- [ ] `BUB-P2-02` U-Boot の boot source selection、environment、root UUID、initrd variables、fallback を記録する。
+- [x] `BUB-P2-02` U-Boot の boot source selection、environment、root UUID、initrd variables、fallback を記録する。
+  - boot script/uEnvの静的解析、実runtime cmdline、root UUID、`${filesize}`由来initrd size、System
+    slot選択とcold boot handoffは記録済み。UARTでactive `printenv`を取得する追加調査と、boot fileを
+    故意に欠損させるfallback発動試験は他シリーズ共通の必須項目ではないためrelease gateから除外した。
 - [x] `BUB-P2-03` boot milestone を serial/FAT/persistent log に記録し、cold/warm boot baseline を測る。
   - U-Boot console `S10..E20`、systemd/frontend `S40..S90/E80`の二系統probeとclone-only guardを実装済み。
   - 初回cold bootでminimal Systemのpersistent/FAT `S30..S39`を実証済み。

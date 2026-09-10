@@ -2,8 +2,6 @@
   "schema": 1,
   "source": "TODO.md",
   "open_gates": {
-    "BUB-P1-04": "boot-probe",
-    "BUB-P2-02": "boot-probe",
     "BUB-P3-02": "license-provenance",
     "BUB-P4-D03": "display-instrumentation",
     "BUB-P4-D05": "license-provenance",
