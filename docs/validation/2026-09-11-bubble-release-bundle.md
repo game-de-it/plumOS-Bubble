@@ -38,9 +38,29 @@ image SHA-256. Every entry in the bundle `SHA256SUMS` passed independently.
 The image verifier repeated filesystem, System A/B, p2, app/component,
 credential, license/content, catalog and 114-core checks successfully.
 
-## Publication state
+## Publication result
 
-This is preparation only. No Git remote is configured and no GitHub release,
-tag or upload was created. `BUB-P7-08` remains open until the maintainer gives
-an explicit publication instruction, a destination repository is configured,
-and the uploaded assets are downloaded again and checksum-verified.
+The maintainer explicitly approved publication after the final README logo and
+device screenshots were added. The public repository, `main` branch, annotated
+tag and prerelease are available at:
+
+```text
+repository=https://github.com/game-de-it/plumOS-Bubble
+release=https://github.com/game-de-it/plumOS-Bubble/releases/tag/v0.1.0-rc1
+tag=v0.1.0-rc1
+tagged_source=990ff92aff5c2490c568cfeb072ccef225c117ba
+assets=7
+```
+
+All seven assets were downloaded through the public browser-download URLs with
+GitHub authentication variables removed. Every file was byte-identical to the
+local release bundle and the downloaded `SHA256SUMS` passed. The downloaded 7z
+also passed `7zz t`; streaming its raw image member reproduced:
+
+```text
+archive_sha256=3b03fb27896072042f9ceccb8367b6d6581ad6285b19418e403505fdbe184f67
+raw_image_sha256=be49fdc3f0ec9f5eeb750e0bc841ed19377bb6e89fdd2ea981ae4fdd6cff3c02
+anonymous_public_download=result-ok
+```
+
+`BUB-P7-08` is therefore complete.
