@@ -759,6 +759,11 @@
     release判定OKとした。未対応はUSB data/ADB、HDMI、Nintendo 3DS、Java MEで、利用者向け
     documentとrelease noteへ明示する。
 - [ ] `BUB-P7-08` 利用者の明示承認後だけreleaseを公開し、公開assetを再downloadしてchecksumを確認する。
+  - `v0.1.0-rc1`の公開前bundleを生成した。7zは459 MiB、SHA-256
+    `3b03fb27896072042f9ceccb8367b6d6581ad6285b19418e403505fdbe184f67`。
+    archive test、stream展開後raw image hash、bundle内`SHA256SUMS`、full image verifierは合格。
+    Git remoteは未設定で、tag/release/uploadは未実施。詳細は
+    `docs/validation/2026-09-11-bubble-release-bundle.md`。
 
 ## Next action
 
