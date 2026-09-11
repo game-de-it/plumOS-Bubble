@@ -741,6 +741,11 @@
     の単一RC imageを再生成・host検証済み。残りはこの再生成image自体のSD write/readback、
     cold boot 3回と最終rollback。詳細は
     `docs/validation/2026-09-11-bubble-release-final-device-check.md`。
+  - 2026-09-11、上記の再生成imageを実SDへ書き込み、cold boot 1/3に合格した。
+    初回provisioning、System A/B、p2 raw block hash、frontend 227件、global 12,477件、
+    Wi-Fi、SSH/FTP/SMB、SD2 ROM/BIOS bindを確認。p1にはmedia handling後にmacOSの
+    `.fseventsd` 3ファイルとFAT/FSInfo差分が追加されていたが、release image自体には
+    含まれない。残りはcold boot 2回と最終rollback。
 - [ ] `BUB-P7-07` release candidateを利用者が物理確認し、未解決項目を明示する。
 - [ ] `BUB-P7-08` 利用者の明示承認後だけreleaseを公開し、公開assetを再downloadしてchecksumを確認する。
 

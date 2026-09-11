@@ -95,3 +95,29 @@ emulator-catalog coverage.
 media, independent block readback, the requested three cold boots and the
 final rollback exercise. Publication remains gated by `BUB-P7-07` and
 `BUB-P7-08`.
+
+## Rebuilt-image physical boot 1 of 3
+
+The user wrote and cold-booted the rebuilt image. Boot ID
+`787b0063-6b52-4ce2-9146-c5e8a9990b66` reached the frontend and Wi-Fi at
+`192.168.10.101`. The command line carried the expected immutable p2 digest,
+and early init verified the same raw matching bundle before switching root:
+
+```text
+p2_host   =b6b53b9c04d1469b87b1ac0d282f02748c3e8386891c9f97ed1a04a652786ef7
+p2_device =b6b53b9c04d1469b87b1ac0d282f02748c3e8386891c9f97ed1a04a652786ef7
+```
+
+First-boot provisioning expanded p3 to 8 GiB, created p4 from the remaining
+space, verified System A/B and mounted p1 read-only. After provisioning,
+frontend 227/227 and global app-layer 12,477/12,477 checksums passed. SD2 and
+its ROM/BIOS binds were read-write, SSH/FTP/SMB listened on ports 22/21/445,
+and the current kernel log contained no FAT, ext4 or I/O error.
+
+The p1 raw digest no longer equals the pristine image digest after media
+handling. Inspection found three macOS `.fseventsd` files on the physical FAT
+volume and corresponding FAT/FSInfo allocation metadata changes. These files
+are absent from the release image and are not part of the boot payload. The
+immutable p2 block comparison, System A/B verification and complete managed
+app-layer readback remain clean. Two more cold boots and the final rollback
+exercise remain for `BUB-P7-06`.
