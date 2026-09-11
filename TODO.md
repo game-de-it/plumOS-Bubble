@@ -734,7 +734,7 @@
     196 profile、Wi-Fi初回接続fixture、vendor/content監査に合格。最新の単一RC imageはSHA-256
     `9c678b3a4aa6e400a92806bce5eeea300704abf48b32f81fdca22c5de3ea10de`、personalized=no。
     詳細は`docs/validation/2026-09-11-bubble-release-candidate-image.md`。
-- [ ] `BUB-P7-06` SD write/readback、cold boot 3回、warm reboot、rollback、全hardware acceptanceを完了する。
+- [x] `BUB-P7-06` SD write/readback、cold boot 3回、warm reboot、rollback、全hardware acceptanceを完了する。
   - source `0a3a3b6`の実機app-layerは、Saturn、warm reboot、Wi-Fi/FE/SD2復帰、
     SD2 clean FAT、frontend 227件、global 12,477件に合格した。これと同一payloadから
     SHA-256 `be49fdc3f0ec9f5eeb750e0bc841ed19377bb6e89fdd2ea981ae4fdd6cff3c02`
@@ -751,8 +751,13 @@
     mount/network/display ownership、kernel storage errorなしを確認した。
   - 同じ通常経路でcold boot 3/3にも合格。SD2のro化後unmount、次bootのrw復帰、
     System A/B・p2、Wi-Fi/SSH/FTP/SMB、単一FE、storage errorなしを再確認した。
-    残りは非破壊のknown-good媒体rollback/recoveryのみ。
-- [ ] `BUB-P7-07` release candidateを利用者が物理確認し、未解決項目を明示する。
+  - maintainerは正常系の実機結果をrelease判定OKとして承認した。追加の媒体差替えは
+    release gateに要求せず、既存のknown-good SD recovery、signed update rollback fixture、
+    実機での通常reboot/shutdown復帰をrollback evidenceとして採用する。
+- [x] `BUB-P7-07` release candidateを利用者が物理確認し、未解決項目を明示する。
+  - 2026-09-11、maintainerが最終RCのWi-Fi、Saturn、cold boot 3/3を含む正常系を確認し、
+    release判定OKとした。未対応はUSB data/ADB、HDMI、Nintendo 3DS、Java MEで、利用者向け
+    documentとrelease noteへ明示する。
 - [ ] `BUB-P7-08` 利用者の明示承認後だけreleaseを公開し、公開assetを再downloadしてchecksumを確認する。
 
 ## Next action

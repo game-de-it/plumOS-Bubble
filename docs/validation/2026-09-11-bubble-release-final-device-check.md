@@ -151,3 +151,17 @@ frontend process were healthy, with no FAT, ext4 or I/O error in the current
 kernel log. The rebuilt image has therefore passed all three requested cold
 boots. Only the final non-destructive known-good-media rollback/recovery
 exercise remains for `BUB-P7-06`.
+
+## Maintainer release decision
+
+The maintainer accepted the successful normal-path result as release-ready on
+2026-09-11. No additional destructive fault injection or physical media swap
+is required for this release. Existing known-good-card recovery evidence,
+signed-update rollback fixtures and normal reboot/shutdown recovery provide the
+rollback basis. `BUB-P7-06` and `BUB-P7-07` are complete; publication and
+public download verification remain separately gated by `BUB-P7-08`.
+
+The image's embedded `publishable=no` value was written before physical
+acceptance and remains unchanged so the physically tested byte sequence keeps
+its SHA-256 identity. Release packaging must promote that exact image through
+an external acceptance manifest rather than altering and rebuilding it.

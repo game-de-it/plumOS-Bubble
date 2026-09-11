@@ -119,13 +119,12 @@ Artifact generation and publication are separate. Do not create a GitHub release
 until the user has accepted the candidate and explicitly approved publication.
 After publishing, anonymously download the assets and verify the public hashes.
 
-## Current physical-validation limitation
+## Final RC physical acceptance
 
-As of 2026-09-11, the target device's top-edge SYS slot is broken. Earlier
-per-feature device evidence remains valid, but the most recently rebuilt image
-cannot receive a new-card write/readback, repeated cold boots or final physical
-acceptance on that unit. Disclose this in release notes; do not describe host
-verification as physical acceptance.
+The apparent top-edge SYS-slot failure was caused by a microSD card entering
+beside the slot. After recovery, the final RC image passed a fresh write, p2
+readback, first-boot provisioning, Saturn, Wi-Fi, managed checksums and three
+cold boots on hardware. The maintainer accepted the result for release.
 
-See [final candidate and SYS-slot limitation](../validation/2026-09-11-bubble-final-candidate-hardware-limit.md)
+See [the final device check](../validation/2026-09-11-bubble-release-final-device-check.md)
 and [release-candidate image verification](../validation/2026-09-11-bubble-release-candidate-image.md).

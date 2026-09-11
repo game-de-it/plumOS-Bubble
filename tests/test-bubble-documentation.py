@@ -58,8 +58,27 @@ def main() -> None:
     require("docs/user/emulators.md", "DraStic", "Function 2 (top edge) + `START`")
     require("docs/user/supported-systems.ja.md", "## 対応システム（88件）", "3DS")
     require("docs/user/supported-systems.md", "## Supported systems (88)", "Nintendo 3DS")
-    require("docs/developer/README.ja.md", "SYSスロットが故障", "物理確認済みと表現しない")
-    require("docs/developer/README.md", "SYS slot is broken", "physical acceptance")
+    require(
+        "docs/developer/README.ja.md",
+        "SDカードがスロット外へ入り込んでいた",
+        "cold boot 3回",
+        "release判定を承認",
+    )
+    require(
+        "docs/developer/README.md",
+        "microSD card entering",
+        "three",
+        "cold boots",
+        "accepted the result for release",
+    )
+    require(
+        "docs/releases/0.1.0-rc1.md",
+        "plumOS Bubble v0.1.0-rc1",
+        "Known limitations",
+        "既知の制限",
+        "top-edge SYS slot",
+        "本体上部のSYSスロット",
+    )
     assert "hot plugは対応外" in ja
     assert "Hot-plugging SD2" in en
     curated = [

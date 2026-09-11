@@ -112,13 +112,12 @@ artifact生成と公開は別操作です。release candidateを利用者が確�
 承認するまでGitHub releaseを作成しません。公開後は匿名経路でassetを再取得し、公開
 checksumと一致することを確認します。
 
-## 現在の物理確認上の制約
+## 最終RCの物理確認
 
-2026-09-11時点で対象実機の本体上部SYSスロットが故障しています。これ以前に得た各機能
-の実機evidenceは有効ですが、最後に再buildしたimageそのものの新規write/readback、cold
-boot反復、最終acceptanceは実施できません。この制約をrelease noteで明示し、host検査を
-物理確認済みと表現しないでください。
+本体上部SYSスロットの故障と思われた事象は、SDカードがスロット外へ入り込んでいたことが
+原因でした。回収後、最終RC imageの新規write、p2 readback、初回provisioning、Saturn、
+Wi-Fi、checksum、cold boot 3回を実機確認し、maintainerがrelease判定を承認しています。
 
-詳細は[最終候補とSYSスロット制約](../validation/2026-09-11-bubble-final-candidate-hardware-limit.md)
-および[release candidate image検証](../validation/2026-09-11-bubble-release-candidate-image.md)
-を参照してください。
+詳細は[最終実機検証](../validation/2026-09-11-bubble-release-final-device-check.md)および
+[release candidate image検証](../validation/2026-09-11-bubble-release-candidate-image.md)を
+参照してください。

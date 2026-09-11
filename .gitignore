@@ -1,6 +1,7 @@
 # Local captures from stock media and hardware probes
 artifacts/
 output/
+dist/
 work/
 .cache/
 build/

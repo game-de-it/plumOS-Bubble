@@ -35,3 +35,12 @@ gate remains unavailable on this device.
 - Release notes must state that the final aggregate candidate was mechanically
   verified but could not be booted after the SYS-slot failure.
 - Do not publish as part of documentation preparation.
+
+## Resolution
+
+The SYS slot was not broken. The microSD card had entered beside the slot
+rather than into it. The maintainer recovered the card path, wrote and booted
+the final RC image, connected Wi-Fi, launched Saturn successfully and completed
+three clean power-menu shutdown/cold-boot cycles. The final physical evidence
+is recorded in `2026-09-11-bubble-release-final-device-check.md`; the limitation
+and disclosure above are superseded and must not appear in release notes.
