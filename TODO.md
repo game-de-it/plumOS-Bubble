@@ -728,6 +728,12 @@
     host-candidate validation image自体は意図的にpublishable=noのままとし、物理SD acceptanceは
     P7-06、利用者確認はP7-07、明示承認後の公開はP7-08で追跡する。詳細は
     `docs/validation/2026-09-10-bubble-release-clean-build.md`。
+  - 2026-09-11、B3 shaderと最新修正を含むsource `a96eb3b`から同じ隔離cloneで全componentを
+    改めて完全buildした。macOS Bash 3.2で空配列がnounset扱いになるstandalone wrapperの
+    clean-build不具合も修正・回帰試験した。独立image verifier、全114 core load、97 system/
+    196 profile、Wi-Fi初回接続fixture、vendor/content監査に合格。最新の単一RC imageはSHA-256
+    `9c678b3a4aa6e400a92806bce5eeea300704abf48b32f81fdca22c5de3ea10de`、personalized=no。
+    詳細は`docs/validation/2026-09-11-bubble-release-candidate-image.md`。
 - [ ] `BUB-P7-06` SD write/readback、cold boot 3回、warm reboot、rollback、全hardware acceptanceを完了する。
 - [ ] `BUB-P7-07` release candidateを利用者が物理確認し、未解決項目を明示する。
 - [ ] `BUB-P7-08` 利用者の明示承認後だけreleaseを公開し、公開assetを再downloadしてchecksumを確認する。
