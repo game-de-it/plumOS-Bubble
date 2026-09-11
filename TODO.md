@@ -760,7 +760,7 @@
     documentとrelease noteへ明示する。
 - [x] `BUB-P7-08` 利用者の明示承認後だけreleaseを公開し、公開assetを再downloadしてchecksumを確認する。
   - maintainerの明示指示後、public repository `game-de-it/plumOS-Bubble`、`main`、
-    tag `v0.1.0-rc1`とGitHub prereleaseを公開した。7 assetsを認証情報なしで再downloadし、
+    tag `v0.1.0-rc1`とGitHub通常リリース（Latest）を公開した。7 assetsを認証情報なしで再downloadし、
     local bundleとのbyte一致、`SHA256SUMS`、7z test、stream展開したraw image SHA-256
     `be49fdc3f0ec9f5eeb750e0bc841ed19377bb6e89fdd2ea981ae4fdd6cff3c02`に合格した。
     詳細は`docs/validation/2026-09-11-bubble-release-bundle.md`。

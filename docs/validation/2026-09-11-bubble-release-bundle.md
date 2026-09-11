@@ -42,7 +42,7 @@ credential, license/content, catalog and 114-core checks successfully.
 
 The maintainer explicitly approved publication after the final README logo and
 device screenshots were added. The public repository, `main` branch, annotated
-tag and prerelease are available at:
+tag and normal GitHub release marked Latest are available at:
 
 ```text
 repository=https://github.com/game-de-it/plumOS-Bubble

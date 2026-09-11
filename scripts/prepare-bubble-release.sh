@@ -70,7 +70,7 @@ release_source_ref=$(git -C "$repo_root" rev-parse HEAD)
 {
     printf '%s\n' 'format=plumos-bubble-release-bundle-v1'
     printf 'version=%s\n' "$version"
-    printf 'prerelease=yes\n'
+    printf 'prerelease=no\n'
     printf 'release_source_ref=%s\n' "$release_source_ref"
     printf 'image_source_ref=0a3a3b6\n'
     printf 'image_file=%s\n' "$raw_name"
