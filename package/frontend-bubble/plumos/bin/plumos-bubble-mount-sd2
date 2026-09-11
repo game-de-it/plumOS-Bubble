@@ -330,6 +330,21 @@ stop_sd2() {
     fi
     if is_mounted "$SD2_MOUNT"; then
         $BB sync 2>/dev/null || true
+        # The Bubble vendor kernel leaves FAT's dirty bit set after a direct
+        # rw unmount.  A rw -> ro transition commits the FAT clean state first;
+        # without it every following boot reports a false unclean removal and
+        # the Apps repair action finds the same dirty bit again.
+        if [ "$(mount_access "$SD2_MOUNT")" = rw ]; then
+            if $BB mount -o remount,ro "$SD2_MOUNT"; then
+                printf 'sd2_mount=result-remounted-before-unmount target=%s access=ro\n' \
+                    "$SD2_MOUNT" | $BB tee -a "$LOG"
+            else
+                printf 'sd2_mount=result-remount-before-unmount-failed target=%s\n' \
+                    "$SD2_MOUNT" | $BB tee -a "$LOG" >&2
+                return 1
+            fi
+        fi
+        $BB sync 2>/dev/null || true
         if $BB umount "$SD2_MOUNT"; then
             printf 'sd2_mount=result-unmounted target=%s fallback=sd1\n' "$SD2_MOUNT" |
                 $BB tee -a "$LOG"

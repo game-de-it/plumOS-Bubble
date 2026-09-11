@@ -114,6 +114,10 @@ grep -q '^sd2_access=rw$' "$tmp/status.log"
 
 run_helper stop >"$tmp/stop.log"
 grep -q 'sd2_content=result-stopped fallback=sd1' "$tmp/stop.log"
+grep -q 'sd2_mount=result-remounted-before-unmount.*access=ro' "$tmp/stop.log"
+remount_line=$(grep -n "remount $sd2 ro" "$tmp/calls" | tail -n 1 | cut -d: -f1)
+unmount_line=$(grep -n "unmount $sd2" "$tmp/calls" | tail -n 1 | cut -d: -f1)
+test "$remount_line" -lt "$unmount_line"
 ! grep -Fq "$fake_device $user/Roms " "$tmp/mounts"
 ! grep -Fq "$fake_device $user/BIOS " "$tmp/mounts"
 ! grep -Fq "$fake_device $sd2 " "$tmp/mounts"
