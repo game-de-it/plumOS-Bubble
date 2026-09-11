@@ -32,9 +32,9 @@ for builder in \
 done
 
 grep -Fq 'PREFIX="$SDL12_ROOT/install-bubble/"' "$pcsx_script"
-grep -Fq -- '-DCMAKE_C_COMPILER=gcc' "$yabasanshiro_script"
-grep -Fq -- '-DCMAKE_CXX_COMPILER=g++' "$yabasanshiro_script"
-! grep -Fq -- '-DCMAKE_C_COMPILER=clang' "$yabasanshiro_script"
+grep -Fq -- '-DCMAKE_C_COMPILER=clang' "$yabasanshiro_script"
+grep -Fq -- '-DCMAKE_CXX_COMPILER=clang++' "$yabasanshiro_script"
+! grep -Fq -- '-DCMAKE_C_COMPILER=gcc' "$yabasanshiro_script"
 grep -Fq 'COMMON_SHA256="$(sha256sum "$SOURCE_LIB_ROOT/libcommon.so"' "$drastic_script"
 grep -Fq 'DETOUR_SHA256="$(sha256sum "$SOURCE_LIB_ROOT/libdtr.so"' "$drastic_script"
 grep -Fq 'SDL2_SHA256="$(sha256sum "$SOURCE_LIB_ROOT/libSDL2-2.0.so.0"' "$drastic_script"

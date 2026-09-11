@@ -79,8 +79,8 @@ ln -s /usr/include/png.h "$BUILD_DIR/compat/libpng12/png.h"
 
 cmake -S "$SOURCE_ROOT/yabause" -B "$BUILD_DIR" -G 'Unix Makefiles' \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_COMPILER=gcc \
-    -DCMAKE_CXX_COMPILER=g++ \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_C_FLAGS="-I$BUILD_DIR/compat -I/usr/include/SDL2 -D__RETORO_ARENA__ -Wno-error" \
     -DCMAKE_CXX_FLAGS="-I$BUILD_DIR/compat -I/usr/include/SDL2 -D__RETORO_ARENA__ -Wno-error" \
     -DYAB_PORTS=retro_arena \
