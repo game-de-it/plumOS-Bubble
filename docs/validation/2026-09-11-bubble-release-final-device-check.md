@@ -121,3 +121,17 @@ are absent from the release image and are not part of the boot payload. The
 immutable p2 block comparison, System A/B verification and complete managed
 app-layer readback remain clean. Two more cold boots and the final rollback
 exercise remain for `BUB-P7-06`.
+
+## Rebuilt-image physical boot 2 of 3
+
+The device was shut down through the normal power path and powered on again.
+Boot ID changed to `5dc65b43-e3de-4dfb-b014-662473fdd9f1`. Early init reported
+`previous_shutdown=clean`, recognized the completed p3/p4 layout without
+running a repair, reverified the immutable p2 digest and both System slots,
+then switched root normally.
+
+After boot, p1 was read-only; p3, p4, SD2 and the SD2 ROM/BIOS binds were in
+their expected read-write state. Wi-Fi obtained `192.168.10.101`, SSH/FTP/SMB
+listened on ports 22/21/445, exactly one frontend owned the display and no
+emulator remained. The current kernel log contained no FAT, ext4 or I/O error.
+One more cold boot and the final rollback exercise remain for `BUB-P7-06`.

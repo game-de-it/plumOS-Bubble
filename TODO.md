@@ -745,7 +745,11 @@
     初回provisioning、System A/B、p2 raw block hash、frontend 227件、global 12,477件、
     Wi-Fi、SSH/FTP/SMB、SD2 ROM/BIOS bindを確認。p1にはmedia handling後にmacOSの
     `.fseventsd` 3ファイルとFAT/FSInfo差分が追加されていたが、release image自体には
-    含まれない。残りはcold boot 2回と最終rollback。
+    含まれない。
+  - 続く電源メニュー経由のshutdownとcold boot 2/3にも合格。boot ID更新、
+    `previous_shutdown=clean`、completed-no-repair、System A/B・p2再検証、
+    mount/network/display ownership、kernel storage errorなしを確認した。
+    残りはcold boot 1回と最終rollback。
 - [ ] `BUB-P7-07` release candidateを利用者が物理確認し、未解決項目を明示する。
 - [ ] `BUB-P7-08` 利用者の明示承認後だけreleaseを公開し、公開assetを再downloadしてchecksumを確認する。
 
