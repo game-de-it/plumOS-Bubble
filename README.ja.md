@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="package/frontend-bubble/plumos/config/frontend/boot-splash.png" alt="plumOS" width="640">
+</p>
+
 # plumOS Bubble
 
 plumOS Bubbleは、GKD Bubble（RK3566 / ARM64）向けのLinuxベースCFWです。
