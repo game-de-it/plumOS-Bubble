@@ -13,6 +13,10 @@ grep -Fq 'source_epoch="${SOURCE_DATE_EPOCH:-$(' "$script"
 grep -Fq -- '-e SOURCE_DATE_EPOCH="$source_epoch"' "$script"
 grep -Fq -- '-v "$ROOT_DIR:/work" -w /work "$TOOLS_IMAGE"' "$script"
 grep -Fq -- '-e PLUMOS_BUBBLE_INCLUDE_CAPTURED_VENDOR_GPU=' "$script"
+grep -Fq 'inside_args=(--inside)' "$script"
+grep -Fq 'inside_args+=(--assemble-only)' "$script"
+grep -Fq './scripts/build-standalone-bubble.sh "${inside_args[@]}"' "$script"
+! grep -Fq 'mode=()' "$script"
 grep -Fq -- '--assemble-only) ;;' "$script"
 
 assembly_line=$(grep -nF 'OUT_ROOT="$ROOT_DIR/${PLUMOS_BUBBLE_STANDALONE_OUT:-output/standalone/bubble}"' "$script" | cut -d: -f1)

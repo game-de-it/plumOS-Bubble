@@ -5,9 +5,11 @@ ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 TOOLS_IMAGE="${PLUMOS_BUBBLE_STANDALONE_TOOLS_IMAGE:-${PLUMOS_BUBBLE_DOCKER_IMAGE:-plumos-bubble-core-tools:dev}}"
 
 if [[ ${1:-} != --inside ]]; then
-    mode=()
+    # Keep this array non-empty. macOS still ships Bash 3.2, where expanding an
+    # empty array under `set -u` raises "unbound variable".
+    inside_args=(--inside)
     if [[ ${1:-} == --assemble-only ]]; then
-        mode=(--assemble-only)
+        inside_args+=(--assemble-only)
     elif [[ -n ${1:-} ]]; then
         printf 'error: unknown standalone build option: %s\n' "$1" >&2
         exit 2
@@ -19,7 +21,7 @@ if [[ ${1:-} != --inside ]]; then
         -e SOURCE_DATE_EPOCH="$source_epoch" \
         -e PLUMOS_BUBBLE_INCLUDE_CAPTURED_VENDOR_GPU="${PLUMOS_BUBBLE_INCLUDE_CAPTURED_VENDOR_GPU:-0}" \
         -v "$ROOT_DIR:/work" -w /work "$TOOLS_IMAGE" \
-        ./scripts/build-standalone-bubble.sh --inside "${mode[@]}"
+        ./scripts/build-standalone-bubble.sh "${inside_args[@]}"
 fi
 
 # The standalone package is a composition of five independently pinned
