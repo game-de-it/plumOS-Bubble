@@ -10,6 +10,9 @@ LOG=${PLUMOS_POWER_ACTION_LOG:-$PLUMOS_ROOT/logs/power-action.log}
 MOUNTS_FILE=${PLUMOS_MOUNTS_FILE:-/proc/mounts}
 USER_MOUNT=${PLUMOS_USER_MOUNT:-/storage/user}
 CLEAN_MARKER=${PLUMOS_CLEAN_P3_MARKER:-$PLUMOS_ROOT/provision/clean-shutdown}
+USER_MARKER=${PLUMOS_CLEAN_P4_MARKER:-$USER_MOUNT/.plumos-clean-shutdown}
+USER_SOURCE_FILE=${PLUMOS_USER_SOURCE_FILE:-$RUNTIME_ROOT/power-action/user-source}
+RUNTIME_QUIESCE=${PLUMOS_RUNTIME_QUIESCE:-$PLUMOS_ROOT/bin/plumos-runtime-quiesce}
 WAIT_SECONDS=${PLUMOS_POWER_FINALIZE_WAIT_SECONDS:-8}
 POWER_BACKEND=${PLUMOS_POWER_BACKEND:-}
 expected=${1:-}
@@ -50,13 +53,35 @@ if $BB grep -qs " $USER_MOUNT " "$MOUNTS_FILE" 2>/dev/null; then
     log 'stage=E92_USER_STORAGE_STILL_MOUNTED clean-shutdown-proof=invalid'
     $BB rm -f "$CLEAN_MARKER" 2>/dev/null || true
 fi
-if $BB mount -o remount,ro /storage 2>/dev/null; then
+writer_quiesce_ok=1
+# A directly requested SSH/recovery action can take longer than the fallback
+# delay to make the frontend exit.  PID 1 repeats this check in its preferred
+# path; mirror it here so an FE log descriptor cannot make remount fail merely
+# because the fallback won the claim first.
+if [ -x "$RUNTIME_QUIESCE" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+        PLUMOS_BUSYBOX="$BB" "$BB" sh "$RUNTIME_QUIESCE" \
+        terminate-storage /storage >>"$LOG" 2>&1 || {
+            log 'stage=E93_STORAGE_WRITER_QUIESCE_FAILED clean-shutdown-proof=invalid'
+            writer_quiesce_ok=0
+        }
+fi
+if [ "$writer_quiesce_ok" -eq 1 ] &&
+    $BB mount -o remount,ro /storage 2>/dev/null; then
     log "stage=S93_STORAGE_READ_ONLY action=$expected"
 else
     log 'stage=E93_STORAGE_READ_ONLY_FAILED clean-shutdown-proof=invalid'
     $BB rm -f "$CLEAN_MARKER" 2>/dev/null || true
+    $BB sync
+    user_source=$($BB sed -n '1p' "$USER_SOURCE_FILE" 2>/dev/null || true)
+    case $user_source in /dev/*) ;; *) user_source=/dev/mmcblk1p4 ;; esac
+    if ! $BB grep -qs " $USER_MOUNT " "$MOUNTS_FILE" 2>/dev/null; then
+        $BB mount -t vfat -o rw,noatime "$user_source" "$USER_MOUNT" \
+            2>/dev/null || true
+    fi
+    $BB rm -f "$USER_MARKER" 2>/dev/null || true
     $BB rmdir "$CLAIM" 2>/dev/null || true
-    log "stage=E94_POWER_ACTION_REFUSED action=$expected"
+    log "stage=E94_POWER_ACTION_REFUSED action=$expected user-storage=recovered"
     exit 1
 fi
 $BB mount -o remount,ro /flash 2>/dev/null || true
