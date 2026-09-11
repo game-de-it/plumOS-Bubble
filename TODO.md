@@ -735,6 +735,12 @@
     `9c678b3a4aa6e400a92806bce5eeea300704abf48b32f81fdca22c5de3ea10de`、personalized=no。
     詳細は`docs/validation/2026-09-11-bubble-release-candidate-image.md`。
 - [ ] `BUB-P7-06` SD write/readback、cold boot 3回、warm reboot、rollback、全hardware acceptanceを完了する。
+  - source `0a3a3b6`の実機app-layerは、Saturn、warm reboot、Wi-Fi/FE/SD2復帰、
+    SD2 clean FAT、frontend 227件、global 12,477件に合格した。これと同一payloadから
+    SHA-256 `be49fdc3f0ec9f5eeb750e0bc841ed19377bb6e89fdd2ea981ae4fdd6cff3c02`
+    の単一RC imageを再生成・host検証済み。残りはこの再生成image自体のSD write/readback、
+    cold boot 3回と最終rollback。詳細は
+    `docs/validation/2026-09-11-bubble-release-final-device-check.md`。
 - [ ] `BUB-P7-07` release candidateを利用者が物理確認し、未解決項目を明示する。
 - [ ] `BUB-P7-08` 利用者の明示承認後だけreleaseを公開し、公開assetを再downloadしてchecksumを確認する。
 
