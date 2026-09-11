@@ -8,6 +8,16 @@ plumOS Bubbleは、GKD Bubble（RK3566 / ARM64）向けのLinuxベースCFWで�
 ゲーム一覧、RetroArch、PicoArch、Standaloneエミュレータ、Game Gear専用FE、
 PortMaster、Pyxel、ネットワーク転送などを1つの操作体系にまとめています。
 
+## 画面
+
+| テキストモード | グラフィックモード |
+| :---: | :---: |
+| ![テキストモードのゲーム一覧](docs/images/frontend-text.png) | ![グラフィックモードのゲーム一覧](docs/images/frontend-graphics.png) |
+
+| ギャラリーモード | Game Gear専用フロントエンド（GGFE） |
+| :---: | :---: |
+| ![ギャラリーモードのボックスアート表示](docs/images/frontend-gallery.png) | ![GGFEのカートリッジ表示](docs/images/ggfe.png) |
+
 ## ドキュメント
 
 利用者向けと開発者向けを分離し、日本語版と英語版を用意しています。

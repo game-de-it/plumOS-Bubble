@@ -9,6 +9,16 @@ plumOS Bubble is a Linux-based custom firmware for the GKD Bubble
 emulators, the dedicated Game Gear frontend, PortMaster, Pyxel, and network
 transfer tools into one consistent interface.
 
+## Screenshots
+
+| Text mode | Graphics mode |
+| :---: | :---: |
+| ![Game list in text mode](docs/images/frontend-text.png) | ![Game list in graphics mode](docs/images/frontend-graphics.png) |
+
+| Gallery mode | Game Gear Frontend (GGFE) |
+| :---: | :---: |
+| ![Box artwork in gallery mode](docs/images/frontend-gallery.png) | ![Cartridge carousel in GGFE](docs/images/ggfe.png) |
+
 ## Documentation
 
 User documentation and developer documentation are kept separate, with both
