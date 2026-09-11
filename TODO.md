@@ -749,7 +749,9 @@
   - 続く電源メニュー経由のshutdownとcold boot 2/3にも合格。boot ID更新、
     `previous_shutdown=clean`、completed-no-repair、System A/B・p2再検証、
     mount/network/display ownership、kernel storage errorなしを確認した。
-    残りはcold boot 1回と最終rollback。
+  - 同じ通常経路でcold boot 3/3にも合格。SD2のro化後unmount、次bootのrw復帰、
+    System A/B・p2、Wi-Fi/SSH/FTP/SMB、単一FE、storage errorなしを再確認した。
+    残りは非破壊のknown-good媒体rollback/recoveryのみ。
 - [ ] `BUB-P7-07` release candidateを利用者が物理確認し、未解決項目を明示する。
 - [ ] `BUB-P7-08` 利用者の明示承認後だけreleaseを公開し、公開assetを再downloadしてchecksumを確認する。
 

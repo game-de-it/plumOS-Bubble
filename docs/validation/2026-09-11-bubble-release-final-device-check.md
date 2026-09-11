@@ -135,3 +135,19 @@ their expected read-write state. Wi-Fi obtained `192.168.10.101`, SSH/FTP/SMB
 listened on ports 22/21/445, exactly one frontend owned the display and no
 emulator remained. The current kernel log contained no FAT, ext4 or I/O error.
 One more cold boot and the final rollback exercise remain for `BUB-P7-06`.
+
+## Rebuilt-image physical boot 3 of 3
+
+The device was shut down through the normal power menu, its LED went dark and
+it was powered on again. Boot ID changed to
+`5b1bb37b-5ce0-446a-807d-e2e6f97dc3d3`. Early init again reported
+`previous_shutdown=clean`, completed without repair, reverified the immutable
+p2 digest and System A/B, and switched root normally.
+
+After boot, p1 was read-only; p3, p4, SD2 and the SD2 ROM/BIOS binds were in
+their expected state. SD2 had been remounted read-only before the preceding
+unmount and mounted read-write on this boot. Wi-Fi, SSH/FTP/SMB and the single
+frontend process were healthy, with no FAT, ext4 or I/O error in the current
+kernel log. The rebuilt image has therefore passed all three requested cold
+boots. Only the final non-destructive known-good-media rollback/recovery
+exercise remains for `BUB-P7-06`.
