@@ -41,6 +41,13 @@ exit 0
 EOF
 chmod 0755 "$tmp/root/bin/fake-quiesce"
 
+cat >"$tmp/root/bin/fake-sd2-manager" <<'EOF'
+#!/bin/sh
+printf 'sd2 %s\n' "$*" >>"$PLUMOS_TEST_CALLS"
+exit 0
+EOF
+chmod 0755 "$tmp/root/bin/fake-sd2-manager"
+
 run_finalizer() {
     result=$1
     : >"$tmp/calls-$result"
@@ -57,6 +64,7 @@ run_finalizer() {
     PLUMOS_USER_MOUNT="$tmp/user" \
     PLUMOS_USER_SOURCE_FILE="$tmp/run/power-action/user-source" \
     PLUMOS_RUNTIME_QUIESCE="$tmp/root/bin/fake-quiesce" \
+    PLUMOS_SD2_MANAGER="$tmp/root/bin/fake-sd2-manager" \
     PLUMOS_POWER_FINALIZE_WAIT_SECONDS=0 \
     PLUMOS_TEST_CALLS="$tmp/calls-$result" \
     PLUMOS_TEST_REMOUNT_RESULT="$result" \
@@ -66,9 +74,11 @@ run_finalizer() {
 : >"$tmp/mounts"
 run_finalizer ok
 grep -qx 'quiesce terminate-storage /storage' "$tmp/calls-ok"
+grep -qx 'sd2 stop' "$tmp/calls-ok"
 grep -qx 'mount -o remount,ro /storage' "$tmp/calls-ok"
 grep -qx 'reboot -f' "$tmp/calls-ok"
 test "$(sed -n '1p' "$tmp/calls-ok")" = 'quiesce terminate-storage /storage'
+test "$(sed -n '2p' "$tmp/calls-ok")" = 'sd2 stop'
 
 if run_finalizer failed; then
     echo 'failed remount unexpectedly succeeded' >&2

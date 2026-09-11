@@ -13,6 +13,7 @@ CLEAN_MARKER=${PLUMOS_CLEAN_P3_MARKER:-$PLUMOS_ROOT/provision/clean-shutdown}
 USER_MARKER=${PLUMOS_CLEAN_P4_MARKER:-$USER_MOUNT/.plumos-clean-shutdown}
 USER_SOURCE_FILE=${PLUMOS_USER_SOURCE_FILE:-$RUNTIME_ROOT/power-action/user-source}
 RUNTIME_QUIESCE=${PLUMOS_RUNTIME_QUIESCE:-$PLUMOS_ROOT/bin/plumos-runtime-quiesce}
+SD2_MANAGER=${PLUMOS_SD2_MANAGER:-$PLUMOS_ROOT/bin/plumos-bubble-mount-sd2}
 WAIT_SECONDS=${PLUMOS_POWER_FINALIZE_WAIT_SECONDS:-8}
 POWER_BACKEND=${PLUMOS_POWER_BACKEND:-}
 expected=${1:-}
@@ -63,6 +64,17 @@ if [ -x "$RUNTIME_QUIESCE" ]; then
         PLUMOS_BUSYBOX="$BB" "$BB" sh "$RUNTIME_QUIESCE" \
         terminate-storage /storage >>"$LOG" 2>&1 || {
             log 'stage=E93_STORAGE_WRITER_QUIESCE_FAILED clean-shutdown-proof=invalid'
+            writer_quiesce_ok=0
+        }
+fi
+# PID 1 may restart the frontend while this delayed fallback is waiting.  The
+# frontend startup wrapper mounts SD2, so stop it again after terminating late
+# storage users and before proving that every persistent filesystem is clean.
+if [ "$writer_quiesce_ok" -eq 1 ] && [ -x "$SD2_MANAGER" ]; then
+    PLUMOS_ROOT="$PLUMOS_ROOT" PLUMOS_RUNTIME_ROOT="$RUNTIME_ROOT" \
+        PLUMOS_BUSYBOX="$BB" "$BB" sh "$SD2_MANAGER" stop \
+        >>"$LOG" 2>&1 || {
+            log 'stage=E93_SD2_STOP_FAILED clean-shutdown-proof=invalid'
             writer_quiesce_ok=0
         }
 fi
